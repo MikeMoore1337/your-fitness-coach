@@ -37,6 +37,11 @@ from fitminiapp_api.schemas.nutrition_import_engine import (
     ImportPreview,
     ImportReceipt,
     ImportResolveRequest,
+    RecurringImportMeals,
+    RecurringMealConfirmRequest,
+    RecurringMealReceipt,
+    RecurringMealReview,
+    RecurringMealReviewRequest,
 )
 from fitminiapp_api.services.nutrition_catalog_import import (
     catalog_import_preview,
@@ -57,12 +62,18 @@ from fitminiapp_api.services.nutrition_import_limits import (
     acquire_parser_slot,
     reserve_upload_attempt,
 )
+from fitminiapp_api.services.nutrition_import_meals import (
+    confirm_recurring_meal,
+    recurring_import_meals,
+    review_recurring_meal,
+)
 from fitminiapp_api.services.nutrition_import_runner import ADAPTERS, run_nutrition_import_adapter
 from fitminiapp_api.services.nutrition_import_validation import (
     MAX_PDF_UPLOAD_BYTES,
     MAX_UPLOAD_BYTES,
     NutritionImportValidationError,
 )
+from fitminiapp_api.services.nutrition_power import NutritionPowerError
 from fitminiapp_api.services.root_admin import has_verified_root_identity
 
 router = APIRouter()
@@ -93,6 +104,9 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         "draft_changed": "Черновик изменился. Загрузите файл снова",
         "stale_revision": "Черновик изменился. Обновите предпросмотр",
         "preview_changed": "Данные изменились. Проверьте предпросмотр снова",
+        "catalog_confirmation_required": "Сначала подтвердите импорт продуктов",
+        "meal_unavailable": "Предложение больше недоступно. Обновите список",
+        "invalid_meal_item": "Проверьте продукт, количество и единицу измерения",
         "unresolved_rows": "Исправьте или исключите проблемные строки",
         "duplicate_import": "Эти строки уже были импортированы",
         "adapter_unavailable": "Этот источник импорта пока не поддерживается",
@@ -297,6 +311,74 @@ def catalog_confirm_alias(
             detail={"code": "alias_conflict", "message": "Обновите предпросмотр импорта"},
             headers={"Cache-Control": "no-store, private"},
         ) from None
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.get("/{draft_id}/recurring-meals", response_model=RecurringImportMeals)
+@limiter.limit("30/minute")
+def preview_recurring_meals(
+    draft_id: str,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    del request
+    try:
+        response.headers["Cache-Control"] = "no-store, private"
+        return RecurringImportMeals.model_validate(
+            recurring_import_meals(db, current_user, draft_id)
+        )
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.post("/{draft_id}/recurring-meals/review", response_model=RecurringMealReview)
+@limiter.limit("30/minute")
+def review_recurring_meals(
+    draft_id: str,
+    payload: RecurringMealReviewRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    del request
+    response.headers["Cache-Control"] = "no-store, private"
+    try:
+        return review_recurring_meal(db, current_user, draft_id, payload)
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.post("/{draft_id}/recurring-meals/confirm", response_model=RecurringMealReceipt)
+@limiter.limit("30/minute")
+def confirm_recurring_meals(
+    draft_id: str,
+    payload: RecurringMealConfirmRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    del request
+    response.headers["Cache-Control"] = "no-store, private"
+    try:
+        return confirm_recurring_meal(db, current_user, draft_id, payload)
+    except NutritionDraftError as exc:
+        db.rollback()
+        raise _error(exc) from exc
+    except NutritionPowerError:
+        db.rollback()
+        raise _error(NutritionDraftError("invalid_meal_item", 422)) from None
     except SQLAlchemyError, ValidationError:
         db.rollback()
         raise _storage_error() from None

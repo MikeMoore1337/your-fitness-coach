@@ -228,7 +228,7 @@ def serialize_meal_template(
     available_items = [item for item in items if item.available and item.nutrition is not None]
     total_weight = (
         sum((cast(Decimal, item.weight_g) for item in available_items), start=ZERO)
-        if len(available_items) == len(items)
+        if len(available_items) == len(items) and all(item.weight_g is not None for item in items)
         else None
     )
     return NutritionMealTemplateResponse(
@@ -304,14 +304,54 @@ def _build_template_item(
     )
 
 
+def find_identical_meal_template(
+    db: Session,
+    user: User,
+    items: list[NutritionMealTemplateItemInput],
+    *,
+    exclude_id: int | None = None,
+) -> NutritionMealTemplate | None:
+    wanted = sorted(
+        (
+            "food" if item.food_id is not None else "recipe",
+            item.food_id or item.recipe_id,
+            item.amount,
+            item.amount_unit,
+        )
+        for item in items
+    )
+    templates = (
+        db.query(NutritionMealTemplate)
+        .filter(NutritionMealTemplate.owner_user_id == user.id)
+        .options(selectinload(NutritionMealTemplate.items))
+        .order_by(NutritionMealTemplate.id)
+        .all()
+    )
+    for template in templates:
+        if template.id == exclude_id:
+            continue
+        if any(item.food_id is None and item.recipe_id is None for item in template.items):
+            continue
+        current = sorted(
+            (item.item_kind, item.food_id or item.recipe_id, item.amount, item.amount_unit)
+            for item in template.items
+        )
+        if current == wanted:
+            return template
+    return None
+
+
 def create_meal_template(
     db: Session,
     user: User,
     payload: NutritionMealTemplateCreate,
 ) -> NutritionMealTemplateResponse:
-    template = NutritionMealTemplate(owner_user_id=user.id, name=payload.name)
-    db.add(template)
     try:
+        db.query(User.id).filter(User.id == user.id).with_for_update().one()
+        if find_identical_meal_template(db, user, payload.items) is not None:
+            raise NutritionPowerConflictError("Шаблон с таким составом и порциями уже существует")
+        template = NutritionMealTemplate(owner_user_id=user.id, name=payload.name)
+        db.add(template)
         db.flush()
         template.items.extend(
             _build_template_item(db, user, template, position, item)
@@ -365,11 +405,24 @@ def update_meal_template(
     template_id: int,
     payload: NutritionMealTemplateUpdate,
 ) -> NutritionMealTemplateResponse:
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
     template = _template_or_404(db, user, template_id)
     if "name" in payload.model_fields_set:
         template.name = cast(str, payload.name)
     try:
         if "items" in payload.model_fields_set:
+            if (
+                find_identical_meal_template(
+                    db,
+                    user,
+                    cast(list[NutritionMealTemplateItemInput], payload.items),
+                    exclude_id=template_id,
+                )
+                is not None
+            ):
+                raise NutritionPowerConflictError(
+                    "Шаблон с таким составом и порциями уже существует"
+                )
             template.items.clear()
             db.flush()
             template.items.extend(
@@ -390,6 +443,7 @@ def update_meal_template(
 
 
 def delete_meal_template(db: Session, user: User, template_id: int) -> None:
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
     template = _template_or_404(db, user, template_id)
     db.delete(template)
     db.commit()
