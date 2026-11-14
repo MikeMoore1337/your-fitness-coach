@@ -471,115 +471,199 @@ for (const importTheme of ['light', 'dark'] as const) {
 
 for (const realTheme of ['light', 'dark'] as const) {
   for (const sourceFormat of ['CSV', 'PDF'] as const) {
-    test(`Issue 885 real synthetic ${sourceFormat} import ${realTheme}`, async ({
-      page,
-    }, testInfo) => {
-      test.skip(!process.env.PW_REAL_IMPORT_BASE, 'requires isolated local import backend');
-      test.setTimeout(120_000);
-      const base = process.env.PW_REAL_IMPORT_BASE!;
-      const ownerId =
-        (realTheme === 'light' ? 98885101 : 98885102) +
-        (testInfo.project.name === 'webkit' ? 10 : 0) +
-        (sourceFormat === 'PDF' ? 20 : 0);
-      const productName = `Синтетический продукт UI 885 ${sourceFormat} ${realTheme} ${testInfo.project.name} ${Date.now()}`;
-      const auth = await page.request.post(`${base}/api/v1/auth/dev-login`, {
-        data: { telegram_user_id: ownerId },
-      });
-      expect(auth.ok()).toBeTruthy();
-      const token = (await auth.json()).access_token as string;
-      await page.setViewportSize({ width: 393, height: 844 });
-      await page.emulateMedia({ colorScheme: realTheme, reducedMotion: 'reduce' });
-      await page.addInitScript((value) => localStorage.setItem('app-theme', value), realTheme);
-      await mockNutritionApi(page);
-      await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
-      await page.route('**/api/v1/nutrition/imports**', (route) => route.continue());
-      const capture = async (stage: string) => {
-        for (const width of [320, 360, 393, 430, 1280]) {
-          await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
-          expect(
-            await page.evaluate(() => document.documentElement.scrollWidth),
-          ).toBeLessThanOrEqual(width);
-          await page.screenshot({
-            path: testInfo.outputPath(`${stage}-${width}.png`),
-            fullPage: true,
+    for (const runtime of ['web', 'tma', 'pwa'] as const) {
+      test.describe(`Issue 888 ${runtime}`, () => {
+        test.use({ serviceWorkers: runtime === 'pwa' ? 'allow' : 'block' });
+        test(`Issue 885 real synthetic ${sourceFormat} import ${realTheme}`, async ({
+          page,
+        }, testInfo) => {
+          test.skip(!process.env.PW_REAL_IMPORT_BASE, 'requires isolated local import backend');
+          test.setTimeout(120_000);
+          const base = process.env.PW_REAL_IMPORT_BASE!;
+          const ownerId =
+            (realTheme === 'light' ? 98885101 : 98885102) +
+            (testInfo.project.name === 'webkit' ? 10 : 0) +
+            (sourceFormat === 'PDF' ? 20 : 0) +
+            (runtime === 'tma' ? 1000 : runtime === 'pwa' ? 2000 : 0);
+          const productName = `Синтетический продукт UI 885 ${runtime} ${sourceFormat} ${realTheme} ${testInfo.project.name} ${Date.now()}`;
+          const auth = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+            data: { telegram_user_id: ownerId },
           });
-        }
-        await page.setViewportSize({ width: 393, height: 844 });
-      };
-      const nutrient = ['65', '3', '0', '5', '0', '0', '4', '1', '0', '0'];
-      const csvRows = [
-        ['# Food Diary Report - Detailed Report', 'Четверг, февраля 29, 2024'],
-        ['# Report Details'],
-        [
-          'Метка',
-          'Кал ( ккал)',
-          'Жир( г)',
-          'Н/жир( г)',
-          'Углев( г)',
-          'Клетч( г)',
-          'Сахар( г)',
-          'Белк( г)',
-          'Натри( мг)',
-          'Холес( мг)',
-          'Калий( мг)',
-        ],
-        ['Четверг, февраля 29, 2024', ...nutrient],
-        ['Завтрак', ...nutrient],
-        ['Синтетический продукт UI 885', ...nutrient],
-        ['100 г'],
-        ['Всего', ...nutrient],
-      ];
-      const csv = csvRows
-        .map((cells) => cells.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(','))
-        .join('\r\n');
-      await page.goto(`${base}/app?section=nutrition`);
-      await page.getByRole('button', { name: /Импорт питания/ }).click();
-      await capture('source-real');
-      if (sourceFormat === 'PDF')
-        await page
-          .locator('#nutrition-import-file')
-          .setInputFiles(resolve('..', '.artifacts/runtime/tmp/issue885-synthetic.pdf'));
-      else
-        await page
-          .locator('#nutrition-import-file')
-          .setInputFiles({ name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
-      await page.getByRole('button', { name: 'Проверить файл' }).click();
-      await expect(
-        page.getByText(sourceFormat === 'PDF' ? 'Synthetic food' : 'Синтетический продукт UI 885'),
-      ).toBeVisible();
-      await capture('preview-real');
-      await page.getByRole('button', { name: 'Разобрать' }).click();
-      await capture('correction-real');
-      await page.locator('#name-0').fill(productName);
-      await page.locator('#kind-0').selectOption('standard_food');
-      await page.locator('#basis-0').selectOption('per_100_g');
-      for (const [field, value] of [
-        ['energy', '65'],
-        ['protein', '4'],
-        ['fat', '3'],
-        ['carbs', '5'],
-      ] as const)
-        await page.locator(`#${field}-0`).fill(value);
-      await page.getByRole('checkbox', { name: /Я проверил/ }).check();
-      await page.getByRole('button', { name: 'Проверить продукт' }).click();
-      await expect(page.locator('#name-0')).toHaveCount(0);
-      await expect(page.getByText('Можно добавить', { exact: false }).first()).toBeVisible();
-      await page.getByRole('button', { name: 'Продолжить' }).click();
-      await capture('confirmation-real');
-      await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
-      await expect(page.getByText('Добавлено: 1')).toBeVisible();
-      await capture('result-real');
-      const second = await page.request.post(`${base}/api/v1/auth/dev-login`, {
-        data: { telegram_user_id: ownerId + 100 },
+          expect(auth.ok()).toBeTruthy();
+          const token = (await auth.json()).access_token as string;
+          await page.setViewportSize({ width: 393, height: 844 });
+          await page.emulateMedia({ colorScheme: realTheme, reducedMotion: 'reduce' });
+          await page.addInitScript((value) => localStorage.setItem('app-theme', value), realTheme);
+          if (runtime === 'tma') {
+            await installTelegramHarness(page, {
+              colorScheme: realTheme,
+              safeAreaInset: { top: 24, bottom: 24, left: 0, right: 0 },
+              contentSafeAreaInset: { top: 8, bottom: 8, left: 0, right: 0 },
+            });
+          }
+          if (runtime === 'pwa') {
+            await page.addInitScript(() => {
+              const original = window.matchMedia.bind(window);
+              window.matchMedia = (query) =>
+                query === '(display-mode: standalone)'
+                  ? { ...original(query), matches: true }
+                  : original(query);
+            });
+          }
+          await mockNutritionApi(
+            page,
+            'data',
+            'female',
+            undefined,
+            true,
+            undefined,
+            false,
+            undefined,
+            token,
+          );
+          await page.route('**/api/v1/nutrition/imports**', (route) => route.continue());
+          if (runtime === 'tma')
+            await page.route('**/api/v1/auth/telegram/init', (route) =>
+              route.fulfill({ json: { access_token: token, token_type: 'bearer' } }),
+            );
+          const capture = async (stage: string) => {
+            for (const width of [320, 360, 393, 430, 1280]) {
+              await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
+              expect(
+                await page.evaluate(() => document.documentElement.scrollWidth),
+              ).toBeLessThanOrEqual(width);
+              await page.screenshot({
+                path: testInfo.outputPath(`${stage}-${width}.png`),
+                fullPage: true,
+              });
+            }
+            await page.setViewportSize({ width: 393, height: 844 });
+          };
+          const nutrient = ['65', '3', '0', '5', '0', '0', '4', '1', '0', '0'];
+          const csvRows = [
+            ['# Food Diary Report - Detailed Report', 'Четверг, февраля 29, 2024'],
+            ['# Report Details'],
+            [
+              'Метка',
+              'Кал ( ккал)',
+              'Жир( г)',
+              'Н/жир( г)',
+              'Углев( г)',
+              'Клетч( г)',
+              'Сахар( г)',
+              'Белк( г)',
+              'Натри( мг)',
+              'Холес( мг)',
+              'Калий( мг)',
+            ],
+            ['Четверг, февраля 29, 2024', ...nutrient],
+            ['Завтрак', ...nutrient],
+            ['Синтетический продукт UI 885', ...nutrient],
+            ['100 г'],
+            ['Всего', ...nutrient],
+          ];
+          const csv = csvRows
+            .map((cells) => cells.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(','))
+            .join('\r\n');
+          await page.goto(`${base}/app?section=nutrition`);
+          if (runtime === 'tma') {
+            await expect
+              .poll(() =>
+                page.evaluate(
+                  () =>
+                    (
+                      window as unknown as { __yfcTmaHarness?: { state(): { ready: number } } }
+                    ).__yfcTmaHarness?.state().ready ?? 0,
+                ),
+              )
+              .toBeGreaterThan(0);
+          }
+          if (runtime === 'pwa') {
+            expect(
+              await page.evaluate(() => matchMedia('(display-mode: standalone)').matches),
+            ).toBe(true);
+            await page.evaluate(() => navigator.serviceWorker.ready);
+            if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))))
+              await page.reload();
+            await expect
+              .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+              .toBe(true);
+          }
+          await page.getByRole('button', { name: /Импорт питания/ }).click();
+          await capture('source-real');
+          if (sourceFormat === 'PDF')
+            await page
+              .locator('#nutrition-import-file')
+              .setInputFiles(resolve('..', '.artifacts/runtime/tmp/issue885-synthetic.pdf'));
+          else
+            await page.locator('#nutrition-import-file').setInputFiles({
+              name: 'synthetic.csv',
+              mimeType: 'text/csv',
+              buffer: Buffer.from(csv),
+            });
+          const uploadResponse = page.waitForResponse(
+            (response) =>
+              new URL(response.url()).pathname === '/api/v1/nutrition/imports' &&
+              response.request().method() === 'POST',
+          );
+          await page.getByRole('button', { name: 'Проверить файл' }).click();
+          const uploaded = await uploadResponse;
+          expect(uploaded.request().headers().authorization === `Bearer ${token}`).toBe(true);
+          expect(uploaded.status()).toBe(201);
+          await expect(
+            page.getByText(
+              sourceFormat === 'PDF' ? 'Synthetic food' : 'Синтетический продукт UI 885',
+            ),
+          ).toBeVisible();
+          await capture('preview-real');
+          await page.getByRole('button', { name: 'Разобрать' }).click();
+          await capture('correction-real');
+          await page.locator('#name-0').fill(productName);
+          await page.locator('#kind-0').selectOption('standard_food');
+          await page.locator('#basis-0').selectOption('per_100_g');
+          for (const [field, value] of [
+            ['energy', '65'],
+            ['protein', '4'],
+            ['fat', '3'],
+            ['carbs', '5'],
+          ] as const)
+            await page.locator(`#${field}-0`).fill(value);
+          await page.getByRole('checkbox', { name: /Я проверил/ }).check();
+          await page.getByRole('button', { name: 'Проверить продукт' }).click();
+          await expect(page.locator('#name-0')).toHaveCount(0);
+          await expect(page.getByText('Можно добавить', { exact: false }).first()).toBeVisible();
+          const continueButton = page.getByRole('button', { name: 'Продолжить' });
+          await continueButton.focus();
+          await expect(continueButton).toBeFocused();
+          await page.keyboard.press('Enter');
+          await capture('confirmation-real');
+          await page.getByRole('button', { name: 'Подтвердить импорт' }).click();
+          await expect(page.getByText('Добавлено: 1')).toBeVisible();
+          await capture('result-real');
+          const second = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+            data: { telegram_user_id: ownerId + 100 },
+          });
+          const secondToken = (await second.json()).access_token as string;
+          const search = await page.request.get(
+            `${base}/api/v1/nutrition/foods/search?q=${encodeURIComponent(productName)}`,
+            { headers: { Authorization: `Bearer ${secondToken}` } },
+          );
+          expect(search.ok()).toBeTruthy();
+          expect(JSON.stringify(await search.json())).toContain(productName);
+          if (runtime === 'pwa') {
+            const cachedPrivateRequests = await page.evaluate(async () => {
+              const requests = await Promise.all(
+                (await caches.keys()).map(async (key) => (await caches.open(key)).keys()),
+              );
+              return requests
+                .flat()
+                .filter((request) => new URL(request.url).pathname.startsWith('/api/')).length;
+            });
+            expect(cachedPrivateRequests).toBe(0);
+          }
+        });
       });
-      const secondToken = (await second.json()).access_token as string;
-      const search = await page.request.get(
-        `${base}/api/v1/nutrition/foods/search?q=${encodeURIComponent(productName)}`,
-        { headers: { Authorization: `Bearer ${secondToken}` } },
-      );
-      expect(search.ok()).toBeTruthy();
-      expect(JSON.stringify(await search.json())).toContain(productName);
-    });
+    }
   }
 }
 
@@ -1327,6 +1411,7 @@ async function mockNutritionApi(
   repeatCandidate?: { source_date: string; source_meal_type: 'lunch'; entry_count: number },
   filterHydrationByDate = false,
   sharedHydrationEntries?: HydrationEntry[],
+  accessToken = 'e2e-token',
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -1477,9 +1562,9 @@ async function mockNutritionApi(
     replayed: false,
   });
 
-  await page.addInitScript(() => {
-    sessionStorage.setItem('fit_access_token', 'e2e-token');
-  });
+  await page.addInitScript((value) => {
+    sessionStorage.setItem('fit_access_token', value);
+  }, accessToken);
   await page.route('**/api/v1/**', async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
