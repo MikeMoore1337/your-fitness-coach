@@ -1329,6 +1329,13 @@ def test_real_csv_upload_review_and_catalog_confirm(client, rows):
         ).status_code
         == 404
     )
+    other_day = client.get(
+        "/api/v1/nutrition/diary", headers=other, params={"diary_date": "2024-03-02"}
+    )
+    assert other_day.status_code == 200
+    assert [item["id"] for meal in other_day.json()["meals"] for item in meal["entries"]] == [
+        entry.json()["id"]
+    ]
 
     repeat = client.post(
         root,
