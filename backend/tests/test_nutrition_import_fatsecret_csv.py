@@ -580,6 +580,19 @@ def test_document_preserves_sections_nutrients_quantities_and_duplicates(rows):
     assert any(issue.code == "totals_not_comparable" for issue in result.diagnostics)
 
 
+@pytest.mark.parametrize("name", ["=2+2", "+2+2", "-2+2", "@SUM(1,2)", "  =2+2"])
+def test_imported_formula_like_food_name_is_escaped_in_account_csv(rows, name):
+    from fitminiapp_api.services.account_exports import _csv_bytes
+
+    rows[9][0] = name
+    _, result = _validated(rows)
+    imported_name = result.rows[0].food.name
+    assert imported_name.lstrip() == name.lstrip()
+    output = _csv_bytes([{"food_name": imported_name}], ("food_name",))
+    exported = list(csv.DictReader(io.StringIO(output.decode("utf-8-sig"))))
+    assert exported == [{"food_name": "'" + imported_name}]
+
+
 def test_unreadable_nutrient_is_preserved_and_marks_the_row_invalid(rows):
     rows[9][1] = "NaN"
     rows[11][2] = "1,123456789"
