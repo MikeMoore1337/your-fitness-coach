@@ -120,6 +120,7 @@ def synthetic_ru_report(
     food_override=None,
     second_date=False,
     wrapped=False,
+    branded_header=False,
 ):
     output = BytesIO()
     pdf = Canvas(output, pagesize=(842, 595), pageCompression=0)
@@ -128,9 +129,17 @@ def synthetic_ru_report(
 
     def header(page):
         pdf.setFont("SyntheticReportInter", 12)
-        pdf.drawString(25, 575, "Synthetic report")
-        pdf.drawString(330, 575, "Synthetic period")
-        pdf.drawString(728, 575, "Synthetic account")
+        pdf.drawString(
+            25, 575, "Food Diary Report - Detailed Report" if branded_header else "Synthetic report"
+        )
+        pdf.drawString(
+            330,
+            575,
+            "Суббота, марта 2 - Воскресенье, марта 3, 2024"
+            if branded_header
+            else "Synthetic period",
+        )
+        pdf.drawString(728, 575, "Synthetic FatSecret" if branded_header else "Synthetic account")
         pdf.setFont("SyntheticReportInter", 8)
         pdf.drawRightString(817, 18, f"Page {page}")
 
@@ -359,6 +368,30 @@ def test_repeated_numeric_content_at_page_top_is_not_discarded(monkeypatch):
     document = NutritionImportV3.model_validate(parse(source))
     assert document.rows == []
     assert document.diagnostics
+
+
+def test_repeated_branded_header_preserves_unrecognized_period():
+    source, _ = synthetic_ru_report(branded_header=True)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert len(document.rows) == 2
+    summary = document.original_summaries[0]
+    assert summary.period_label == "Период: Суббота, марта 2 - Воскресенье, марта 3, 2024"
+    assert summary.period_start is None and summary.period_end is None
+    assert summary.period_coordinates.page == 1
+    assert any(item.code == "period_unrecognized" for item in document.diagnostics)
+
+
+def test_repeated_branded_header_with_extra_numeric_content_fails_closed(monkeypatch):
+    source, _ = synthetic_ru_report(branded_header=True)
+    lines = nutrition_import_fatsecret_pdf.extract_pdf_lines(source)
+    lines.extend(
+        PdfLine(page, (600, 574, 690, 583), "Synthetic product 99", page_height=595)
+        for page in (1, 2, 3)
+    )
+    monkeypatch.setattr(nutrition_import_fatsecret_pdf, "extract_pdf_lines", lambda _: lines)
+    document = NutritionImportV3.model_validate(parse(source))
+    assert document.rows == []
+    assert any(item.severity == "error" for item in document.diagnostics)
 
 
 def test_ru_report_does_not_guess_ambiguous_merged_column():
