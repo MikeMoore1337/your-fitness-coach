@@ -1281,3 +1281,87 @@ def test_real_csv_upload_review_and_catalog_confirm(client, rows):
     assert client.post(f"{endpoint}/confirm", headers=owner, json=confirm).json() == first.json()
     food_id = first.json()["rows"][0]["food_id"]
     assert client.get(f"/api/v1/nutrition/foods/{food_id}", headers=other).status_code == 200
+    assert client.get(f"{root}/{draft['id']}", headers=other).status_code == 404
+    search = client.get(
+        "/api/v1/nutrition/foods/search", headers=other, params={"q": correction["name"]}
+    )
+    assert search.status_code == 200
+    found = next(item for item in search.json()["items"] if item["id"] == food_id)
+    assert found["catalog_quality"] == "community_unverified"
+    entry = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=other,
+        json={
+            "food_id": food_id,
+            "diary_date": "2024-03-02",
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert entry.status_code == 201
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{entry.json()['id']}", headers=owner
+        ).status_code
+        == 404
+    )
+    owner_day = client.get(
+        "/api/v1/nutrition/diary", headers=owner, params={"diary_date": "2024-03-02"}
+    )
+    assert owner_day.status_code == 200
+    assert all(not meal["entries"] for meal in owner_day.json()["meals"])
+    owner_entry = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=owner,
+        json={
+            "food_id": food_id,
+            "diary_date": "2024-03-02",
+            "meal_type": "breakfast",
+            "amount": "50",
+            "amount_unit": "g",
+        },
+    )
+    assert owner_entry.status_code == 201
+    assert (
+        client.delete(
+            f"/api/v1/nutrition/diary/entries/{owner_entry.json()['id']}", headers=other
+        ).status_code
+        == 404
+    )
+
+    repeat = client.post(
+        root,
+        headers={**other, "Idempotency-Key": "csv-full-upload-b"},
+        data={"adapter_id": "fatsecret-csv-v1"},
+        files={"file": ("synthetic.csv", _csv(rows), "text/csv")},
+    )
+    assert repeat.status_code == 201, repeat.text
+    repeat_draft = repeat.json()
+    repeat_body = {**body, "revision": repeat_draft["revision"]}
+    repeat_endpoint = f"{root}/{repeat_draft['id']}/catalog"
+    repeat_preview = client.post(f"{repeat_endpoint}/review", headers=other, json=repeat_body)
+    assert repeat_preview.status_code == 200, repeat_preview.text
+    assert repeat_preview.json()["rows"][index]["outcome"] == "reuse"
+    repeat_confirm = client.post(
+        f"{repeat_endpoint}/confirm",
+        headers=other,
+        json={
+            **repeat_body,
+            "preview_signature": repeat_preview.json()["preview_signature"],
+            "confirm_key": "csv-full-confirm-b",
+            "row_indexes": [index],
+            "confirmed": True,
+        },
+    )
+    assert repeat_confirm.status_code == 200, repeat_confirm.text
+    assert repeat_confirm.json()["rows"][0]["food_id"] == food_id
+    owner_after = client.get(
+        "/api/v1/nutrition/diary", headers=owner, params={"diary_date": "2024-03-02"}
+    )
+    assert owner_after.status_code == 200
+    assert [entry["id"] for meal in owner_after.json()["meals"] for entry in meal["entries"]] == [
+        owner_entry.json()["id"]
+    ]
+    with get_session_context() as db:
+        assert db.query(Food).filter_by(name=correction["name"]).count() == 1
