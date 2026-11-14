@@ -16,6 +16,7 @@ from test_training_analytics import _auth
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.nutrition_import import NutritionImportDraft
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import import NutritionImportV1, NutritionImportV2
@@ -1372,3 +1373,133 @@ def test_real_csv_upload_review_and_catalog_confirm(client, rows):
     ]
     with get_session_context() as db:
         assert db.query(Food).filter_by(name=correction["name"]).count() == 1
+
+
+def test_stale_catalog_preview_requires_explicit_review_without_partial_writes(client, rows):
+    if engine.dialect.name != "postgresql":
+        pytest.skip("requires PostgreSQL transaction locks")
+    owner = _auth(client, 984_240)
+    other = _auth(client, 984_241)
+    root = "/api/v1/nutrition/imports"
+
+    def upload(headers, key):
+        result = client.post(
+            root,
+            headers={**headers, "Idempotency-Key": key},
+            data={"adapter_id": "fatsecret-csv-v1"},
+            files={"file": ("synthetic.csv", _csv(rows), "text/csv")},
+        )
+        assert result.status_code == 201, result.text
+        return result.json()
+
+    first, second = upload(owner, "stale-upload-a-888"), upload(other, "stale-upload-b-888")
+    indices = [
+        row["index"]
+        for row in first["rows"]
+        if not any(item["severity"] == "error" for item in row["source"].get("diagnostics", []))
+    ][:2]
+    assert len(indices) == 2
+
+    def correction(index, name):
+        return {
+            "index": index,
+            "name": name,
+            "kind": "standard_food",
+            "nutrition": {
+                "source_basis": "per_100_g",
+                "energy_kcal": "65",
+                "protein_g": "4",
+                "fat_g": "3",
+                "carbohydrate_g": "5",
+            },
+            "confirmed": True,
+        }
+
+    common = correction(indices[0], "Синтетический общий продукт 888")
+    additional = correction(indices[1], "Синтетический второй продукт 888")
+    first_endpoint = f"{root}/{first['id']}/catalog"
+    second_endpoint = f"{root}/{second['id']}/catalog"
+    first_body = {"revision": first["revision"], "corrections": [common], "choices": []}
+    second_body = {
+        "revision": second["revision"],
+        "corrections": [common, additional],
+        "choices": [],
+    }
+    first_preview = client.post(f"{first_endpoint}/review", headers=owner, json=first_body)
+    stale = client.post(f"{second_endpoint}/review", headers=other, json=second_body)
+    assert first_preview.status_code == stale.status_code == 200
+    assert stale.json()["rows"][indices[0]]["outcome"] == "publish"
+    assert stale.json()["rows"][indices[1]]["outcome"] == "publish"
+    first_confirm = {
+        **first_body,
+        "preview_signature": first_preview.json()["preview_signature"],
+        "confirm_key": "stale-confirm-a-888",
+        "row_indexes": [indices[0]],
+        "confirmed": True,
+    }
+    published = client.post(f"{first_endpoint}/confirm", headers=owner, json=first_confirm)
+    assert published.status_code == 200, published.text
+    food_id = published.json()["rows"][0]["food_id"]
+    assert published.json()["rows"][0]["outcome"] == "publish"
+
+    for headers in (owner, other):
+        entry = client.post(
+            "/api/v1/nutrition/diary/entries",
+            headers=headers,
+            json={
+                "food_id": food_id,
+                "diary_date": "2024-03-02",
+                "meal_type": "breakfast",
+                "amount": "50",
+                "amount_unit": "g",
+            },
+        )
+        assert entry.status_code == 201, entry.text
+
+    def diary(headers):
+        response = client.get(
+            "/api/v1/nutrition/diary", headers=headers, params={"diary_date": "2024-03-02"}
+        )
+        assert response.status_code == 200
+        return response.json()
+
+    diaries_before = [diary(owner), diary(other)]
+    with get_session_context() as db:
+        contributions_before = db.query(NutritionCatalogContribution).count()
+    second_confirm = {
+        **second_body,
+        "preview_signature": stale.json()["preview_signature"],
+        "confirm_key": "stale-confirm-b-888",
+        "row_indexes": indices,
+        "confirmed": True,
+    }
+    rejected = client.post(f"{second_endpoint}/confirm", headers=other, json=second_confirm)
+    assert rejected.status_code == 409
+    assert rejected.json()["detail"]["code"] == "preview_changed"
+    with get_session_context() as db:
+        assert db.query(Food).filter_by(name=common["name"]).count() == 1
+        assert db.query(Food).filter_by(name=additional["name"]).count() == 0
+        assert db.query(NutritionCatalogContribution).count() == contributions_before
+        assert db.get(NutritionImportDraft, second["id"]).catalog_receipt is None
+    assert [diary(owner), diary(other)] == diaries_before
+
+    refreshed = client.post(f"{second_endpoint}/review", headers=other, json=second_body)
+    assert refreshed.status_code == 200, refreshed.text
+    assert refreshed.json()["preview_signature"] != stale.json()["preview_signature"]
+    assert refreshed.json()["rows"][indices[0]]["outcome"] == "reuse"
+    assert refreshed.json()["rows"][indices[0]]["food_id"] == food_id
+    assert refreshed.json()["rows"][indices[1]]["outcome"] == "publish"
+    second_confirm["preview_signature"] = refreshed.json()["preview_signature"]
+    unconfirmed = client.post(
+        f"{second_endpoint}/confirm", headers=other, json={**second_confirm, "confirmed": False}
+    )
+    assert unconfirmed.status_code == 422
+    completed = client.post(f"{second_endpoint}/confirm", headers=other, json=second_confirm)
+    assert completed.status_code == 200, completed.text
+    assert [item["outcome"] for item in completed.json()["rows"]] == ["reuse", "publish"]
+    repeated = client.post(f"{second_endpoint}/confirm", headers=other, json=second_confirm)
+    assert repeated.status_code == 200 and repeated.json() == completed.json()
+    with get_session_context() as db:
+        assert db.query(Food).filter_by(name=common["name"]).count() == 1
+        assert db.query(Food).filter_by(name=additional["name"]).count() == 1
+    assert [diary(owner), diary(other)] == diaries_before
