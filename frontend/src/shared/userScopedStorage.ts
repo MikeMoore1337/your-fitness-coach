@@ -9,6 +9,7 @@ const LAST_AUTHENTICATED_USER_ID_STORAGE_KEY = 'fit_last_authenticated_user_id_v
 export const HYDRATION_PENDING_SESSION_PREFIX = 'fit_hydration_pending_v1_';
 export const HYDRATION_PENDING_STORAGE_PREFIX = 'fit_hydration_pending_v2_';
 export const NUTRITION_IMPORT_RECOVERY_SESSION_KEY = 'nutrition-import-confirm-v1';
+export const NUTRITION_HISTORY_RECOVERY_SESSION_KEY = 'nutrition-history-confirm-v1';
 
 export const ACTIVE_WORKOUT_STORAGE_PREFIXES = {
   queue: 'fit_active_workout_v1_',
@@ -309,17 +310,27 @@ export function clearSensitiveUserScopedStorage(
       }
     }
     sessionStorage.removeItem(AUTHENTICATED_USER_ID_STORAGE_KEY);
-    const savedImport = sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY);
-    let retainImport = false;
-    if (savedImport && pendingUserId && Number.isSafeInteger(pendingUserId) && pendingUserId > 0) {
-      try {
-        const parsed = JSON.parse(savedImport) as { userId?: unknown };
-        retainImport = parsed.userId === String(pendingUserId);
-      } catch {
-        // Invalid records are cleared.
+    for (const recoveryKey of [
+      NUTRITION_IMPORT_RECOVERY_SESSION_KEY,
+      NUTRITION_HISTORY_RECOVERY_SESSION_KEY,
+    ]) {
+      const savedImport = sessionStorage.getItem(recoveryKey);
+      let retainImport = false;
+      if (
+        savedImport &&
+        pendingUserId &&
+        Number.isSafeInteger(pendingUserId) &&
+        pendingUserId > 0
+      ) {
+        try {
+          const parsed = JSON.parse(savedImport) as { userId?: unknown };
+          retainImport = parsed.userId === String(pendingUserId);
+        } catch {
+          // Invalid records are cleared.
+        }
       }
+      if (!retainImport) sessionStorage.removeItem(recoveryKey);
     }
-    if (!retainImport) sessionStorage.removeItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY);
   } catch {
     // Storage is optional in restrictive webviews.
   }

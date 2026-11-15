@@ -13,6 +13,293 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+test('Issue 887 real CSV import stays private and repeat requires a decision', async ({ page }) => {
+  test.skip(!process.env.PW_REAL_IMPORT_BASE, 'requires isolated local import backend');
+  const base = process.env.PW_REAL_IMPORT_BASE!;
+  const ownerId = 98_887_000 + (Date.now() % 1_000_000) * 2;
+  const auth = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+    data: { telegram_user_id: ownerId },
+  });
+  expect(auth.ok()).toBeTruthy();
+  const token = (await auth.json()).access_token as string;
+  const otherAuth = await page.request.post(`${base}/api/v1/auth/dev-login`, {
+    data: { telegram_user_id: ownerId + 1 },
+  });
+  expect(otherAuth.ok()).toBeTruthy();
+  const otherToken = (await otherAuth.json()).access_token as string;
+  await page.clock.setFixedTime(new Date('2024-02-29T12:00:00Z'));
+  await mockNutritionApi(
+    page,
+    'data',
+    'female',
+    undefined,
+    true,
+    undefined,
+    false,
+    undefined,
+    token,
+  );
+  await page.route('**/api/v1/nutrition/imports**', (route) => route.continue());
+  await page.route('**/api/v1/nutrition/diary?**', (route) => route.continue());
+  const values = ['120', '8', '0', '1', '0', '0', '10', '0', '0', '0'];
+  const rows = [
+    ['# Food Diary Report - Detailed Report', 'Четверг, февраля 29, 2024'],
+    ['# Report Details'],
+    [
+      'Метка',
+      'Кал ( ккал)',
+      'Жир( г)',
+      'Н/жир( г)',
+      'Углев( г)',
+      'Клетч( г)',
+      'Сахар( г)',
+      'Белк( г)',
+      'Натри( мг)',
+      'Холес( мг)',
+      'Калий( мг)',
+    ],
+    ['Четверг, февраля 29, 2024', ...values],
+    ['Завтрак', ...values],
+    ['Синтетическое яйцо', ...values],
+    ['2 шт'],
+    ['Всего', ...values],
+  ];
+  const csv = rows.map((cells) => cells.map((cell) => `"${cell}"`).join(',')).join('\r\n');
+  const file = { name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) };
+  await page.goto(`${base}/app?section=nutrition`);
+  await page.getByRole('button', { name: /Импорт питания/ }).click();
+  await page.locator('#nutrition-import-file').setInputFiles(file);
+  await page.getByRole('button', { name: 'Проверить файл' }).click();
+  await page.getByRole('button', { name: 'Перенести историю питания' }).click();
+  await page.getByLabel(/Перенести историю питания/).check();
+  await page.getByLabel(/Выбрать строки вручную/).check();
+  await page.getByLabel(/Синтетическое яйцо/).check();
+  await page.getByRole('button', { name: 'Проверить изменения' }).click();
+  await page.getByLabel(/Подтверждаю перенос/).check();
+  await page.getByRole('button', { name: 'Перенести историю', exact: true }).click();
+  await expect(page.getByText('История перенесена')).toBeVisible();
+  await page.getByRole('button', { name: 'Открыть дневник' }).click();
+  await page.getByRole('button', { name: 'Завтрак', exact: true }).click();
+  await expect(page.getByText('Синтетическое яйцо')).toBeVisible();
+  const diaryUrl = `${base}/api/v1/nutrition/diary?diary_date=2024-02-29`;
+  const ownDiary = await page.request.get(diaryUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const otherDiary = await page.request.get(diaryUrl, {
+    headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  expect(JSON.stringify(await ownDiary.json())).toContain('Синтетическое яйцо');
+  expect(JSON.stringify(await otherDiary.json())).not.toContain('Синтетическое яйцо');
+  await page.getByRole('button', { name: /Импорт питания/ }).click();
+  await page.locator('#nutrition-import-file').setInputFiles(file);
+  await page.getByRole('button', { name: 'Проверить файл' }).click();
+  await page.getByRole('button', { name: 'Перенести историю питания' }).click();
+  await page.getByLabel(/Перенести историю питания/).check();
+  await page.getByLabel(/Добавить отсутствующие/).check();
+  await page.getByRole('button', { name: 'Проверить изменения' }).click();
+  await expect(page.getByText(/Нужно проверить/)).toBeVisible();
+  await page.getByLabel('Пропустить строку из файла').check();
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await page.getByLabel(/Подтверждаю перенос/).check();
+  await page.getByRole('button', { name: 'Перенести историю', exact: true }).click();
+  await expect(page.getByText(/Добавлено: 0/)).toBeVisible();
+  const repeated = await page.request.get(diaryUrl, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await repeated.json();
+  expect(payload.meals.flatMap((meal: { entries: unknown[] }) => meal.entries)).toHaveLength(1);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Issue 887 reviews and confirms history ${theme}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockNutritionApi(page);
+    const draft = '123e4567-e89b-42d3-a456-426614174000';
+    const source = {
+      diary_date: '2024-02-29',
+      meal_type: 'breakfast',
+      food: { name: 'Яйцо' },
+      quantity: '2',
+      amount_unit: 'piece',
+      coordinates: { section: 'report_details', row: 1 },
+      diagnostics: [],
+    };
+    const nutrition = {
+      energy_kcal: '120',
+      protein_g: '10',
+      fat_g: '8',
+      carbs_g: '1',
+      fiber_g: null,
+    };
+    let confirmations = 0;
+    let histories = 0;
+    let empty = true;
+    let stale = true;
+    let invalid = true;
+    await page.route('**/api/v1/nutrition/imports**', async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path.endsWith('/history/confirm')) {
+        confirmations++;
+        return route.fulfill({
+          json: {
+            added: 1,
+            skipped: 0,
+            conflicts: 1,
+            entry_ids: [1],
+            review_signature: 'b'.repeat(64),
+          },
+        });
+      }
+      if (path.endsWith('/history/review')) {
+        if (stale) {
+          stale = false;
+          return route.fulfill({
+            status: 409,
+            json: { detail: { code: 'preview_changed', message: 'Данные изменились' } },
+          });
+        }
+        const body = route.request().postDataJSON();
+        return route.fulfill({
+          json: {
+            preview_signature: 'a'.repeat(64),
+            review_signature: 'b'.repeat(64),
+            rows: [
+              {
+                index: 0,
+                action: body.decisions.length
+                  ? body.decisions[0].action === 'skip'
+                    ? 'skip'
+                    : 'add'
+                  : invalid
+                    ? 'invalid'
+                    : 'conflict',
+                conflict: !invalid,
+                reason: invalid ? 'source_incomplete' : null,
+              },
+            ],
+          },
+        });
+      }
+      if (path.endsWith('/history')) {
+        histories++;
+        return route.fulfill({
+          json: {
+            revision: 1,
+            preview_signature: 'a'.repeat(64),
+            dates: empty ? [] : ['2024-02-29'],
+            rows: empty ? [] : [{ index: 0, source, nutrition_amount: nutrition }],
+            existing_meals: [
+              {
+                date: '2024-02-29',
+                meal_type: 'breakfast',
+                entries: [
+                  {
+                    id: 1,
+                    food_name: 'Яйцо',
+                    amount: '1',
+                    amount_unit: 'serving',
+                    serving_unit: 'piece',
+                    nutrition: { ...nutrition, energy_kcal: '100' },
+                  },
+                ],
+              },
+            ],
+          },
+        });
+      }
+      if (path.endsWith('/catalog'))
+        return route.fulfill({
+          json: {
+            id: draft,
+            revision: 1,
+            expires_at: '2030-01-01T00:00:00Z',
+            source: {},
+            preview_signature: 'c'.repeat(64),
+            rows: [
+              {
+                index: 0,
+                outcome: 'reuse',
+                reason: null,
+                food_id: 10,
+                suggestions: [],
+                suggestions_evaluated: false,
+              },
+            ],
+          },
+        });
+      return route.fulfill({
+        status: 201,
+        json: {
+          id: draft,
+          revision: 1,
+          expires_at: '2030-01-01T00:00:00Z',
+          rows: [{ index: 0, source }],
+          original_totals: [],
+          diagnostics: [],
+        },
+      });
+    });
+    const capture = async (state: string) => {
+      for (const width of [393, 1280]) {
+        await page.setViewportSize({ width, height: width === 393 ? 844 : 800 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(`history-${state}-${theme}-${width}.png`),
+          fullPage: true,
+        });
+      }
+      await page.setViewportSize({ width: 393, height: 844 });
+    };
+    await page.goto('/app?section=nutrition');
+    await page.getByRole('button', { name: /Импорт питания/ }).click();
+    await page
+      .locator('#nutrition-import-file')
+      .setInputFiles({ name: 'synthetic.csv', mimeType: 'text/csv', buffer: Buffer.from('test') });
+    await page.getByRole('button', { name: 'Проверить файл' }).click();
+    await page.getByRole('button', { name: 'Перенести историю питания' }).click();
+    expect(histories).toBe(0);
+    await capture('disabled');
+    await page.getByLabel(/Перенести историю питания/).check();
+    await expect(page.getByText(/Записи с датами не найдены/)).toBeVisible();
+    await capture('empty');
+    await page.getByLabel(/Перенести историю питания/).uncheck();
+    empty = false;
+    await page.getByLabel(/Перенести историю питания/).check();
+    await expect(page.getByLabel(/Добавить отсутствующие/)).toBeVisible();
+    await capture('selection');
+    await page.getByLabel(/Выбрать строки вручную/).check();
+    await capture('manual');
+    await page.getByLabel(/Добавить отсутствующие/).check();
+    await page.getByRole('button', { name: 'Проверить изменения' }).click();
+    await expect(page.getByRole('button', { name: 'Обновить предпросмотр' })).toBeVisible();
+    await capture('stale');
+    await page.getByRole('button', { name: 'Обновить предпросмотр' }).click();
+    await page.getByRole('button', { name: 'Проверить изменения' }).click();
+    await expect(page.getByText(/Не хватает данных для переноса/)).toBeVisible();
+    await capture('invalid');
+    await page.getByRole('button', { name: 'Назад', exact: true }).click();
+    invalid = false;
+    await page.getByRole('button', { name: 'Проверить изменения' }).click();
+    await expect(page.getByText(/Разница: ккал \+20/)).toBeVisible();
+    await capture('conflict');
+    await page.getByLabel('Добавить как отдельное употребление').check();
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await expect(
+      page.getByRole('button', { name: 'Перенести историю', exact: true }),
+    ).toBeDisabled();
+    await capture('confirmation');
+    await page.getByLabel(/Подтверждаю перенос/).check();
+    await page.getByRole('button', { name: 'Перенести историю', exact: true }).click();
+    await expect(page.getByText('История перенесена')).toBeVisible();
+    await capture('result');
+    expect(confirmations).toBe(1);
+  });
+}
+
 async function openQuickAdd(page: Page) {
   await page.getByTestId('nutrition-add-product').click();
   await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод', exact: true }).click();

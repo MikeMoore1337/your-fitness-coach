@@ -6,12 +6,16 @@ import {
   AUTH_LOGOUT_EVENT,
 } from '../../shared/api/client';
 import { AUTHENTICATED_USER_ID_STORAGE_KEY } from '../../shared/auth/legacySessionKeys';
-import { NUTRITION_IMPORT_RECOVERY_SESSION_KEY as recoveryKey } from '../../shared/userScopedStorage';
+import {
+  NUTRITION_HISTORY_RECOVERY_SESSION_KEY as historyRecoveryKey,
+  NUTRITION_IMPORT_RECOVERY_SESSION_KEY as recoveryKey,
+} from '../../shared/userScopedStorage';
 import { Button, Field, Input, Select, Surface } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import type { components } from '../../shared/api/schema';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { RecurringMealSuggestions } from './RecurringMealSuggestions';
+import { NutritionHistoryImport, readHistoryRecovery } from './NutritionHistoryImport';
 import './NutritionImport.css';
 
 type ImportPreview = components['schemas']['ImportPreview'];
@@ -190,6 +194,9 @@ export function NutritionImport({
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [receiptDraftId, setReceiptDraftId] = useState<string | null>(null);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyCompleted, setHistoryCompleted] = useState(false);
+  const [historyRecovery, setHistoryRecovery] = useState(readHistoryRecovery);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [recovery, setRecovery] = useState<Recovery | null>(readRecovery);
@@ -201,6 +208,7 @@ export function NutritionImport({
     const clear = () => {
       try {
         sessionStorage.removeItem(recoveryKey);
+        sessionStorage.removeItem(historyRecoveryKey);
       } catch {
         /* Storage is unavailable. */
       }
@@ -214,6 +222,9 @@ export function NutritionImport({
       setReceipt(null);
       setReceiptDraftId(null);
       setShowRecurring(false);
+      setShowHistory(false);
+      setHistoryCompleted(false);
+      setHistoryRecovery(null);
       setFile(null);
       setEditing(null);
       setConfirming(false);
@@ -407,7 +418,7 @@ export function NutritionImport({
       setError('Сначала проверьте результат отправленного подтверждения.');
       return;
     }
-    if (draft && !receipt) {
+    if (draft && !receipt && !historyCompleted) {
       try {
         await api(`${root}/${draft.id}/cancel`, {
           method: 'POST',
@@ -421,13 +432,56 @@ export function NutritionImport({
     onClose();
   }
 
-  useTelegramOverlayBackButton(!showRecurring, () => {
+  useTelegramOverlayBackButton(!showRecurring && !showHistory, () => {
     void cancel();
   });
 
   const selectable =
     preview?.rows.filter((row) => row.outcome === 'publish' || row.outcome === 'reuse') ?? [];
   const rowsByIndex = new Map(preview?.rows.map((row) => [row.index, row]));
+  if (showHistory && (draft || historyRecovery)) {
+    const draftId = draft?.id ?? historyRecovery?.draftId;
+    const expiresAt = draft ? Date.parse(draft.expires_at) : historyRecovery?.expiresAt;
+    if (draftId && expiresAt !== undefined) {
+      return (
+        <div className="nutrition-import stack">
+          <header>
+            <h1>Импорт питания</h1>
+            <p>Проверьте данные из файла перед добавлением.</p>
+          </header>
+          <ol className="nutrition-import__steps" aria-label="Этапы импорта">
+            <li>
+              <span>1</span>Источник
+            </li>
+            <li aria-current="step">
+              <span>2</span>Проверка
+            </li>
+            <li>
+              <span>3</span>Подтверждение
+            </li>
+          </ol>
+          <div className="nutrition-import__layout">
+            <NutritionHistoryImport
+              draftId={draftId}
+              expiresAt={expiresAt}
+              onBack={() => setShowHistory(false)}
+              onClose={onClose}
+              onDone={() => {
+                setHistoryCompleted(true);
+                setHistoryRecovery(null);
+              }}
+            />
+            <Surface className="nutrition-import__aside stack" subtle>
+              <div className="nutrition-import__history-eyebrow">Отдельные действия</div>
+              <h2>Продукты и история</h2>
+              <p>Продукты добавляются в общий каталог после отдельного подтверждения.</p>
+              <p>История доступна только вам и не публикуется вместе с продуктами.</p>
+            </Surface>
+          </div>
+        </div>
+      );
+    }
+  }
   if (showRecurring && receiptDraftId) {
     return (
       <RecurringMealSuggestions
@@ -484,7 +538,16 @@ export function NutritionImport({
               </Button>
             </Surface>
           )}
-          {!draft && !recovery && !receipt && (
+          {!draft && !recovery && historyRecovery && !receipt && (
+            <Surface className="stack">
+              <h2>Проверить результат переноса истории</h2>
+              <p>Ответ на подтверждение не получен. Проверьте прежний запрос.</p>
+              <Button type="button" onClick={() => setShowHistory(true)}>
+                Проверить результат
+              </Button>
+            </Surface>
+          )}
+          {!draft && !recovery && !historyRecovery && !receipt && (
             <Surface className="stack">
               <h2>Источник данных</h2>
               <p>CSV до 512 КБ или текстовый PDF до 2 МБ.</p>
@@ -520,7 +583,9 @@ export function NutritionImport({
                   Отменить загрузку
                 </Button>
               )}
-              <p>До подтверждения продукты не добавляются. История питания не переносится.</p>
+              <p>
+                До подтверждения продукты не добавляются. Историю питания можно перенести отдельно.
+              </p>
             </Surface>
           )}
           {draft && preview && !receipt && !confirming && (
@@ -869,6 +934,16 @@ export function NutritionImport({
                   Продолжить
                 </Button>
               )}
+              {editing === null && !historyCompleted && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => setShowHistory(true)}
+                >
+                  Перенести историю питания
+                </Button>
+              )}
             </Surface>
           )}
           {draft && preview && confirming && !receipt && (
@@ -878,7 +953,7 @@ export function NutritionImport({
                 Подходящие продукты станут доступны всем пользователям. Совпадения будут
                 использованы повторно.
               </p>
-              <p>Выбрано строк: {selectable.length}. Личная история питания не переносится.</p>
+              <p>Выбрано строк: {selectable.length}. История питания подтверждается отдельно.</p>
               {pending ? (
                 <Button type="button" disabled={busy} onClick={() => void submit(pending)}>
                   Проверить результат
@@ -951,6 +1026,11 @@ export function NutritionImport({
                   </Button>
                 </div>
               )}
+              {draft && !historyCompleted && (
+                <Button type="button" variant="secondary" onClick={() => setShowHistory(true)}>
+                  Перенести историю питания
+                </Button>
+              )}
               <Button type="button" onClick={onClose}>
                 К питанию
               </Button>
@@ -960,7 +1040,7 @@ export function NutritionImport({
         <Surface className="nutrition-import__aside stack" subtle>
           <h2>Сначала проверка</h2>
           <p>Посмотрите продукты и совпадения, затем подтвердите добавление пригодных продуктов.</p>
-          <p>Личная история питания в этом сценарии не переносится.</p>
+          <p>Личную историю питания можно перенести отдельно после проверки.</p>
         </Surface>
       </div>
     </div>

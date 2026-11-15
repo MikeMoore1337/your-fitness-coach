@@ -463,6 +463,8 @@ def confirm_nutrition_import_draft(
     rows = preview["rows"]
     if any(row["status"] not in {"matched", "skipped"} for row in rows):
         raise NutritionDraftError("unresolved_rows", 409)
+    if draft.provider == "fatsecret" and draft.schema_version == "nutrition-import-v3":
+        raise NutritionDraftError("history_confirmation_required", 409)
     selected = [row for row in rows if row["status"] == "matched"]
     if not selected:
         raise NutritionDraftError("nothing_to_import", 409)

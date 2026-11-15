@@ -81,7 +81,8 @@ function formatDate(value: string): string {
 
 function entryAmount(entry: FoodDiaryEntry): string {
   if (entry.amount_unit === 'ml') return `${entry.amount} мл`;
-  if (entry.amount_unit === 'serving') return `${entry.amount} порц.`;
+  if (entry.amount_unit === 'serving')
+    return `${entry.amount} ${entry.serving_unit === 'piece' ? 'шт.' : 'порц.'}`;
   return `${entry.weight_g ?? entry.amount} г`;
 }
 

@@ -4,7 +4,7 @@ import hashlib
 import json
 import secrets
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, DecimalException, localcontext
 from typing import Literal, cast
 
 from pydantic import BaseModel
@@ -277,6 +277,46 @@ def _set_nutrition_amount(entry: FoodDiaryEntry, calculation: FoodNutrition) -> 
     }
 
 
+def _scale_imported_nutrition(entry: FoodDiaryEntry, amount: Decimal) -> dict:
+    snapshot = entry.nutrition_snapshot
+    if not isinstance(snapshot, dict):
+        raise FoodDiaryError("imported nutrition snapshot is unavailable")
+    try:
+        original_amount = Decimal(snapshot["source_row"]["quantity"])
+        facts = snapshot["original_total"]["facts"]
+        if original_amount <= 0:
+            raise ValueError("invalid source amount")
+        fields = {
+            "energy_kcal": ("energy_kcal", "kcal"),
+            "protein_g": ("protein_g", "g"),
+            "fat_g": ("fat_g", "g"),
+            "carbs_g": ("carbohydrate_g", "g"),
+            "fiber_g": ("fiber_g", "g"),
+        }
+        result: dict[str, str | None] = {}
+        with localcontext() as context:
+            context.prec = 50
+            for target, (source, unit) in fields.items():
+                fact = facts.get(source)
+                if not fact or fact.get("evidence") != "read" or fact.get("unit") != unit:
+                    result[target] = None
+                    continue
+                original = Decimal(fact["value"])
+                value = (
+                    original
+                    if amount == original_amount
+                    else (original * amount / original_amount).quantize(
+                        Decimal("0.00000001"), rounding=ROUND_HALF_UP
+                    )
+                )
+                result[target] = str(value)
+        if result["energy_kcal"] is None:
+            raise ValueError("missing source energy")
+        return result
+    except (KeyError, TypeError, ValueError, DecimalException) as exc:
+        raise FoodDiaryError("imported nutrition snapshot is unavailable") from exc
+
+
 def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
     return FoodDiaryEntryResponse(
         id=entry.id,
@@ -286,7 +326,7 @@ def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
         recipe_id=entry.recipe_id,
         entry_kind=cast(Literal["food", "recipe", "quick_add"], entry.entry_kind),
         nutrition_source=cast(
-            Literal["catalog", "recipe", "manual", "restaurant", "photo"],
+            Literal["catalog", "recipe", "manual", "restaurant", "photo", "fatsecret"],
             diary_entry_source(entry),
         ),
         nutrition_confidence=cast(
@@ -706,6 +746,9 @@ def update_food_diary_entry(
     ) and amount_unit != "g":
         raise FoodDiaryError("recipe diary entries must use grams")
     photo_quick_add = entry.entry_kind == "quick_add" and entry.nutrition_source == "photo"
+    imported = entry.nutrition_source == "fatsecret" and food is None and recipe is None
+    if imported and amount_unit != entry.amount_unit:
+        raise FoodDiaryError("imported portion unit cannot be changed")
     if food is not None:
         calculation_food = food
     elif recipe is not None:
@@ -714,10 +757,12 @@ def update_food_diary_entry(
         except RecipeError as exc:
             raise FoodDiaryError(str(exc)) from exc
         calculation_food = _recipe_as_food(recipe_calculation)
-    elif not photo_quick_add:
+    elif not photo_quick_add and not imported:
         calculation_food = _entry_snapshot_as_food(entry)
-    if not photo_quick_add:
+    if not photo_quick_add and not imported:
         calculation = _calculate_amount(calculation_food, amount, amount_unit)
+    if imported:
+        imported_nutrition = _scale_imported_nutrition(entry, amount)
 
     if food is not None:
         _copy_food_snapshot(entry, food)
@@ -733,6 +778,9 @@ def update_food_diary_entry(
     if photo_quick_add:
         entry.weight_g = None
         entry.serving_weight_g = None
+    elif imported:
+        entry.weight_g = amount if amount_unit == "g" else None
+        entry.nutrition_amount = imported_nutrition
     else:
         entry.weight_g = calculation.weight_g
         _set_nutrition_amount(entry, calculation)

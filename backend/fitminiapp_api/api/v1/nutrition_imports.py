@@ -32,7 +32,11 @@ from fitminiapp_api.schemas.nutrition_import_engine import (
     CatalogImportPreview,
     CatalogImportReceipt,
     CatalogReviewRequest,
+    HistoryConfirmRequest,
     HistoryPreview,
+    HistoryReceipt,
+    HistoryReview,
+    HistoryReviewRequest,
     ImportCancelRequest,
     ImportConfirmRequest,
     ImportPreview,
@@ -59,7 +63,11 @@ from fitminiapp_api.services.nutrition_import_drafts import (
     nutrition_import_preview,
     set_resolutions,
 )
-from fitminiapp_api.services.nutrition_import_history import history_preview
+from fitminiapp_api.services.nutrition_import_history import (
+    confirm_history,
+    history_preview,
+    review_history,
+)
 from fitminiapp_api.services.nutrition_import_limits import (
     acquire_parser_slot,
     reserve_upload_attempt,
@@ -107,6 +115,7 @@ def _error(exc: NutritionDraftError | NutritionImportValidationError) -> HTTPExc
         "stale_revision": "Черновик изменился. Обновите предпросмотр",
         "preview_changed": "Данные изменились. Проверьте предпросмотр снова",
         "catalog_confirmation_required": "Сначала подтвердите импорт продуктов",
+        "history_confirmation_required": "Проверьте и подтвердите перенос истории отдельно",
         "meal_unavailable": "Предложение больше недоступно. Обновите список",
         "invalid_meal_item": "Проверьте продукт, количество и единицу измерения",
         "unresolved_rows": "Исправьте или исключите проблемные строки",
@@ -231,6 +240,53 @@ def preview_history(
         return HistoryPreview.model_validate(history_preview(db, current_user, draft_id))
     except NutritionDraftError as exc:
         raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.post("/{draft_id}/history/review", response_model=HistoryReview)
+def review_history_import(
+    draft_id: str,
+    payload: HistoryReviewRequest,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        response.headers["Cache-Control"] = "no-store, private"
+        return HistoryReview.model_validate(review_history(db, current_user, draft_id, payload))
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.post("/{draft_id}/history/confirm", response_model=HistoryReceipt)
+def confirm_history_import(
+    draft_id: str,
+    payload: HistoryConfirmRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        _lock_active_session(db, current_user, getattr(request.state, "session_family_id", None))
+        result = HistoryReceipt.model_validate(confirm_history(db, current_user, draft_id, payload))
+        db.commit()
+        response.headers["Cache-Control"] = "no-store, private"
+        return result
+    except NutritionDraftError as exc:
+        db.rollback()
+        raise _error(exc) from exc
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "import_conflict", "message": "Обновите предпросмотр импорта"},
+        ) from None
     except SQLAlchemyError, ValidationError:
         db.rollback()
         raise _storage_error() from None

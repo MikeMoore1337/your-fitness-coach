@@ -105,6 +105,7 @@ function formatDate(value: string, today: string): { title: string; subtitle: st
 
 function amountLabel(entry: FoodDiaryEntry): string {
   if (entry.amount_unit === 'serving') {
+    if (entry.serving_unit === 'piece') return `${formatNumber(entry.amount, 2)} шт.`;
     const weight = entry.weight_g === null ? '' : ` · ${formatNumber(entry.weight_g)} г`;
     return `${formatNumber(entry.amount, 2)} ${Number(entry.amount) === 1 ? 'порция' : 'порции'}${weight}`;
   }
@@ -434,9 +435,11 @@ function EntryRow({
             <span>
               {entry.entry_kind === 'quick_add'
                 ? `${nutritionEntryMeta(entry)}${entry.logged_at ? ` · ${entry.logged_at.slice(0, 5)}` : ''}`
-                : entry.food_brand
-                  ? `${entry.food_brand} · ${amountLabel(entry)}`
-                  : amountLabel(entry)}
+                : entry.nutrition_source === 'fatsecret'
+                  ? `FatSecret · ${amountLabel(entry)}`
+                  : entry.food_brand
+                    ? `${entry.food_brand} · ${amountLabel(entry)}`
+                    : amountLabel(entry)}
             </span>
           </div>
           <strong className="nutrition-entry__calories">
@@ -508,16 +511,24 @@ function EntryRow({
             <Select
               id={`nutrition-entry-unit-${entry.id}`}
               value={amountUnit}
+              disabled={entry.nutrition_source === 'fatsecret'}
               onChange={(event) => {
                 update.reset();
                 setAmountUnit(event.target.value as FoodDiaryEntry['amount_unit']);
               }}
             >
-              <option value="g">граммы</option>
+              {(entry.nutrition_source !== 'fatsecret' || entry.amount_unit === 'g') && (
+                <option value="g">граммы</option>
+              )}
               {(entry.amount_unit === 'ml' || entry.nutrition_basis_unit === 'ml') && (
                 <option value="ml">миллилитры</option>
               )}
-              {entry.serving_weight_g && <option value="serving">порции</option>}
+              {(entry.serving_weight_g ||
+                (entry.nutrition_source === 'fatsecret' && entry.amount_unit === 'serving')) && (
+                <option value="serving">
+                  {entry.serving_unit === 'piece' ? 'штуки' : 'порции'}
+                </option>
+              )}
             </Select>
           </Field>
           <div className="nutrition-entry-editor__actions">

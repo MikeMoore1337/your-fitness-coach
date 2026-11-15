@@ -5567,6 +5567,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports/{draft_id}/history/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review History Import */
+        post: operations["review_history_import_api_v1_nutrition_imports__draft_id__history_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/history/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm History Import */
+        post: operations["confirm_history_import_api_v1_nutrition_imports__draft_id__history_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports/{draft_id}/resolve": {
         parameters: {
             query?: never;
@@ -13156,7 +13190,7 @@ export interface components {
              */
             entry_kind: "food" | "recipe" | "quick_add";
             /** Nutrition Source */
-            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo") | null;
+            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo" | "fatsecret") | null;
             /** Nutrition Confidence */
             nutrition_confidence?: ("exact" | "approximate" | "partial") | null;
             /** Logged At */
@@ -13757,6 +13791,51 @@ export interface components {
             /** Web Article Potential Reasons */
             web_article_potential_reasons?: string[];
         };
+        /** HistoryConfirmRequest */
+        HistoryConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "keep" | "add_missing" | "manual";
+            /** Selected Rows */
+            selected_rows?: number[];
+            /** Decisions */
+            decisions?: components["schemas"]["HistoryConflictDecision"][];
+            /** Review Signature */
+            review_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** HistoryConflictDecision */
+        HistoryConflictDecision: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "skip";
+        };
         /** HistoryExistingEntry */
         HistoryExistingEntry: {
             /** Id */
@@ -13767,6 +13846,8 @@ export interface components {
             amount: string;
             /** Amount Unit */
             amount_unit: string;
+            /** Serving Unit */
+            serving_unit: string | null;
             nutrition: components["schemas"]["HistoryNutritionAmount"];
         };
         /** HistoryExistingMeal */
@@ -14102,8 +14183,26 @@ export interface components {
             /** Fiber G */
             fiber_g: string | null;
         };
+        /** HistoryPlanRow */
+        HistoryPlanRow: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "skip" | "conflict" | "invalid";
+            /** Reason */
+            reason: string | null;
+            /** Conflict */
+            conflict: boolean;
+        };
         /** HistoryPreview */
         HistoryPreview: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
             /** Dates */
             dates: string[];
             /** Rows */
@@ -14124,6 +14223,54 @@ export interface components {
             ambiguous_facts: boolean;
             /** Ambiguous Duplicate */
             ambiguous_duplicate: boolean;
+        };
+        /** HistoryReceipt */
+        HistoryReceipt: {
+            /** Added */
+            added: number;
+            /** Skipped */
+            skipped: number;
+            /** Conflicts */
+            conflicts: number;
+            /** Entry Ids */
+            entry_ids: number[];
+            /** Review Signature */
+            review_signature: string;
+        };
+        /** HistoryReview */
+        HistoryReview: {
+            /** Preview Signature */
+            preview_signature: string;
+            /** Review Signature */
+            review_signature: string;
+            /** Rows */
+            rows: components["schemas"]["HistoryPlanRow"][];
+        };
+        /** HistoryReviewRequest */
+        HistoryReviewRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "keep" | "add_missing" | "manual";
+            /** Selected Rows */
+            selected_rows?: number[];
+            /** Decisions */
+            decisions?: components["schemas"]["HistoryConflictDecision"][];
         };
         /**
          * HydrationBeverageType
@@ -34877,6 +35024,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_history_import_api_v1_nutrition_imports__draft_id__history_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_history_import_api_v1_nutrition_imports__draft_id__history_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryReceipt"];
                 };
             };
             /** @description Validation Error */
