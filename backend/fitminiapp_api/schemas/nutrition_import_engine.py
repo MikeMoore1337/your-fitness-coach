@@ -84,6 +84,100 @@ class ImportReceipt(BaseModel):
     preview_signature: str
 
 
+class HistoryNutritionAmount(BaseModel):
+    energy_kcal: Decimal | None
+    protein_g: Decimal | None
+    fat_g: Decimal | None
+    carbs_g: Decimal | None
+    fiber_g: Decimal | None
+
+
+class HistoryPreviewRow(BaseModel):
+    index: int
+    source: ImportFoodRow
+    original_total: OriginalTotal | None
+    original_detail_cells: list[OriginalDetailCell]
+    nutrition_amount: HistoryNutritionAmount
+    ambiguous_facts: bool
+    ambiguous_duplicate: bool
+
+
+class HistoryExistingEntry(BaseModel):
+    id: int
+    food_name: str
+    amount: Decimal
+    amount_unit: str
+    serving_unit: str | None
+    nutrition: HistoryNutritionAmount
+
+
+class HistoryExistingMeal(BaseModel):
+    date: date
+    meal_type: MealType
+    entries: list[HistoryExistingEntry]
+
+
+class HistoryPreview(BaseModel):
+    revision: int
+    preview_signature: str
+    dates: list[date]
+    rows: list[HistoryPreviewRow]
+    existing_meals: list[HistoryExistingMeal]
+
+
+class HistoryConflictDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    index: int = Field(ge=0, strict=True)
+    action: Literal["add", "skip"]
+
+
+class HistoryReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(ge=1, strict=True)
+    preview_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    date_from: date
+    date_to: date
+    mode: Literal["keep", "add_missing", "manual"]
+    selected_rows: list[Annotated[int, Field(ge=0, strict=True)]] = Field(
+        default_factory=list, max_length=2000
+    )
+    decisions: list[HistoryConflictDecision] = Field(default_factory=list, max_length=2000)
+
+
+class HistoryPlanRow(BaseModel):
+    index: int
+    action: Literal["add", "skip", "conflict", "invalid"]
+    reason: str | None
+    conflict: bool
+
+
+class HistoryReview(BaseModel):
+    preview_signature: str
+    review_signature: str
+    rows: list[HistoryPlanRow]
+
+
+class HistoryConfirmRequest(HistoryReviewRequest):
+    review_signature: str = Field(pattern=r"^[a-f0-9]{64}$")
+    confirm_key: str = Field(min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    confirmed: Literal[True]
+
+    @field_validator("confirmed", mode="before")
+    @classmethod
+    def require_explicit_true(cls, value: object) -> object:
+        if value is not True:
+            raise ValueError("explicit confirmation is required")
+        return value
+
+
+class HistoryReceipt(BaseModel):
+    added: int
+    skipped: int
+    conflicts: int
+    entry_ids: list[int]
+    review_signature: str
+
+
 class CatalogImportRow(BaseModel):
     index: int
     outcome: Literal["reuse", "publish", "conflict", "needs_review", "private_only", "skipped"]

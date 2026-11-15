@@ -3,6 +3,7 @@ import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   HYDRATION_PENDING_SESSION_PREFIX,
   HYDRATION_PENDING_STORAGE_PREFIX,
+  NUTRITION_HISTORY_RECOVERY_SESSION_KEY,
   NUTRITION_IMPORT_RECOVERY_SESSION_KEY,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
   activeWorkoutPointerStorageKey,
@@ -112,11 +113,12 @@ describe('user-scoped browser storage registry', () => {
 
   it('retains import recovery only for the same account during session expiry', () => {
     const saved = JSON.stringify({ userId: '7', payload: 'synthetic' });
-    sessionStorage.setItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY, saved);
+    const keys = [NUTRITION_IMPORT_RECOVERY_SESSION_KEY, NUTRITION_HISTORY_RECOVERY_SESSION_KEY];
+    for (const key of keys) sessionStorage.setItem(key, saved);
     clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
-    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBe(saved);
+    for (const key of keys) expect(sessionStorage.getItem(key)).toBe(saved);
     clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 8 });
-    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBeNull();
+    for (const key of keys) expect(sessionStorage.getItem(key)).toBeNull();
   });
 
   it('retains pending hydration for the same account on expiry and clears it on logout', () => {

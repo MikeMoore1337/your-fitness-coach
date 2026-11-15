@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 MealType = Literal["breakfast", "lunch", "dinner", "snacks"]
 DiaryAmountUnit = Literal["g", "ml", "serving"]
 DiaryDayStatus = Literal["complete", "incomplete", "unlogged", "fasted"]
-NutritionSource = Literal["catalog", "recipe", "manual", "restaurant", "photo"]
+NutritionSource = Literal["catalog", "recipe", "manual", "restaurant", "photo", "fatsecret"]
 NutritionConfidence = Literal["exact", "approximate", "partial"]
 
 

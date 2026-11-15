@@ -25,11 +25,9 @@ from fitminiapp_api.schemas.nutrition_import import NutritionImportV3
 from fitminiapp_api.services import nutrition_import_fatsecret_pdf
 from fitminiapp_api.services.nutrition_import_drafts import (
     NutritionDraftError,
-    confirm_nutrition_import_draft,
     create_nutrition_import_draft,
     get_nutrition_import_draft,
     nutrition_import_preview,
-    set_resolutions,
 )
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import DETAIL_HEADERS, SUMMARY_HEADERS
 from fitminiapp_api.services.nutrition_import_fatsecret_csv import parse as parse_csv
@@ -237,6 +235,20 @@ def test_synthetic_detail_is_normalized_with_page_coordinates(russian, name):
     assert (str(row.quantity), row.amount_unit) == ("100", "g")
     assert row.coordinates.page == 1
     assert result.original_totals[0].facts.energy_kcal.value == Decimal("12.3")
+
+
+def test_history_preparation_preserves_synthetic_pdf_source_values():
+    from fitminiapp_api.services.nutrition_import_history import prepare_history_rows
+
+    document = NutritionImportV3.model_validate(parse(synthetic_pdf(russian=True)))
+    prepared = prepare_history_rows(document)
+    assert len(prepared) == 1
+    assert str(prepared[0]["source"].diary_date) == "2024-03-02"
+    assert prepared[0]["source"].meal_type == "breakfast"
+    assert str(prepared[0]["source"].quantity) == "100"
+    assert prepared[0]["original_total"].facts.energy_kcal.value == Decimal("12.3")
+    assert prepared[0]["nutrition_amount"]["energy_kcal"] == Decimal("12.3")
+    assert not prepared[0]["ambiguous_facts"]
 
 
 def test_pdf_and_csv_agree_on_synthetic_russian_entry():
@@ -763,8 +775,17 @@ def test_real_pdf_upload_is_private_and_creates_no_canonical_rows(client):
 def test_concurrent_pdf_confirm_is_idempotent_in_postgresql(client):
     if engine.dialect.name != "postgresql":
         pytest.skip("requires PostgreSQL transaction locks")
-    from test_food_diary import _active_food
     from test_training_analytics import _auth, _user_id
+
+    from fitminiapp_api.schemas.nutrition_import_engine import (
+        HistoryConfirmRequest,
+        HistoryReviewRequest,
+    )
+    from fitminiapp_api.services.nutrition_import_history import (
+        confirm_history,
+        history_preview,
+        review_history,
+    )
 
     headers = _auth(client, 984_914)
     owner_id = _user_id(984_914)
@@ -778,11 +799,22 @@ def test_concurrent_pdf_confirm_is_idempotent_in_postgresql(client):
     draft_id = response.json()["id"]
     with get_session_context() as db:
         owner = db.get(User, owner_id)
-        food = _active_food(protein_g_per_100g=None)
-        db.add(food)
-        db.flush()
-        set_resolutions(db, owner, draft_id, revision=1, matches={0: food.id}, skipped_rows=[])
-        preview = nutrition_import_preview(db, owner, draft_id)
+        preview = history_preview(db, owner, draft_id)
+        review_request = HistoryReviewRequest(
+            revision=preview["revision"],
+            preview_signature=preview["preview_signature"],
+            date_from="2024-03-02",
+            date_to="2024-03-02",
+            mode="manual",
+            selected_rows=[0],
+        )
+        review = review_history(db, owner, draft_id, review_request)
+        confirmation = HistoryConfirmRequest(
+            **review_request.model_dump(),
+            review_signature=review["review_signature"],
+            confirm_key="synthetic-pdf-confirm-913",
+            confirmed=True,
+        )
         db.commit()
     barrier = Barrier(2)
 
@@ -790,15 +822,7 @@ def test_concurrent_pdf_confirm_is_idempotent_in_postgresql(client):
         with get_session_context() as db:
             owner = db.get(User, owner_id)
             barrier.wait(timeout=10)
-            receipt = confirm_nutrition_import_draft(
-                db,
-                owner,
-                draft_id,
-                revision=preview["revision"],
-                preview_signature=preview["preview_signature"],
-                confirm_key="synthetic-pdf-confirm-913",
-                confirmed=True,
-            )
+            receipt = confirm_history(db, owner, draft_id, confirmation)
             db.commit()
             return receipt
 
