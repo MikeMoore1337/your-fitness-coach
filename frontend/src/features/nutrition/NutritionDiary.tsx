@@ -1202,19 +1202,23 @@ export function NutritionDiary({
                 </p>
               )}
             </header>
-            {!readOnlyEntries && !demoSafeMode && <NutritionNotesControls consent={notesConsent} />}
             <div className="nutrition-meals">
               {meals.map((meal) => (
                 <MealSection
                   key={meal.meal_type}
                   meal={meal}
                   personalNotes={
-                    notesConsent.status === 'enabled' ? (
-                      <NutritionMealNotes
-                        key={`${selectedDate}-${meal.meal_type}`}
-                        date={selectedDate}
-                        meal={meal.meal_type as MealType}
-                      />
+                    !readOnlyEntries && !demoSafeMode ? (
+                      <>
+                        <NutritionNotesControls consent={notesConsent} />
+                        {notesConsent.status === 'enabled' && (
+                          <NutritionMealNotes
+                            key={`${selectedDate}-${meal.meal_type}`}
+                            date={selectedDate}
+                            meal={meal.meal_type as MealType}
+                          />
+                        )}
+                      </>
                     ) : null
                   }
                   newEntryIds={newEntryIds}

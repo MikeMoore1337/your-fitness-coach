@@ -67,9 +67,9 @@ for (const notesRuntime of ['web', 'pwa', 'tma'] as const) {
         return route.fulfill({ status: 404 });
       });
       await page.goto('/app?section=nutrition&date=2026-08-19');
-      await page.getByRole('button', { name: 'Включить личные отметки' }).click();
       const breakfast = page.getByRole('region', { name: 'Завтрак' });
       await breakfast.getByRole('button', { name: 'Завтрак', exact: true }).click();
+      await breakfast.getByRole('button', { name: 'Включить личные отметки' }).click();
       const hunger = breakfast.getByRole('group', { name: 'Голод до еды · необязательно' });
       await expect(hunger.getByRole('button', { name: 'Нет' })).toHaveAttribute(
         'aria-pressed',
