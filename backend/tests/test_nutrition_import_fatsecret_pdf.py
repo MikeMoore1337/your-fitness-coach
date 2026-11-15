@@ -239,6 +239,19 @@ def test_synthetic_detail_is_normalized_with_page_coordinates(russian, name):
     assert result.original_totals[0].facts.energy_kcal.value == Decimal("12.3")
 
 
+def test_history_preparation_preserves_synthetic_pdf_source_values():
+    from fitminiapp_api.services.nutrition_import_history import prepare_history_rows
+
+    document = NutritionImportV3.model_validate(parse(synthetic_pdf(russian=True)))
+    prepared = prepare_history_rows(document)
+    assert len(prepared) == 1
+    assert str(prepared[0]["source"].diary_date) == "2024-03-02"
+    assert prepared[0]["source"].meal_type == "breakfast"
+    assert str(prepared[0]["source"].quantity) == "100"
+    assert prepared[0]["original_total"].facts.energy_kcal.value == Decimal("12.3")
+    assert not prepared[0]["ambiguous_facts"]
+
+
 def test_pdf_and_csv_agree_on_synthetic_russian_entry():
     data = io.StringIO(newline="")
     writer = csv.writer(data)
