@@ -15,6 +15,7 @@ from fitminiapp_api.api.v1 import (
     notifications,
     nutrition,
     nutrition_imports,
+    nutrition_notes,
     program_imports,
     programs,
     public,
@@ -57,6 +58,9 @@ api_router.include_router(workout_previous_note.router, prefix="/workouts", tags
 api_router.include_router(workout_rest.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(check_ins.router, prefix="/check-ins", tags=["check-ins"])
 api_router.include_router(nutrition.router, prefix="/nutrition", tags=["nutrition"])
+api_router.include_router(
+    nutrition_notes.router, prefix="/nutrition-notes", tags=["nutrition-notes"]
+)
 api_router.include_router(
     nutrition_imports.router, prefix="/nutrition/imports", tags=["nutrition-imports"]
 )

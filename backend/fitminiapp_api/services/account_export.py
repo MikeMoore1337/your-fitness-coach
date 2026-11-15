@@ -66,6 +66,7 @@ from fitminiapp_api.models.nutrition_import import (
     NutritionImportUploadAttempt,
 )
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
+from fitminiapp_api.models.nutrition_notes import NutritionMealNote, NutritionNotesConsent
 from fitminiapp_api.models.nutrition_plan import NutritionPlan
 from fitminiapp_api.models.nutrition_power import (
     FoodSearchAlias,
@@ -133,6 +134,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "energy_calibrations": "energy_calibrations",
     "weekly_check_ins": "weekly_check_ins",
     "daily_wellbeing_check_ins": "daily_wellbeing_check_ins",
+    "nutrition_meal_notes": "nutrition_meal_notes",
+    "nutrition_notes_consents": "nutrition_notes_consent",
     "foods": "private_foods",
     "food_favorites": "food_favorites",
     "recipes": "recipes",
@@ -1017,6 +1020,19 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(DailyWellbeingCheckIn.local_date.asc(), DailyWellbeingCheckIn.id.asc())
         .all()
     )
+    # Keep consent and note reads ordered with revoke and deletion until export is built.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    nutrition_notes_consent = (
+        db.query(NutritionNotesConsent).filter_by(user_id=user.id).one_or_none()
+    )
+    nutrition_meal_notes = (
+        db.query(NutritionMealNote)
+        .filter(NutritionMealNote.user_id == user.id)
+        .order_by(NutritionMealNote.local_date.asc(), NutritionMealNote.id.asc())
+        .all()
+        if nutrition_notes_consent and nutrition_notes_consent.status in ("enabled", "disabled")
+        else []
+    )
     auth_identities = (
         db.query(AuthIdentity)
         .filter(AuthIdentity.user_id == user.id)
@@ -1588,6 +1604,30 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "daily_wellbeing_check_ins": [
             _fields(row, DAILY_WELLBEING_FIELDS) for row in daily_wellbeing_check_ins
         ],
+        "nutrition_meal_notes": [
+            _fields(
+                row,
+                (
+                    "local_date",
+                    "meal_type",
+                    "timezone_at_entry",
+                    "hunger_before",
+                    "fullness_after",
+                    "energy",
+                    "note",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for row in nutrition_meal_notes
+        ],
+        "nutrition_notes_consent": (
+            _fields(
+                nutrition_notes_consent, ("status", "consent_version", "granted_at", "revoked_at")
+            )
+            if nutrition_notes_consent
+            else None
+        ),
         "measurement_definitions": [
             {
                 "id": definition.id,

@@ -332,6 +332,20 @@ def build_account_export_archive(db: Session, user: User) -> tuple[bytes, str]:
                 "updated_at",
             ),
         ),
+        "nutrition-meal-notes.csv": _csv_bytes(
+            _rows(payload.get("nutrition_meal_notes")),
+            (
+                "local_date",
+                "meal_type",
+                "timezone_at_entry",
+                "hunger_before",
+                "fullness_after",
+                "energy",
+                "note",
+                "created_at",
+                "updated_at",
+            ),
+        ),
         "food-diary.csv": _csv_bytes(
             _rows(payload.get("food_diary_entries")),
             (

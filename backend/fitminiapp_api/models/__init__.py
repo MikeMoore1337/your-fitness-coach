@@ -98,6 +98,7 @@ from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogIdentifier,
     NutritionLabelDraft,
 )
+from fitminiapp_api.models.nutrition_notes import NutritionMealNote, NutritionNotesConsent
 from fitminiapp_api.models.nutrition_plan import (
     NutritionPlan,
     NutritionPlanItem,
@@ -242,8 +243,10 @@ __all__ = [
     "NutritionImportDraft",
     "NutritionImportUploadAttempt",
     "NutritionLabelDraft",
+    "NutritionMealNote",
     "NutritionMealTemplate",
     "NutritionMealTemplateItem",
+    "NutritionNotesConsent",
     "NutritionPlan",
     "NutritionPlanItem",
     "NutritionPlanOperation",

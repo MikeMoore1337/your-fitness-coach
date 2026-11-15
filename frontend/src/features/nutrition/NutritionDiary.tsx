@@ -30,6 +30,11 @@ import { FoodPickerDialog, type MealType } from './FoodPickerDialog';
 import { CopyDiaryDialog, type CopySubject } from './CopyDiaryDialog';
 import { HydrationTracker } from './HydrationTracker';
 import { NutritionSuggestions } from './NutritionSuggestions';
+import {
+  NutritionMealNotes,
+  NutritionNotesControls,
+  useNutritionNotesConsent,
+} from './NutritionNotes';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 
 const mealOrder: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -582,6 +587,7 @@ function MealSection({
   onCopyEntry,
   repeatAction,
   repeatFeedback,
+  personalNotes,
   readOnly = false,
 }: {
   meal: FoodDiaryMeal;
@@ -594,6 +600,7 @@ function MealSection({
   onCopyEntry: (entry: FoodDiaryEntry) => void;
   repeatAction?: ReactNode;
   repeatFeedback?: ReactNode;
+  personalNotes?: ReactNode;
   readOnly?: boolean;
 }) {
   const hasEntries = meal.entries.length > 0;
@@ -671,6 +678,7 @@ function MealSection({
         ) : (
           <p className="nutrition-meal__empty">Добавьте продукт — недавние будут под рукой.</p>
         )}
+        {personalNotes}
       </div>
     </section>
   );
@@ -918,6 +926,7 @@ export function NutritionDiary({
   const today = dateInputValue(new Date(), timeZone || undefined);
   const [uncontrolledDate, setUncontrolledDate] = useState(initialDate || today);
   const selectedDate = controlledDate ?? uncontrolledDate;
+  const notesConsent = useNutritionNotesConsent(!readOnlyEntries && !demoSafeMode);
   const [addingTo, setAddingTo] = useState<{
     mealType: MealType;
     initialView?: 'browse' | 'quick-add';
@@ -1198,6 +1207,20 @@ export function NutritionDiary({
                 <MealSection
                   key={meal.meal_type}
                   meal={meal}
+                  personalNotes={
+                    !readOnlyEntries && !demoSafeMode ? (
+                      <>
+                        <NutritionNotesControls consent={notesConsent} />
+                        {notesConsent.status === 'enabled' && (
+                          <NutritionMealNotes
+                            key={`${selectedDate}-${meal.meal_type}`}
+                            date={selectedDate}
+                            meal={meal.meal_type as MealType}
+                          />
+                        )}
+                      </>
+                    ) : null
+                  }
                   newEntryIds={newEntryIds}
                   repeatAction={
                     candidate &&

@@ -57,6 +57,7 @@ from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
 )
+from fitminiapp_api.models.nutrition_notes import NutritionMealNote, NutritionNotesConsent
 from fitminiapp_api.models.photo_meal import PhotoMealDraft
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
@@ -398,6 +399,12 @@ def delete_user_cascade(db: Session, user: User) -> None:
         synchronize_session=False
     )
     db.query(DailyWellbeingCheckIn).filter(DailyWellbeingCheckIn.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionMealNote).filter(NutritionMealNote.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionNotesConsent).filter(NutritionNotesConsent.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(NutritionTargetDateOverride).filter(

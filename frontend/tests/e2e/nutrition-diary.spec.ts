@@ -13,6 +13,93 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
+for (const notesRuntime of ['web', 'pwa', 'tma'] as const) {
+  for (const notesTheme of ['light', 'dark'] as const) {
+    test(`Issue 956 personal notes in diary ${notesRuntime} ${notesTheme}`, async ({
+      page,
+    }, testInfo) => {
+      await page.emulateMedia({ colorScheme: notesTheme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), notesTheme);
+      if (notesRuntime === 'tma') {
+        await installTelegramHarness(page, {
+          colorScheme: notesTheme,
+          safeAreaInset: { top: 24, bottom: 24, left: 0, right: 0 },
+          contentSafeAreaInset: { top: 8, bottom: 8, left: 0, right: 0 },
+        });
+      }
+      if (notesRuntime === 'pwa') {
+        await page.addInitScript(() => {
+          const original = window.matchMedia.bind(window);
+          window.matchMedia = (query) =>
+            query === '(display-mode: standalone)'
+              ? { ...original(query), matches: true }
+              : original(query);
+        });
+      }
+      await mockNutritionApi(page);
+      let consent = 'revoked';
+      let note: Record<string, unknown> | null = null;
+      const savedNotes: Record<string, unknown>[] = [];
+      await page.route('**/api/v1/nutrition-notes/**', async (route) => {
+        const path = new URL(route.request().url()).pathname;
+        const method = route.request().method();
+        if (path.endsWith('/consent')) return route.fulfill({ json: { status: consent } });
+        if (path.endsWith('/consent/enable')) {
+          consent = 'enabled';
+          return route.fulfill({ json: { status: consent } });
+        }
+        if (path.endsWith('/consent/revoke')) {
+          consent = 'revoked';
+          note = null;
+          return route.fulfill({ json: { status: consent } });
+        }
+        if (method === 'GET') return route.fulfill({ json: note ? [note] : [] });
+        if (method === 'PUT') {
+          const savedNote = { meal_type: 'breakfast', ...route.request().postDataJSON() };
+          note = savedNote;
+          savedNotes.push(savedNote);
+          return route.fulfill({ json: savedNote });
+        }
+        if (method === 'DELETE') {
+          note = null;
+          return route.fulfill({ status: 204 });
+        }
+        return route.fulfill({ status: 404 });
+      });
+      await page.goto('/app?section=nutrition&date=2026-08-19');
+      const breakfast = page.getByRole('region', { name: 'Завтрак' });
+      await breakfast.getByRole('button', { name: 'Завтрак', exact: true }).click();
+      await breakfast.getByRole('button', { name: 'Включить личные отметки' }).click();
+      const hunger = breakfast.getByRole('group', { name: 'Голод до еды · необязательно' });
+      await expect(hunger.getByRole('button', { name: 'Нет' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      await hunger.getByRole('button', { name: 'Нет' }).click();
+      await breakfast.getByLabel('Короткая заметка · необязательно').fill('Синтетический пример');
+      await breakfast.getByRole('button', { name: 'Сохранить отметки' }).click();
+      await expect(breakfast.getByRole('button', { name: 'Удалить отметку' })).toBeVisible();
+      expect(savedNotes[0]?.hunger_before).toBe('none');
+      for (const width of [320, 360, 393, 430, 1280]) {
+        await page.setViewportSize({ width, height: 844 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width,
+        );
+        await breakfast.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`notes-${notesTheme}-${width}.png`) });
+      }
+      const target = hunger.getByRole('button', { name: 'Нет' });
+      expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await target.focus();
+      await expect(target).toBeFocused();
+      await page.setViewportSize({ width: 393, height: 844 });
+      page.once('dialog', (dialog) => void dialog.accept());
+      await breakfast.getByRole('button', { name: 'Удалить отметку' }).click();
+      await expect(breakfast.getByRole('button', { name: 'Удалить отметку' })).toHaveCount(0);
+    });
+  }
+}
+
 test('Issue 887 real CSV import stays private and repeat requires a decision', async ({ page }) => {
   test.skip(!process.env.PW_REAL_IMPORT_BASE, 'requires isolated local import backend');
   const base = process.env.PW_REAL_IMPORT_BASE!;
@@ -1856,6 +1943,9 @@ async function mockNutritionApi(
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (path === '/api/v1/nutrition-notes/consent') {
+      return route.fulfill({ json: { status: 'revoked' } });
+    }
     if (path === '/api/v1/public/config') {
       return route.fulfill({
         json: {

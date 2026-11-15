@@ -105,6 +105,7 @@ def test_export_job_is_current_user_only_zip_and_replaces_previous_artifact(clie
             "manifest.json",
             "measurements.csv",
             "nutrition-target-history.csv",
+            "nutrition-meal-notes.csv",
             "weekly-check-ins.csv",
             "workout-history.csv",
             "workout-history-neutral-v2.csv",

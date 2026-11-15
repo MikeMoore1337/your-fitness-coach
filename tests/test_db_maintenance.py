@@ -44,6 +44,9 @@ def test_restore_uses_single_transaction_and_streams_selected_dump(
     monkeypatch.setattr(db_maintenance, "create_backup", lambda output: safety_backup)
 
     def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        if command == db_maintenance._compose_exec(db_maintenance.NOTES_RECOVERY_HOLD_SCRIPT):
+            captured["hold_sql"] = kwargs["input"]
+            return SimpleNamespace(returncode=0, stderr=b"")
         captured["command"] = command
         stream = kwargs["stdin"]
         assert hasattr(stream, "read")
@@ -60,6 +63,25 @@ def test_restore_uses_single_transaction_and_streams_selected_dump(
     assert captured["cwd"] == isolated_paths.parent
     assert captured["command"] == db_maintenance._compose_exec(db_maintenance.RESTORE_SCRIPT)
     assert "--single-transaction" in db_maintenance.RESTORE_SCRIPT
+    assert captured["hold_sql"] == db_maintenance.NOTES_RECOVERY_HOLD_SQL
+
+
+def test_restore_hold_failure_stops_recovery(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = isolated_paths / "operations" / "backups" / "selected.dump"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"postgres-custom-dump")
+    monkeypatch.setattr(db_maintenance, "_database_name", lambda: "fitminiapp_test")
+    monkeypatch.setattr(db_maintenance, "create_backup", lambda output: source)
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        failed = command == db_maintenance._compose_exec(db_maintenance.NOTES_RECOVERY_HOLD_SCRIPT)
+        return SimpleNamespace(returncode=1 if failed else 0, stderr=b"")
+
+    monkeypatch.setattr(db_maintenance.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="writers must remain stopped"):
+        db_maintenance.restore_backup(source, confirmed_database="fitminiapp_test")
 
 
 def test_restore_rejects_wrong_database_before_backup_or_pg_restore(

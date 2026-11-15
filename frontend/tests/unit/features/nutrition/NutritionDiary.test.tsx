@@ -13,7 +13,15 @@ import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 const apiMock = vi.hoisted(() => vi.fn());
 const useAuthMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
+vi.mock('../../../../src/shared/api/client', () => ({
+  api: (path: string, ...args: unknown[]) =>
+    path === '/api/v1/nutrition-notes/consent'
+      ? Promise.resolve({ status: 'revoked' })
+      : apiMock(path, ...args),
+  AUTH_ACCOUNT_SWITCH_EVENT: 'fit:auth-account-switch',
+  AUTH_LOGOUT_EVENT: 'fit:auth-logout',
+  AUTH_VERIFIED_LOGIN_EVENT: 'fit:auth-verified-login',
+}));
 vi.mock('../../../../src/app/AuthProvider', () => ({ useAuth: useAuthMock }));
 vi.mock('../../../../src/features/nutrition/HydrationTracker', () => ({
   HydrationTracker: ({ diaryDate }: { diaryDate: string }) => (
