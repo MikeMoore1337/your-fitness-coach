@@ -1943,6 +1943,9 @@ async function mockNutritionApi(
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
+    if (path === '/api/v1/nutrition-notes/consent') {
+      return route.fulfill({ json: { status: 'revoked' } });
+    }
     if (path === '/api/v1/public/config') {
       return route.fulfill({
         json: {
