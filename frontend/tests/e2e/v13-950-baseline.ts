@@ -245,6 +245,7 @@ for (const count of [1, 3, 6]) {
       expect(batchRequests[0]?.key).toBeTruthy();
       expect(postedIds).toEqual(foods.slice(0, count).map((food) => food.id));
       await page.reload();
+      await breakfast.getByRole('button', { name: 'Завтрак', exact: true }).click();
       for (const food of foods.slice(0, count))
         await expect(breakfast.getByText(food.name, { exact: true })).toBeVisible();
       console.log(
