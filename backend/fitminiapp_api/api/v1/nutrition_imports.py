@@ -32,6 +32,7 @@ from fitminiapp_api.schemas.nutrition_import_engine import (
     CatalogImportPreview,
     CatalogImportReceipt,
     CatalogReviewRequest,
+    HistoryPreview,
     ImportCancelRequest,
     ImportConfirmRequest,
     ImportPreview,
@@ -58,6 +59,7 @@ from fitminiapp_api.services.nutrition_import_drafts import (
     nutrition_import_preview,
     set_resolutions,
 )
+from fitminiapp_api.services.nutrition_import_history import history_preview
 from fitminiapp_api.services.nutrition_import_limits import (
     acquire_parser_slot,
     reserve_upload_attempt,
@@ -210,6 +212,23 @@ def preview(
 ):
     try:
         return ImportPreview.model_validate(nutrition_import_preview(db, current_user, draft_id))
+    except NutritionDraftError as exc:
+        raise _error(exc) from exc
+    except SQLAlchemyError, ValidationError:
+        db.rollback()
+        raise _storage_error() from None
+
+
+@router.get("/{draft_id}/history", response_model=HistoryPreview)
+def preview_history(
+    draft_id: str,
+    response: Response,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        response.headers["Cache-Control"] = "no-store, private"
+        return HistoryPreview.model_validate(history_preview(db, current_user, draft_id))
     except NutritionDraftError as exc:
         raise _error(exc) from exc
     except SQLAlchemyError, ValidationError:

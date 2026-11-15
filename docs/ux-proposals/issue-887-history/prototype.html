@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YFC · Перенос истории питания — макет</title>
+<style>
+@font-face{font-family:Inter;src:url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2')}@font-face{font-family:Oswald;src:url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2')}
+:root{color-scheme:dark;--bg:#080b0a;--surface:#131716;--soft:#1c201f;--text:#f6f8f5;--muted:#b2b9b3;--border:#404741;--lime:#b3f517;--accent-text:#a9e834;--ink:#101500}
+:root.light{color-scheme:light;--bg:#f5f7f3;--surface:#fff;--soft:#eef1ec;--text:#171b17;--muted:#535d54;--border:#c8cec6;--lime:#b3f517;--accent-text:#496e00;--ink:#101500}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.48 Inter,Arial,sans-serif}button,select,input{font:inherit}button,select{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid #a8dc48;outline-offset:3px}
+.demo{padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:12px;text-align:center;background:#253214;color:#e5f3d9;font-size:12px}.demo button{border:1px solid #b7ccac;border-radius:8px;background:transparent;color:inherit;padding:6px}.shell{max-width:1050px;margin:auto;padding:20px 24px 110px}header{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px}.brand{font-size:12px;font-weight:900;line-height:1.05}.brand strong{color:var(--accent-text);font-size:24px;vertical-align:middle;margin-right:8px}.avatar{border:1px solid #a7d828;border-radius:50%;width:38px;height:38px;display:grid;place-items:center}.back{color:var(--muted);margin-bottom:24px}.eyebrow{color:var(--accent-text);font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}h1,h2{font-family:Oswald,'Arial Narrow',sans-serif;line-height:1.2;margin:4px 0 8px}h1{font-size:30px}h2{font-size:22px}p{margin:5px 0 12px}.muted{color:var(--muted)}.steps{display:flex;justify-content:space-around;border-bottom:1px solid var(--border);padding:14px 0;margin-bottom:22px;font-size:12px;color:var(--muted)}.steps b{color:var(--text)}.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}.stack{display:grid;gap:16px}.panel{border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface)}.soft{background:var(--soft);border-radius:12px;padding:14px;margin:12px 0}.panel p:last-child{margin-bottom:0}.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.option{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-top:1px solid var(--border)}.option:first-of-type{border-top:0}input{accent-color:#9bd313}.option input{width:19px;height:19px;flex:none}.option label{flex:1}.option small,.tiny{display:block;color:var(--muted);font-size:12px}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:grid;gap:5px;font-size:13px;font-weight:700}.field select{width:100%;min-height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);padding:8px}.data{font-variant-numeric:tabular-nums}.entry{border-top:1px solid var(--border);padding:12px 0}.pill{font-size:11px;border:1px solid var(--border);border-radius:20px;padding:4px 8px;white-space:nowrap}.warning{border:1px solid #b89034;background:var(--soft);border-radius:12px;padding:12px;margin:12px 0}.warning svg{vertical-align:middle;color:var(--accent-text)}.actions{display:flex;gap:12px;margin-top:16px}.btn{min-height:46px;border:1px solid var(--border);border-radius:12px;padding:9px 16px;font-weight:700;color:var(--text);background:transparent}.primary{background:var(--lime);color:var(--ink);border-color:var(--lime)}.actions .btn{flex:1}.btn:disabled{opacity:.45;cursor:not-allowed}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dock{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);width:min(370px,calc(100% - 32px));display:flex;justify-content:space-around;border:1px solid var(--border);border-radius:999px;padding:10px;background:var(--soft);font-size:11px}.dock strong{color:var(--accent-text)}
+@media(max-width:700px){.shell{padding:18px 16px 100px}header{margin-bottom:34px}.layout{grid-template-columns:1fr}.aside{order:2}.panel{padding:16px}.two{grid-template-columns:1fr}.actions{display:grid;grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="demo"><span>Макет для согласования · вымышленные данные · действия ничего не сохраняют</span><button id="theme">Тема</button></div>
+<main class="shell">
+<header><div class="brand"><strong>YFC</strong> YOUR FITNESS<br>　　COACH</div><span class="avatar">А</span></header>
+<div class="back">‹ &nbsp;Питание</div>
+<div class="eyebrow">Питание</div><h1>Импорт питания</h1><p class="muted">Проверьте данные из файла перед добавлением.</p>
+<div class="steps"><span>1 &nbsp; Источник</span><b>2 &nbsp; Проверка</b><span>3 &nbsp; Подтверждение</span></div>
+<div class="layout"><div class="stack">
+<section class="panel" id="selection">
+ <div class="eyebrow">Личная история</div><h2>Перенести записи в дневник</h2>
+ <p class="muted">Отдельно от импорта продуктов в общий каталог. Дневник изменится только после подтверждения.</p>
+ <div class="option"><input id="enable" type="checkbox"><label for="enable"><strong>Перенести историю питания</strong><small>По умолчанию история не переносится.</small></label></div>
+ <div id="history-options" hidden>
+  <div class="soft"><strong>В файле найдены 3 дня с записями</strong><span class="tiny">2, 4 и 7 марта 2024 · дни без записей не добавятся</span></div>
+  <div class="formgrid"><label class="field">С даты<select id="start"><option value="2">2 марта 2024</option><option value="4">4 марта 2024</option><option value="7">7 марта 2024</option></select></label><label class="field">По дату<select id="end"><option value="7">7 марта 2024</option><option value="4">4 марта 2024</option><option value="2">2 марта 2024</option></select></label></div>
+  <h2 style="margin-top:22px">Если в дневнике уже есть записи</h2>
+  <div class="option"><input id="keep" type="radio" name="mode" checked><label for="keep"><strong>Сохранить существующие записи</strong><small>Пропустить импорт в те приёмы пищи, где уже есть записи.</small></label></div>
+  <div class="option"><input id="add" type="radio" name="mode"><label for="add"><strong>Добавить отсутствующие</strong><small>Возможные совпадения потребуется проверить.</small></label></div>
+  <div class="option"><input id="manual" type="radio" name="mode"><label for="manual"><strong>Выбрать строки вручную</strong><small>Отметьте записи, которые хотите перенести.</small></label></div>
+  <div id="manual-list" hidden><div class="entry" data-day="2"><label><input type="checkbox" checked> &nbsp;2 марта · Завтрак · Овсяные хлопья, 100 г</label><span class="tiny data">365 ккал · Б 12 г · Ж 6 г · У 66 г</span></div><div class="entry" data-day="2"><label><input type="checkbox"> &nbsp;2 марта · Завтрак · Молоко, 200 мл</label><span class="tiny data">100 ккал · Б 6 г · Ж 4 г · У 10 г</span></div><div class="entry" data-day="4"><label><input id="apple" type="checkbox"> &nbsp;4 марта · Перекус · Яблоко, 2 шт.</label><span class="tiny data">156 ккал · Б 0,8 г · Ж 0,4 г · У 42 г</span></div><div class="entry" data-day="4"><label><input type="checkbox"> &nbsp;4 марта · Перекус · Орехи, 30 г</label><span class="tiny data">180 ккал · Б 5 г · Ж 16 г · У 4 г</span></div><div class="entry" data-day="7"><label><input type="checkbox"> &nbsp;7 марта · Обед · Рис, 1 порция</label><span class="tiny data">205 ккал · Б 4 г · Ж 0,4 г · У 45 г</span></div></div>
+  <div class="actions"><button class="btn" id="off">Отмена</button><button class="btn primary" id="to-conflict">Проверить изменения</button></div>
+ </div>
+</section>
+<section class="panel" id="conflict" hidden>
+ <div class="eyebrow">Нужно проверить · 1 из 1</div><h2>Похожая запись в дневнике</h2><p class="muted">4 марта · Перекус. Мы не можем определить, одна это запись или две.</p>
+ <div class="two"><div class="soft"><span class="tiny">Уже в дневнике</span><strong>Яблоко · 1 шт.</strong><p class="data">78 ккал · Б 0,4 г · Ж 0,2 г · У 21 г</p></div><div class="soft"><span class="tiny">В файле</span><strong>Яблоко · 2 шт.</strong><p class="data">156 ккал · Б 0,8 г · Ж 0,4 г · У 42 г</p></div></div>
+ <p class="tiny data">Разница: +78 ккал · Б +0,4 г · Ж +0,2 г · У +21 г</p>
+ <div class="warning"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v1"/></svg> Существующая запись останется без изменений. Выберите действие для строки из файла.</div>
+ <div class="option"><input id="skip" type="radio" name="conflict"><label for="skip"><strong>Пропустить строку из файла</strong></label></div>
+ <div class="option"><input id="include" type="radio" name="conflict"><label for="include"><strong>Добавить как отдельное употребление</strong></label></div>
+ <div class="actions"><button class="btn" id="back-selection">Назад</button><button class="btn primary" id="to-review" disabled>Продолжить</button></div>
+</section>
+<section class="panel" id="review" hidden>
+ <div class="eyebrow">Перед подтверждением</div><h2>Проверьте перенос</h2>
+ <p id="review-period">Выбраны записи за 2–7 марта 2024. Дни без записей не добавятся.</p>
+ <div class="soft"><strong id="review-added">Будет добавлено: 4 записи</strong><span class="tiny" id="review-skipped">Пропущено: 1 · Решено конфликтов: 1</span></div>
+ <div class="warning"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v1"/></svg> Дни не будут автоматически отмечены как заполненные. Существующие записи сохранятся.</div>
+ <label class="option"><input id="confirm" type="checkbox"><span>Подтверждаю перенос выбранных записей в личный дневник.</span></label>
+ <div class="actions"><button class="btn" id="back-conflict">Назад</button><button class="btn primary" id="to-result" disabled>Перенести историю</button></div>
+</section>
+<section class="panel" id="result" hidden>
+ <div class="eyebrow">Готово</div><h2>История перенесена</h2><div class="soft"><strong id="result-added">Добавлено: 4</strong><span class="tiny" id="result-skipped">Пропущено: 1 · Решено конфликтов: 1</span></div>
+ <p class="muted">Дни не отмечены как заполненные автоматически. Проверьте записи в дневнике.</p><button class="btn primary">Открыть дневник</button>
+</section>
+<section class="panel" id="empty" hidden>
+ <div class="eyebrow">Личная история</div><h2>Записи с датами не найдены</h2><p class="muted">В этом файле нет распознанных дат и приёмов пищи. Перенос истории недоступен.</p><p>Проверьте файл или продолжите импорт продуктов отдельно.</p><button class="btn">Вернуться к продуктам</button>
+</section>
+<section class="panel" id="uncertain" hidden>
+ <div class="eyebrow">Нужно проверить · 1 из 1</div><h2>Не хватает данных для переноса</h2><div class="soft"><strong>4 марта · Перекус · Тестовый напиток</strong><span class="tiny">Количество: 1 чашка · Калорийность: не удалось прочитать</span></div><div class="warning"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v1"/></svg> Неизвестные значения не заменяются нулями. Эту строку нельзя перенести без недостающих данных.</div><div class="actions"><button class="btn">Назад</button><button class="btn primary">Пропустить строку</button></div>
+</section>
+<section class="panel" id="stale" hidden>
+ <div class="eyebrow">Проверка изменений</div><h2>Дневник изменился</h2><p>После предпросмотра в выбранных днях появились изменения. Ничего не добавлено.</p><div class="warning"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v6m0-9v1"/></svg> Обновите предпросмотр и снова проверьте совпадения.</div><button class="btn primary">Обновить предпросмотр</button>
+</section>
+<section class="panel" id="repeat" hidden>
+ <div class="eyebrow">Результат проверки</div><h2>Возможный повторный перенос</h2><p>Похожие строки уже встречались в вашем импорте. Проверьте их перед добавлением, чтобы не посчитать питание дважды.</p><div class="soft"><strong>Проверить: 2 строки</strong><span class="tiny">Существующие записи не изменены</span></div><button class="btn primary">Проверить совпадения</button>
+</section>
+</div><aside class="panel aside"><div class="eyebrow">Отдельные действия</div><h2>Продукты и история</h2><p>Продукты добавляются в общий каталог после отдельного подтверждения.</p><p class="muted">История доступна только вам и не публикуется вместе с продуктами.</p></aside></div>
+</main><nav class="dock" aria-label="Навигация"><span>Сегодня</span><span>План</span><strong>Питание</strong><span>Прогресс</span><span>Добавить</span></nav>
+<script>
+const $=id=>document.getElementById(id); const show=id=>{for(const v of ['selection','conflict','review','result','empty','uncertain','stale','repeat']) $(v).hidden=v!==id;window.scrollTo(0,0)};
+$('theme').onclick=()=>document.documentElement.classList.toggle('light');
+$('enable').onchange=e=>$('history-options').hidden=!e.target.checked;
+document.querySelectorAll('[name=mode]').forEach(x=>x.onchange=()=>{$('manual-list').hidden=!$('manual').checked;updateSelection()});
+document.querySelectorAll('#manual-list input').forEach(x=>x.onchange=updateSelection);
+$('start').onchange=()=>{if(+$('start').value>+$('end').value)$('end').value=$('start').value;filterDates()};
+$('end').onchange=()=>{if(+$('end').value<+$('start').value)$('start').value=$('end').value;filterDates()};
+function filterDates(){document.querySelectorAll('#manual-list .entry').forEach(e=>e.hidden=+e.dataset.day<+$('start').value||+e.dataset.day>+$('end').value);updateSelection()}
+function updateSelection(){$('to-conflict').disabled=$('manual').checked&&![...document.querySelectorAll('#manual-list .entry')].some(e=>!e.hidden&&e.querySelector('input').checked)}
+$('off').onclick=()=>{$('enable').checked=false;$('history-options').hidden=true};
+function updateReview(conflict) {
+ const eligible=[...document.querySelectorAll('#manual-list .entry')].filter(e=>!e.hidden);
+ const manual=$('manual').checked, selected=manual ? eligible.filter(e=>e.querySelector('input').checked).length : eligible.length;
+ const hasApple=eligible.some(e=>e.querySelector('#apple'));
+ const skipped=conflict ? Number($('skip').checked) : ($('keep').checked&&hasApple ? 1 : 0);
+ const added=Math.max(0,selected-skipped);
+ $('review-period').textContent='Выбраны записи за '+$('start').value+'–'+$('end').value+' марта 2024. Дни без записей не добавятся.';
+ $('review-added').textContent='Будет добавлено: '+added;
+ $('review-skipped').textContent='Пропущено: '+skipped+' · Решено конфликтов: '+Number(conflict);
+ $('result-added').textContent='Добавлено: '+added;$('result-skipped').textContent=$('review-skipped').textContent;
+}
+$('to-conflict').onclick=()=>{const inRange=!$('apple').closest('.entry').hidden;if(inRange&&($('add').checked||($('manual').checked&&$('apple').checked)))show('conflict');else{updateReview(false);show('review')}};
+$('back-selection').onclick=()=>show('selection');
+$('skip').onchange=$('include').onchange=()=>$('to-review').disabled=false;
+$('to-review').onclick=()=>{updateReview(true);show('review')};$('back-conflict').onclick=()=>show('selection');
+$('confirm').onchange=e=>$('to-result').disabled=!e.target.checked;$('to-result').onclick=()=>show('result');
+const params=new URLSearchParams(location.search);if(params.get('theme')==='light')document.documentElement.classList.add('light');
+if(params.get('state')!=='off'){$('enable').checked=true;$('history-options').hidden=false}
+if(params.get('state')==='manual'){$('manual').checked=true;$('manual-list').hidden=false;updateSelection()}
+if(['conflict','review','result','empty','uncertain','stale','repeat'].includes(params.get('state')))show(params.get('state'));
+</script>
+</body></html>

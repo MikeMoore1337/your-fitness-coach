@@ -5550,6 +5550,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/imports/{draft_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview History */
+        get: operations["preview_history_api_v1_nutrition_imports__draft_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports/{draft_id}/resolve": {
         parameters: {
             query?: never;
@@ -13740,6 +13757,36 @@ export interface components {
             /** Web Article Potential Reasons */
             web_article_potential_reasons?: string[];
         };
+        /** HistoryExistingEntry */
+        HistoryExistingEntry: {
+            /** Id */
+            id: number;
+            /** Food Name */
+            food_name: string;
+            /** Amount */
+            amount: string;
+            /** Amount Unit */
+            amount_unit: string;
+            /** Nutrition */
+            nutrition: {
+                [key: string]: string | null;
+            };
+        };
+        /** HistoryExistingMeal */
+        HistoryExistingMeal: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Entries */
+            entries: components["schemas"]["HistoryExistingEntry"][];
+        };
         /** HistoryImportCatalogSearch */
         HistoryImportCatalogSearch: {
             /** Q */
@@ -14044,6 +14091,28 @@ export interface components {
             right_reached_failure?: string | null;
             /** Right Status */
             right_status?: string | null;
+        };
+        /** HistoryPreview */
+        HistoryPreview: {
+            /** Dates */
+            dates: string[];
+            /** Rows */
+            rows: components["schemas"]["HistoryPreviewRow"][];
+            /** Existing Meals */
+            existing_meals: components["schemas"]["HistoryExistingMeal"][];
+        };
+        /** HistoryPreviewRow */
+        HistoryPreviewRow: {
+            /** Index */
+            index: number;
+            source: components["schemas"]["ImportFoodRow"];
+            original_total: components["schemas"]["OriginalTotal"] | null;
+            /** Original Detail Cells */
+            original_detail_cells: components["schemas"]["OriginalDetailCell"][];
+            /** Ambiguous Facts */
+            ambiguous_facts: boolean;
+            /** Ambiguous Duplicate */
+            ambiguous_duplicate: boolean;
         };
         /**
          * HydrationBeverageType
@@ -34766,6 +34835,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_history_api_v1_nutrition_imports__draft_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPreview"];
                 };
             };
             /** @description Validation Error */

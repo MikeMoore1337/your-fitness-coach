@@ -84,6 +84,35 @@ class ImportReceipt(BaseModel):
     preview_signature: str
 
 
+class HistoryPreviewRow(BaseModel):
+    index: int
+    source: ImportFoodRow
+    original_total: OriginalTotal | None
+    original_detail_cells: list[OriginalDetailCell]
+    ambiguous_facts: bool
+    ambiguous_duplicate: bool
+
+
+class HistoryExistingEntry(BaseModel):
+    id: int
+    food_name: str
+    amount: Decimal
+    amount_unit: str
+    nutrition: dict[str, Decimal | None]
+
+
+class HistoryExistingMeal(BaseModel):
+    date: date
+    meal_type: MealType
+    entries: list[HistoryExistingEntry]
+
+
+class HistoryPreview(BaseModel):
+    dates: list[date]
+    rows: list[HistoryPreviewRow]
+    existing_meals: list[HistoryExistingMeal]
+
+
 class CatalogImportRow(BaseModel):
     index: int
     outcome: Literal["reuse", "publish", "conflict", "needs_review", "private_only", "skipped"]
