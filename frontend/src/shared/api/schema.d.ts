@@ -5516,6 +5516,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition-notes/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consent */
+        get: operations["consent_api_v1_nutrition_notes_consent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/consent/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Consent */
+        post: operations["change_consent_api_v1_nutrition_notes_consent__action__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/{local_date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_v1_nutrition_notes__local_date__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/{local_date}/{meal_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save */
+        put: operations["save_api_v1_nutrition_notes__local_date___meal_type__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_nutrition_notes__local_date___meal_type__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/imports": {
         parameters: {
             query?: never;
@@ -15260,6 +15329,17 @@ export interface components {
              * @default false
              */
             confirm_energy_mismatch: boolean;
+        };
+        /** NutritionMealNoteUpdate */
+        NutritionMealNoteUpdate: {
+            /** Hunger Before */
+            hunger_before?: ("none" | "low" | "medium" | "high") | null;
+            /** Fullness After */
+            fullness_after?: ("none" | "low" | "medium" | "high") | null;
+            /** Energy */
+            energy?: ("low" | "normal" | "high") | null;
+            /** Note */
+            note?: string | null;
         };
         /** NutritionMealTemplateCreate */
         NutritionMealTemplateCreate: {
@@ -34928,6 +35008,154 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NutritionTargetHistoryResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_api_v1_nutrition_notes_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    change_consent_api_v1_nutrition_notes_consent__action__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "enable" | "disable" | "revoke";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_nutrition_notes__local_date__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_api_v1_nutrition_notes__local_date___meal_type__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+                meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionMealNoteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_nutrition_notes__local_date___meal_type__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+                meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

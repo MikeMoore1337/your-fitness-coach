@@ -1893,6 +1893,51 @@ body:has(.app-shell--design-v2) {
   display: none;
 }
 
+.nutrition-notes-controls,
+.nutrition-personal-notes {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4) 0;
+  border-top: 1px solid var(--v2-border);
+}
+
+.nutrition-notes-controls p,
+.nutrition-personal-notes p {
+  margin: 0;
+  color: var(--v2-text-secondary);
+}
+
+.nutrition-personal-notes fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.nutrition-personal-notes__choices,
+.nutrition-personal-notes__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  margin-top: var(--v2-space-2);
+}
+
+.nutrition-personal-notes__choices button {
+  flex: 1 1 4rem;
+  min-height: 44px;
+}
+
+.nutrition-personal-notes textarea {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-top: var(--v2-space-2);
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+}
+
 .nutrition-diary--design-v2 .nutrition-meal__content .nutrition-meal__secondary-actions {
   justify-content: flex-end;
   margin-top: calc(-1 * var(--v2-space-2));

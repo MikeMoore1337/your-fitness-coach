@@ -69,6 +69,21 @@ RESTORE_SCRIPT = (
     '--dbname="$POSTGRES_DB" --username="$POSTGRES_USER"'
 )
 VERIFY_DUMP_SCRIPT = "exec pg_restore --list"
+NOTES_RECOVERY_HOLD_SCRIPT = (
+    'exec psql --set ON_ERROR_STOP=1 --dbname="$POSTGRES_DB" --username="$POSTGRES_USER"'
+)
+NOTES_RECOVERY_HOLD_SQL = b"""
+DO $$
+BEGIN
+  IF to_regclass('public.nutrition_notes_consents') IS NOT NULL THEN
+    UPDATE account_data_exports SET status = 'expired', archive_bytes = NULL,
+      content_size_bytes = NULL, download_token_hash = NULL, download_token_expires_at = NULL
+      WHERE user_id IN (SELECT user_id FROM nutrition_notes_consents);
+    UPDATE nutrition_notes_consents SET status = 'recovery_hold'
+      WHERE status IN ('enabled', 'disabled');
+  END IF;
+END; $$;
+"""
 DATABASE_MAJOR_SCRIPT = (
     "exec psql --tuples-only --no-align "
     '--dbname="$POSTGRES_DB" --username="$POSTGRES_USER" '
@@ -378,6 +393,19 @@ def restore_backup(source: Path, *, confirmed_database: str) -> tuple[Path, str]
         sys.stderr.buffer.write(process.stderr)
         raise RuntimeError(
             "pg_restore failed; writers must remain stopped. "
+            f"The automatic safety backup is {safety_backup}"
+        )
+    hold = subprocess.run(
+        _compose_exec(NOTES_RECOVERY_HOLD_SCRIPT),
+        cwd=ROOT,
+        check=False,
+        input=NOTES_RECOVERY_HOLD_SQL,
+        stderr=subprocess.PIPE,
+    )
+    if hold.returncode != 0:
+        sys.stderr.buffer.write(hold.stderr)
+        raise RuntimeError(
+            "Could not protect restored nutrition notes; writers must remain stopped. "
             f"The automatic safety backup is {safety_backup}"
         )
     return safety_backup, actual_database
