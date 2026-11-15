@@ -249,6 +249,7 @@ def test_history_preparation_preserves_synthetic_pdf_source_values():
     assert prepared[0]["source"].meal_type == "breakfast"
     assert str(prepared[0]["source"].quantity) == "100"
     assert prepared[0]["original_total"].facts.energy_kcal.value == Decimal("12.3")
+    assert prepared[0]["nutrition_amount"]["energy_kcal"] == Decimal("12.3")
     assert not prepared[0]["ambiguous_facts"]
 
 

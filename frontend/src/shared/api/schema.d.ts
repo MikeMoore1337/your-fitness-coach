@@ -13767,10 +13767,7 @@ export interface components {
             amount: string;
             /** Amount Unit */
             amount_unit: string;
-            /** Nutrition */
-            nutrition: {
-                [key: string]: string | null;
-            };
+            nutrition: components["schemas"]["HistoryNutritionAmount"];
         };
         /** HistoryExistingMeal */
         HistoryExistingMeal: {
@@ -14092,6 +14089,19 @@ export interface components {
             /** Right Status */
             right_status?: string | null;
         };
+        /** HistoryNutritionAmount */
+        HistoryNutritionAmount: {
+            /** Energy Kcal */
+            energy_kcal: string | null;
+            /** Protein G */
+            protein_g: string | null;
+            /** Fat G */
+            fat_g: string | null;
+            /** Carbs G */
+            carbs_g: string | null;
+            /** Fiber G */
+            fiber_g: string | null;
+        };
         /** HistoryPreview */
         HistoryPreview: {
             /** Dates */
@@ -14109,6 +14119,7 @@ export interface components {
             original_total: components["schemas"]["OriginalTotal"] | null;
             /** Original Detail Cells */
             original_detail_cells: components["schemas"]["OriginalDetailCell"][];
+            nutrition_amount: components["schemas"]["HistoryNutritionAmount"];
             /** Ambiguous Facts */
             ambiguous_facts: boolean;
             /** Ambiguous Duplicate */

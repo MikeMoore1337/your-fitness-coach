@@ -31,6 +31,25 @@ def _number(value: Decimal | None) -> str | None:
     return format(value.normalize(), "f") if value is not None else None
 
 
+def _source_amount(total: OriginalTotal | None) -> dict[str, Decimal | None]:
+    fields = {
+        "energy_kcal": ("energy_kcal", "kcal"),
+        "protein_g": ("protein_g", "g"),
+        "fat_g": ("fat_g", "g"),
+        "carbs_g": ("carbohydrate_g", "g"),
+        "fiber_g": ("fiber_g", "g"),
+    }
+    result = {}
+    for target, (source, unit) in fields.items():
+        fact = getattr(total.facts, source) if total is not None else None
+        result[target] = (
+            fact.value
+            if fact is not None and fact.evidence == "read" and fact.unit == unit
+            else None
+        )
+    return result
+
+
 def prepare_history_rows(document: NutritionImportV3) -> list[dict]:
     """Associate source facts and flag identical candidates, not proven duplicate identities."""
     if document.source.provider != "fatsecret":
@@ -94,6 +113,7 @@ def prepare_history_rows(document: NutritionImportV3) -> list[dict]:
                 "index": index,
                 "source": row,
                 "original_total": total,
+                "nutrition_amount": _source_amount(total),
                 "fingerprint": _digest(_canonical(identity)) if total is not None else None,
                 "ambiguous_facts": total is None,
             }

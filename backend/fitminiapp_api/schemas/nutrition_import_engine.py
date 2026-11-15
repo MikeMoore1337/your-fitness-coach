@@ -84,11 +84,20 @@ class ImportReceipt(BaseModel):
     preview_signature: str
 
 
+class HistoryNutritionAmount(BaseModel):
+    energy_kcal: Decimal | None
+    protein_g: Decimal | None
+    fat_g: Decimal | None
+    carbs_g: Decimal | None
+    fiber_g: Decimal | None
+
+
 class HistoryPreviewRow(BaseModel):
     index: int
     source: ImportFoodRow
     original_total: OriginalTotal | None
     original_detail_cells: list[OriginalDetailCell]
+    nutrition_amount: HistoryNutritionAmount
     ambiguous_facts: bool
     ambiguous_duplicate: bool
 
@@ -98,7 +107,7 @@ class HistoryExistingEntry(BaseModel):
     food_name: str
     amount: Decimal
     amount_unit: str
-    nutrition: dict[str, Decimal | None]
+    nutrition: HistoryNutritionAmount
 
 
 class HistoryExistingMeal(BaseModel):

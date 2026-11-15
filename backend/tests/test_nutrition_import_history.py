@@ -28,6 +28,8 @@ def test_history_uses_only_observed_dates_and_keeps_source_facts(rows):
     assert first["source"].amount_unit == "g"
     assert str(first["original_total"].facts.energy_kcal.value) == "12.30000001"
     assert first["original_total"].facts.fiber_g.value is None
+    assert str(first["nutrition_amount"]["energy_kcal"]) == "12.30000001"
+    assert first["nutrition_amount"]["fiber_g"] is None
     assert not first["ambiguous_facts"]
 
 
@@ -57,6 +59,7 @@ def test_missing_or_ambiguous_source_facts_are_not_invented(rows):
     assert prepared[0]["original_total"] is None
     assert prepared[0]["ambiguous_facts"]
     assert prepared[0]["fingerprint"] is None
+    assert all(value is None for value in prepared[0]["nutrition_amount"].values())
 
 
 def test_partial_export_fingerprint_is_independent_of_file_and_line(rows):
@@ -79,6 +82,20 @@ def test_source_details_change_candidate_fingerprint(rows):
         prepare_history_rows(original)[0]["fingerprint"]
         != prepare_history_rows(changed)[0]["fingerprint"]
     )
+
+
+def test_source_amount_does_not_convert_unknown_or_mismatched_units(rows):
+    _, document = _validated(rows)
+    total = next(
+        item
+        for item in document.original_totals
+        if item.coordinates == document.rows[0].coordinates
+    )
+    total.facts.energy_kcal.unit = "mg"
+    result = prepare_history_rows(document)[0]["nutrition_amount"]
+    assert result["energy_kcal"] is None
+    assert result["fiber_g"] is None
+    assert str(result["protein_g"]) == "3.00"
 
 
 def test_history_preview_is_private_read_only_and_expires(client, rows):
@@ -118,6 +135,8 @@ def test_history_preview_is_private_read_only_and_expires(client, rows):
     assert preview["dates"] == ["2024-02-29", "2024-03-02"]
     assert preview["rows"][0]["original_total"]["facts"]["energy_kcal"]["value"] == "12.30000001"
     assert preview["rows"][0]["original_total"]["facts"]["fiber_g"]["value"] is None
+    assert preview["rows"][0]["nutrition_amount"]["energy_kcal"] == "12.30000001"
+    assert preview["rows"][0]["nutrition_amount"]["fiber_g"] is None
     assert len(preview["existing_meals"]) == 1
     assert preview["existing_meals"][0]["entries"][0]["food_name"] == "Существующая запись"
     assert "Чужая запись" not in response.text
