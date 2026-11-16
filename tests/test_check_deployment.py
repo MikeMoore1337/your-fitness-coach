@@ -151,7 +151,9 @@ def test_production_smoke_requires_private_nutrition_diary(
                 final_url=response.final_url,
                 headers=response.headers,
             )
-        return source(base_url, path, timeout=timeout, method=method, body=body, headers=headers)
+        return source(
+            base_url, path, timeout=timeout, method=method, body=body, headers=headers
+        )
 
     with pytest.raises(RuntimeError, match="nutrition diary privacy boundary returned"):
         check_deployment.check_deployment(
