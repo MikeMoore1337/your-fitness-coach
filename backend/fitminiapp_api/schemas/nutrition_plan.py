@@ -12,6 +12,7 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryTargets,
     MealType,
 )
+from fitminiapp_api.schemas.nutrition_power import NutritionSuggestionConstraints
 
 PlanItemKind = Literal["food", "recipe"]
 PlanItemAmountUnit = DiaryAmountUnit
@@ -87,7 +88,7 @@ class NutritionPlanFillItem(BaseModel):
         return self
 
 
-class NutritionPlanFillRequest(BaseModel):
+class NutritionPlanFillBaseRequest(BaseModel):
     plan_date: date
     meal_type: MealType
     candidate_id: str = Field(min_length=1, max_length=128)
@@ -95,11 +96,25 @@ class NutritionPlanFillRequest(BaseModel):
     expected_revision: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def require_unique_positions(self) -> NutritionPlanFillRequest:
+    def require_unique_positions(self) -> NutritionPlanFillBaseRequest:
         positions = [item.position for item in self.items]
         if len(positions) != len(set(positions)):
             raise ValueError("candidate item positions must be unique")
         return self
+
+
+class NutritionPlanFillPreviewRequest(NutritionPlanFillBaseRequest):
+    constraints: NutritionSuggestionConstraints | None = None
+
+
+class NutritionPlanFillRequest(NutritionPlanFillPreviewRequest):
+    preview_token: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+        description="Нужен для нового заполнения; без него разрешён только повтор прежней операции.",
+    )
 
 
 class NutritionPlanItemActionRequest(BaseModel):

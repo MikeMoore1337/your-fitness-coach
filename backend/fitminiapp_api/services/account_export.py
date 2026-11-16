@@ -26,6 +26,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_nutrition_proposal import CoachNutritionProposal
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
@@ -52,8 +53,20 @@ from fitminiapp_api.models.notification import (
     NotificationSetting,
     WebPushSubscription,
 )
-from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition import (
+    EnergyCalibration,
+    NutritionScheduleBinding,
+    NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
+    NutritionTargetScheduleRule,
+)
+from fitminiapp_api.models.nutrition_import import (
+    NutritionImportDraft,
+    NutritionImportUploadAttempt,
+)
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
+from fitminiapp_api.models.nutrition_notes import NutritionMealNote, NutritionNotesConsent
 from fitminiapp_api.models.nutrition_plan import NutritionPlan
 from fitminiapp_api.models.nutrition_power import (
     FoodSearchAlias,
@@ -93,7 +106,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 26
+ACCOUNT_EXPORT_SCHEMA_VERSION = 30
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -110,6 +123,10 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
+    "nutrition_schedule_bindings": "nutrition",
+    "nutrition_target_date_overrides": "nutrition",
+    "nutrition_target_day_snapshots": "nutrition",
+    "nutrition_target_schedule_rules": "nutrition",
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
     "hydration_presets": "hydration",
@@ -117,6 +134,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "energy_calibrations": "energy_calibrations",
     "weekly_check_ins": "weekly_check_ins",
     "daily_wellbeing_check_ins": "daily_wellbeing_check_ins",
+    "nutrition_meal_notes": "nutrition_meal_notes",
+    "nutrition_notes_consents": "nutrition_notes_consent",
     "foods": "private_foods",
     "food_favorites": "food_favorites",
     "recipes": "recipes",
@@ -129,6 +148,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "grocery_list_items": "grocery_lists",
     "grocery_list_item_sources": "grocery_lists",
     "food_search_aliases": "food_search_aliases",
+    "nutrition_import_drafts": "nutrition_import_drafts",
+    "nutrition_import_upload_attempts": "nutrition_import_upload_attempts",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
     "food_diary_copy_operations": "food_diary_copy_operations",
@@ -158,6 +179,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "exercise_guide_metadata": "custom_exercises",
     "exercise_alternatives": "custom_exercises",
     "coach_clients": "coaching_relationships",
+    "coach_nutrition_proposals": "coach_nutrition_proposals",
     "coach_session_series": "coach_session_series",
     "coach_business_sessions": "coach_business_sessions",
     "coach_packages": "coach_packages",
@@ -186,6 +208,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
+    "nutrition_catalog_identifiers": "shared catalog identity mappings, not user-owned records",
     "account_data_exports": "short-lived generated archive bytes and download capability metadata",
     "auth_action_tokens": "hashed authentication actions and session-family metadata",
     "oauth_transactions": "short-lived browser OAuth state, PKCE, nonce, and recovery metadata",
@@ -385,6 +408,7 @@ NUTRITION_FIELDS = (
     "id",
     "effective_from",
     "effective_to",
+    "target_scope",
     "source",
     "created_by_user_id",
     "created_at",
@@ -928,6 +952,32 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     nutrition = next((row for row in nutrition_history if row.effective_to is None), None)
+    nutrition_snapshots = (
+        db.query(NutritionTargetDaySnapshot)
+        .filter(NutritionTargetDaySnapshot.user_id == user.id)
+        .order_by(NutritionTargetDaySnapshot.diary_date.asc())
+        .all()
+    )
+    nutrition_overrides = (
+        db.query(NutritionTargetDateOverride)
+        .filter(NutritionTargetDateOverride.user_id == user.id)
+        .order_by(
+            NutritionTargetDateOverride.target_date.asc(), NutritionTargetDateOverride.id.asc()
+        )
+        .all()
+    )
+    nutrition_bindings = (
+        db.query(NutritionScheduleBinding)
+        .filter(NutritionScheduleBinding.user_id == user.id)
+        .order_by(NutritionScheduleBinding.effective_from, NutritionScheduleBinding.id)
+        .all()
+    )
+    nutrition_schedule_rules = (
+        db.query(NutritionTargetScheduleRule)
+        .filter(NutritionTargetScheduleRule.user_id == user.id)
+        .order_by(NutritionTargetScheduleRule.effective_from, NutritionTargetScheduleRule.id)
+        .all()
+    )
     hydration_goals = (
         db.query(HydrationGoal)
         .filter(HydrationGoal.user_id == user.id)
@@ -969,6 +1019,19 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .filter(DailyWellbeingCheckIn.user_id == user.id)
         .order_by(DailyWellbeingCheckIn.local_date.asc(), DailyWellbeingCheckIn.id.asc())
         .all()
+    )
+    # Keep consent and note reads ordered with revoke and deletion until export is built.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    nutrition_notes_consent = (
+        db.query(NutritionNotesConsent).filter_by(user_id=user.id).one_or_none()
+    )
+    nutrition_meal_notes = (
+        db.query(NutritionMealNote)
+        .filter(NutritionMealNote.user_id == user.id)
+        .order_by(NutritionMealNote.local_date.asc(), NutritionMealNote.id.asc())
+        .all()
+        if nutrition_notes_consent and nutrition_notes_consent.status in ("enabled", "disabled")
+        else []
     )
     auth_identities = (
         db.query(AuthIdentity)
@@ -1035,6 +1098,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         db.query(FoodSearchAlias)
         .filter(FoodSearchAlias.user_id == user.id)
         .order_by(FoodSearchAlias.created_at.asc(), FoodSearchAlias.id.asc())
+        .all()
+    )
+    nutrition_import_drafts = (
+        db.query(NutritionImportDraft)
+        .filter(
+            NutritionImportDraft.owner_user_id == user.id,
+            NutritionImportDraft.expires_at > datetime.now(UTC).replace(tzinfo=None),
+        )
+        .order_by(NutritionImportDraft.created_at.asc(), NutritionImportDraft.id.asc())
+        .all()
+    )
+    nutrition_import_upload_attempts = (
+        db.query(NutritionImportUploadAttempt)
+        .filter(NutritionImportUploadAttempt.owner_user_id == user.id)
+        .order_by(
+            NutritionImportUploadAttempt.created_at.asc(), NutritionImportUploadAttempt.id.asc()
+        )
         .all()
     )
     diary_entries = (
@@ -1180,6 +1260,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         db.query(CoachClient)
         .filter(or_(CoachClient.coach_user_id == user.id, CoachClient.client_user_id == user.id))
         .order_by(CoachClient.created_at.asc(), CoachClient.id.asc())
+        .all()
+    )
+    coach_nutrition_proposals = (
+        db.query(CoachNutritionProposal)
+        .filter(CoachNutritionProposal.client_user_id == user.id)
+        .order_by(CoachNutritionProposal.id.asc())
         .all()
     )
     session_series = (
@@ -1409,6 +1495,44 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "nutrition_target_history": [
             _fields(target, NUTRITION_FIELDS) for target in nutrition_history
         ],
+        "nutrition_target_day_snapshots": [
+            _fields(snapshot, ("diary_date", "target_id", "captured_at"))
+            for snapshot in nutrition_snapshots
+        ],
+        "nutrition_target_date_overrides": [
+            _fields(
+                override,
+                ("id", "target_date", "day_type", "target_id", "created_by_user_id", "created_at"),
+            )
+            for override in nutrition_overrides
+        ],
+        "nutrition_schedule_bindings": [
+            _fields(
+                item,
+                ("id", "program_revision_id", "effective_from", "created_by_user_id", "created_at"),
+            )
+            for item in nutrition_bindings
+        ],
+        "nutrition_target_schedule_rules": [
+            _fields(
+                item,
+                (
+                    "id",
+                    "target_id",
+                    "program_id",
+                    "scope",
+                    "day_type",
+                    "week_type",
+                    "effective_from",
+                    "source_cycle_week",
+                    "cycle_boundary",
+                    "weekday",
+                    "created_by_user_id",
+                    "created_at",
+                ),
+            )
+            for item in nutrition_schedule_rules
+        ],
         "hydration": {
             "goals": [
                 _fields(
@@ -1480,6 +1604,30 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "daily_wellbeing_check_ins": [
             _fields(row, DAILY_WELLBEING_FIELDS) for row in daily_wellbeing_check_ins
         ],
+        "nutrition_meal_notes": [
+            _fields(
+                row,
+                (
+                    "local_date",
+                    "meal_type",
+                    "timezone_at_entry",
+                    "hunger_before",
+                    "fullness_after",
+                    "energy",
+                    "note",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for row in nutrition_meal_notes
+        ],
+        "nutrition_notes_consent": (
+            _fields(
+                nutrition_notes_consent, ("status", "consent_version", "granted_at", "revoked_at")
+            )
+            if nutrition_notes_consent
+            else None
+        ),
         "measurement_definitions": [
             {
                 "id": definition.id,
@@ -1568,6 +1716,32 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("id", "alias", "normalized_alias", "food_id", "created_at", "updated_at"),
             )
             for row in food_search_aliases
+        ],
+        "nutrition_import_drafts": [
+            _fields(
+                row,
+                (
+                    "id",
+                    "provider",
+                    "source",
+                    "parser_version",
+                    "adapter_id",
+                    "schema_version",
+                    "status",
+                    "revision",
+                    "document",
+                    "skipped_rows",
+                    "resolutions",
+                    "receipt",
+                    "catalog_receipt",
+                    "created_at",
+                    "expires_at",
+                ),
+            )
+            for row in nutrition_import_drafts
+        ],
+        "nutrition_import_upload_attempts": [
+            _fields(row, ("created_at",)) for row in nutrition_import_upload_attempts
         ],
         "food_diary_entries": [
             {
@@ -1719,6 +1893,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "id": relation.id,
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
+                "nutrition_access": relation.nutrition_access is not False,
                 **(
                     {"operational_status": relation.operational_status or "active"}
                     if relation.coach_user_id == user.id
@@ -1730,6 +1905,26 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "ended_reason": relation.ended_reason,
             }
             for relation in relations
+        ],
+        "coach_nutrition_proposals": [
+            _fields(
+                proposal,
+                (
+                    "id",
+                    "coach_user_id",
+                    "relationship_id",
+                    "version",
+                    "target_date",
+                    "target_id",
+                    "plan_revision",
+                    "request",
+                    "before",
+                    "status",
+                    "created_at",
+                    "decided_at",
+                ),
+            )
+            for proposal in coach_nutrition_proposals
         ],
         "coach_session_series": [
             _fields(

@@ -8,93 +8,48 @@ description: >
 
 # performance-engineer
 
-Не оптимизируй по ощущениям.
+Do not optimize by intuition.
 
-## Сначала baseline
+## Establish a baseline
 
-Определи измеримый показатель:
-
-- p50/p95/p99 latency;
-- throughput;
-- CPU;
-- memory;
-- query count/time;
-- bundle/load metrics;
-- startup;
-- job duration.
-
-Профилируй bottleneck.
+Measure p50/p95/p99 latency, throughput, CPU, memory, query count/duration, bundle/loading metrics, startup and job duration as applicable. Profile the actual bottleneck.
 
 ## Backend
 
-Проверь:
-
-- N+1;
-- query plans;
-- connection pools;
-- serialization;
-- sync blocking in async code;
-- unbounded concurrency;
-- inefficient retries;
-- cache suitability;
-- memory growth.
+Check N+1 queries, plans, pools, serialization, blocking sync code in async flows, unbounded concurrency, inefficient retries, caching suitability and memory growth.
 
 ## Frontend
 
-Проверь:
+Check bundle, network waterfalls, LCP/INP/CLS, heavy JavaScript, images/fonts, render churn and virtualization when large lists justify it.
 
-- bundle;
-- network waterfall;
-- LCP/INP/CLS;
-- heavy JS;
-- image/font loading;
-- render churn;
-- virtualization для больших списков при необходимости.
+## Mobile Web/TMA
 
-## Mobile Web/TMA performance
+Measure Mobile Web and TMA separately for client-facing YFC flows:
 
-Для client-facing YFC flow измеряй отдельно Mobile Web и TMA:
+- Initial/core-flow JavaScript, CSS and media cost.
+- Low-end device main-thread blocking and memory.
+- Keyboard/sheet/open-close stutter.
+- Foreground resume and slow/unstable networks.
+- Duplicate platform bundles.
+- Eager charts/exercise media.
+- Fixed/sticky layout work during viewport/safe-area changes.
 
-- initial/core-flow JS/CSS/media cost;
-- low-end device main-thread blocking и memory;
-- keyboard/sheet/open-close jank;
-- foreground resume;
-- slow/unstable network;
-- duplicate platform bundles;
-- eager charts/exercise media;
-- fixed/sticky layout work при viewport/safe-area events.
-
-Не считай desktop localhost достаточным baseline. Используй task `50A` smoke и `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md`. Telegram client performance и browser mobile lab data фиксируй отдельно.
+Desktop localhost is not a sufficient baseline. Use task `50A` smoke and `references/MOBILE_TMA_ACCEPTANCE_MATRIX.md`, keeping browser mobile lab measurements separate from Telegram client data.
 
 ## Web performance budget
 
-Для публичного или пользовательского web-интерфейса, если проект не задаёт другой budget, используй
-текущие Core Web Vitals "good" thresholds как ориентир для field data на 75-м перцентиле отдельно для
-mobile и desktop:
+For public/user-facing web UI without an explicit project budget, use current Core Web Vitals good field thresholds at the 75th percentile, separately for mobile and desktop:
 
-- LCP <= 2.5 s;
-- INP <= 200 ms;
+- LCP <= 2.5 s.
+- INP <= 200 ms.
 - CLS <= 0.1.
 
-Lab-метрики нужны для диагностики, но не подменяют реальные пользовательские данные. Если field data
-ещё нет, зафиксируй это как ограничение, а не выдавай локальный benchmark за production experience.
+Lab measurements aid diagnosis, but never represent actual field experience. Report missing field data as a limitation rather than claiming localhost benchmarks measure production UX.
 
-## Нагрузка
+## Load
 
-Для критических сервисов проверь:
+For critical services verify a realistic load profile, saturation, graceful degradation, dependency/rate limits and recovery after spikes. Repeat the same benchmark after changes and record the difference.
 
-- realistic load profile;
-- saturation point;
-- graceful degradation;
-- dependency limits;
-- rate limits;
-- recovery after spike.
+## Narrow external references
 
-После изменения повтори тот же benchmark и зафиксируй разницу.
-
-## Внешние ссылки по узкому performance-scope
-
-После baseline при React/motion проблеме используй
-`../../references/external-quality/vercel/react-best-practices/SKILL.md` и/или
-`../../references/external-quality/ui-skills/fixing-motion-performance.md`.
-Не переносить Next.js-специфичные советы в Vite без технической проверки.
+After baseline, use `../../references/external-quality/vercel/react-best-practices/SKILL.md` and/or `../../references/external-quality/ui-skills/fixing-motion-performance.md` for related React/motion concerns. Verify applicability before importing Next.js-specific advice into Vite.

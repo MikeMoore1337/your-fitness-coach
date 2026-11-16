@@ -26,6 +26,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     "<span>{'pending' === status ? 'Готово' : 'Review'}</span>",
     '<span>RPE review</span>',
     '<span>Hevy review</span>',
+    '<span>FatSecret review</span>',
   ])('rejects new English user-facing copy: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(1);
@@ -45,6 +46,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     "<span>{'pending' === status ? 'Ожидает' : 'Готово'}</span>",
     '<p>RPE: 8</p>',
     '<span>Импорт из Hevy, Strong и FitNotes</span>',
+    '<span>Импорт из FatSecret</span>',
   ])('allows Russian copy, identifiers, and documented exceptions: %s', (source) => {
     const result = runGuard(source);
     expect(result.status).toBe(0);

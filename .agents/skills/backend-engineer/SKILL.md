@@ -8,77 +8,54 @@ description: >
 
 # backend-engineer
 
-Строй backend вокруг ясных бизнес-границ.
+Structure backend services around clear business boundaries.
 
 ## API
 
-- явные request/response schemas;
-- валидация на границе;
-- стабильные error contracts;
-- корректные status codes/protocol semantics;
-- pagination/filter/sort contracts;
-- versioning только при необходимости;
-- backward compatibility.
+- Explicit request/response schemas.
+- Validate at the boundary.
+- Stable error contracts and correct HTTP status/protocol semantics.
+- Pagination, filtering and sorting contracts.
+- Version only when necessary; preserve backward compatibility.
 
-## Бизнес-логика
+## Business logic
 
-- не прячь бизнес-правила в controllers/routers;
-- транзакционные границы должны быть явными;
-- side effects должны происходить в предсказуемом порядке;
-- повторяемые операции делай идемпотентными, если запрос может повториться.
+- Do not hide business rules in controllers/routers.
+- Make transaction boundaries explicit.
+- Order side effects predictably.
+- Make repeated operations idempotent when the request may be retried.
 
-## Интеграции
+## Integrations
 
-Для внешних сервисов учитывай:
+For external services, handle timeouts, safe retries with backoff, rate limits, partial failures, malformed responses, observability and sandbox/test doubles.
 
-- timeout;
-- retry с backoff только когда безопасно;
-- rate limits;
-- partial failure;
-- malformed response;
-- observability;
-- sandbox/test doubles.
+## Errors
 
-## Ошибки
+Never return stack traces to clients. Log enough for investigation without logging secrets or sensitive data.
 
-Не возвращай stack traces наружу.
-Логируй достаточно для расследования, но не секреты и чувствительные данные.
+## Security
 
-## Безопасность
+- Server-side authorization and least privilege.
+- Input validation, safe serialization and secure secret handling.
+- Protection against relevant injection, SSRF, path traversal and other attack classes.
 
-- server-side authorization;
-- least privilege;
-- validation;
-- safe serialization;
-- secure secret handling;
-- защита от injection/SSRF/path traversal и других релевантных классов.
+## Privacy and data exposure
 
-## Privacy и data exposure
+For APIs handling user or sensitive data:
 
-Для API, работающего с пользовательскими/чувствительными данными:
+- Return only necessary fields.
+- Never rely on client-side filtering to hide sensitive records.
+- Account for export/deletion lifecycle.
+- Do not log whole payloads by default.
+- Minimize data sent to external integrations.
+- Authorize access to each object, not only authentication.
 
-- возвращай только необходимые поля;
-- не доверяй client-side фильтрации скрытых данных;
-- учитывай export/delete lifecycle;
-- не логируй payload целиком по умолчанию;
-- минимизируй данные, уходящие во внешние интеграции;
-- проверяй authorization на объект, а не только факт аутентификации.
+For data lifecycle changes, load `$privacy-engineer`.
 
-При изменении lifecycle данных используй `$privacy-engineer`.
+## Tests
 
-## Тесты
+Cover happy paths, validation, authentication/authorization, transaction rollback, duplicate/retry scenarios, external integration failures and critical business invariants.
 
-Покрой:
+## Project adaptation
 
-- happy path;
-- validation;
-- auth/authz;
-- transaction rollback;
-- duplicate/retry scenarios;
-- external integration failures;
-- critical business invariants.
-## Адаптация к проекту
-
-Сначала определи используемый backend framework, структуру модулей, contract-generation workflow,
-auth model и проектные команды. Если API contract генерирует клиентские типы/SDK, используй
-существующий generator workflow и не редактируй generated output вручную.
+First identify the backend framework, module structure, contract generation process, authorization model and project commands. If API contracts generate client types or SDKs, use the existing generator workflow; never manually edit generated output.

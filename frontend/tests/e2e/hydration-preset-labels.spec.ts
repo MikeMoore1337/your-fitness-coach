@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installTelegramHarness } from './fixtures/mobile-tma';
-import { installPlatformApi } from './fixtures/platform-api';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -19,6 +19,25 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         });
       }
       await installPlatformApi(page, { browserSession: width !== 393, fixedDate: '2026-08-19' });
+      const longName = 'Ж'.repeat(40);
+      await page.route('**/api/v1/nutrition/hydration?*', (route) => {
+        const day = emptyHydrationDay('2026-08-19');
+        return route.fulfill({
+          json: {
+            ...day,
+            presets: [
+              ...day.presets,
+              {
+                id: 7,
+                label: longName,
+                volume_ml: 420,
+                beverage_type: 'coffee',
+                is_default: false,
+              },
+            ],
+          },
+        });
+      });
       await page.goto('/app?section=nutrition');
       const hydration = page.getByRole('region', { name: 'Гидратация' });
       const largeGlass = hydration.getByRole('button', { name: /Большой стакан.*350 мл/ });
@@ -36,6 +55,33 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.height + 1);
         expect(geometry.ellipsis).not.toBe('ellipsis');
       }
+      const saved = hydration.getByRole('button', {
+        name: new RegExp(`${longName}.*420 мл.*Кофе`),
+      });
+      await expect(saved).toContainText(`${longName} · Кофе`);
+      const savedGeometry = await saved.evaluate((node) => {
+        const label = node.querySelector('span')!;
+        const box = node.getBoundingClientRect();
+        const parent = node.parentElement!.getBoundingClientRect();
+        return {
+          width: label.clientWidth,
+          scrollWidth: label.scrollWidth,
+          height: label.clientHeight,
+          scrollHeight: label.scrollHeight,
+          left: box.left,
+          right: box.right,
+          parentLeft: parent.left,
+          parentRight: parent.right,
+          targetWidth: box.width,
+          targetHeight: box.height,
+        };
+      });
+      expect(savedGeometry.scrollWidth).toBeLessThanOrEqual(savedGeometry.width + 1);
+      expect(savedGeometry.scrollHeight).toBeLessThanOrEqual(savedGeometry.height + 1);
+      expect(savedGeometry.left).toBeGreaterThanOrEqual(savedGeometry.parentLeft - 1);
+      expect(savedGeometry.right).toBeLessThanOrEqual(savedGeometry.parentRight + 1);
+      expect(savedGeometry.targetWidth).toBeGreaterThanOrEqual(44);
+      expect(savedGeometry.targetHeight).toBeGreaterThanOrEqual(44);
       const quantity = largeGlass.locator('strong');
       await expect(quantity).toHaveText('350 мл');
       const plus = quantity.locator('svg.yfc-icon[data-icon="plus"]');
@@ -49,6 +95,19 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         width + 1,
       );
       await hydration.screenshot({ path: testInfo.outputPath('full-water-labels.png') });
+      if (width === 320) {
+        // A 160 CSS px viewport checks reflow equivalent to 200% zoom at 320 px.
+        await page.setViewportSize({ width: 160, height: 900 });
+        for (const button of await hydration.locator('.hydration-presets button').all()) {
+          const box = await button.boundingBox();
+          expect(box!.width).toBeGreaterThanOrEqual(44);
+          expect(box!.height).toBeGreaterThanOrEqual(44);
+        }
+        const label = saved.locator('span');
+        expect(
+          await label.evaluate((node) => node.scrollWidth - node.clientWidth),
+        ).toBeLessThanOrEqual(1);
+      }
     });
   }
 }

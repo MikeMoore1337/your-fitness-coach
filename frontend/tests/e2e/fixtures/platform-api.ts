@@ -1328,6 +1328,9 @@ export async function installPlatformApi(
     const url = new URL(request.url());
     const path = url.pathname;
     if (offline && !path.endsWith('/public/config')) return route.abort('internetdisconnected');
+    if (path.endsWith('/nutrition-notes/consent')) {
+      return route.fulfill({ json: { status: 'revoked' } });
+    }
     if (path.endsWith('/me/equipment-profiles')) {
       return route.fulfill({ json: { revision: 0, active_profile_id: null, profiles: [] } });
     }
@@ -2350,6 +2353,28 @@ export async function installPlatformApi(
       });
     }
     if (/\/workouts\/\d+\/comments$/.test(path)) return route.fulfill({ json: [] });
+    if (path.endsWith('/nutrition/targets/for-date') && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          date: url.searchParams.get('target_date'),
+          target: currentTarget,
+          origin: 'base',
+          day_type: null,
+          week_type: null,
+          frozen: false,
+        },
+      });
+    }
+    if (
+      (path.endsWith('/nutrition/targets/schedule/program') ||
+        path.endsWith('/nutrition/targets/schedule/binding')) &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: null });
+    }
+    if (path.endsWith('/nutrition/targets/schedule') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
     if (path.endsWith('/nutrition/targets/history') && request.method() === 'GET') {
       return route.fulfill({ json: { items: targetHistory } });
     }

@@ -83,6 +83,110 @@ def test_dev_launcher_handles_native_stderr_and_preserves_failures(
     assert result.returncode == expected, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize("shell_name", ["powershell.exe", "pwsh"])
+@pytest.mark.parametrize("ci_state", ["PASS", "PENDING", "FAILED"])
+def test_dev_updater_fetch_handles_git_stderr_and_preserves_failures(
+    tmp_path: Path, ci_state: str, shell_name: str
+) -> None:
+    shell = shutil.which(shell_name)
+    if shell is None:
+        pytest.skip(f"{shell_name} is unavailable on this runner")
+
+    remote = tmp_path / "remote.git"
+    writer = tmp_path / "writer"
+    checkout = tmp_path / "dev checkout"
+    writer.mkdir()
+
+    def git(cwd: Path, *args: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=Contract", "-c", "user.email=contract@example.invalid", *args],
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git(tmp_path, "init", "--bare", "--initial-branch=dev", str(remote))
+    git(writer, "init", "--initial-branch=dev")
+    (writer / "example.txt").write_text("before\n", encoding="utf-8")
+    git(writer, "add", "example.txt")
+    git(writer, "commit", "-m", "before")
+    git(writer, "remote", "add", "origin", str(remote))
+    git(writer, "push", "-u", "origin", "dev")
+    git(tmp_path, "clone", "--branch", "dev", str(remote), str(checkout))
+    source = git(checkout, "rev-parse", "HEAD")
+    (writer / "example.txt").write_text("after\n", encoding="utf-8")
+    git(writer, "commit", "-am", "after")
+    target = git(writer, "rev-parse", "HEAD")
+    git(writer, "push", "origin", "dev")
+
+    harness = tmp_path / "updater git harness.ps1"
+    harness.write_text(
+        "$ErrorActionPreference='Stop'\n"
+        "$script:RepoRoot=$env:MOCK_REPO_ROOT\n"
+        "$script:CurrentResult=@{installed_sha=''; available_sha=''}\n"
+        "$script:ExitCode=0; $script:Applied=$false; $Automatic=$true\n"
+        "$script:InProgressPath=Join-Path $env:MOCK_REPO_ROOT 'not-running'\n"
+        "$tokens=$null; $errors=$null\n"
+        "$ast=[System.Management.Automation.Language.Parser]::ParseFile("
+        "$env:MOCK_UPDATE_SCRIPT,[ref]$tokens,[ref]$errors)\n"
+        "if ($errors.Count) { throw 'parse failure' }\n"
+        "$names=@('Invoke-Git','Get-GitValue','Update-RemoteDev','Test-FastForward','Invoke-Check')\n"
+        "$ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]},$false) | "
+        "Where-Object {$_.Name -in $names} | ForEach-Object {. ([scriptblock]::Create($_.Extent.Text))}\n"
+        "function Stop-Update { param($Code,$Summary) throw $Code }\n"
+        "function Get-GitContext { [pscustomobject]@{Dirty=$false} }\n"
+        "function Test-ManualLock { $false }\n"
+        "function Test-AutoApplyEnabled { $true }\n"
+        "function Get-PostPushCi { param($TargetSha) "
+        "if ($TargetSha -ne $env:MOCK_TARGET) { throw 'wrong CI SHA' }; "
+        "[pscustomobject]@{State=$env:MOCK_CI_STATE; Url='synthetic'} }\n"
+        "function Save-Result {}\n"
+        "function Invoke-Apply { $script:Applied=$true }\n"
+        "try {\n"
+        "  Invoke-Check\n"
+        "  if ($script:CurrentResult.installed_sha -ne $env:MOCK_SOURCE -or "
+        "$script:CurrentResult.available_sha -ne $env:MOCK_TARGET) { throw 'wrong SHA' }\n"
+        "  if ($script:Applied -ne ($env:MOCK_CI_STATE -eq 'PASS')) { throw 'wrong apply decision' }\n"
+        "  if ($script:ExitCode -ne $(if ($env:MOCK_CI_STATE -eq 'PASS') {0} else {2})) { throw 'wrong exit code' }\n"
+        "  if ($ErrorActionPreference -ne 'Stop') { throw 'caller preference changed' }\n"
+        "  $result=Invoke-Git -Arguments @('rev-parse','--verify','missing-dev-ref') -AllowFailure\n"
+        "  if ($result.ExitCode -eq 0) { throw 'missing ref accepted' }\n"
+        "  if (@($result.Output).Count -ne 0) { throw 'stderr leaked into stdout' }\n"
+        "  try { [void](Invoke-Git -Arguments @('rev-parse','--verify','missing-dev-ref')); throw 'missing ref accepted' }\n"
+        "  catch { if ($_.Exception.Message -ne 'GIT_COMMAND_FAILED') { throw } }\n"
+        "  if ((Get-GitValue -Arguments @('rev-parse','HEAD')) -ne $env:MOCK_SOURCE) { throw 'stdout corrupted' }\n"
+        "  $originalPath=$env:PATH; $env:PATH=''\n"
+        "  try {\n"
+        "    if (Get-Command git -ErrorAction SilentlyContinue) { throw 'git still available' }\n"
+        "    $global:LASTEXITCODE=0\n"
+        "    try { [void](Invoke-Git -Arguments @('status') -AllowFailure); throw 'missing git accepted' }\n"
+        "    catch { if ($_.Exception.Message -ne 'GIT_COMMAND_FAILED') { throw } }\n"
+        "  } finally { $env:PATH=$originalPath }\n"
+        "  'GIT_BOUNDARY_PASS'\n"
+        "} catch { Write-Output ('FAIL: '+$_.Exception.Message); exit 17 }\n",
+        encoding="utf-8-sig",
+    )
+    result = subprocess.run(
+        [shell, "-NoProfile", "-NonInteractive", "-File", str(harness)],
+        env={
+            **os.environ,
+            "MOCK_REPO_ROOT": str(checkout),
+            "MOCK_UPDATE_SCRIPT": str(UPDATE_SCRIPT),
+            "MOCK_SOURCE": source,
+            "MOCK_TARGET": target,
+            "MOCK_CI_STATE": ci_state,
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GIT_BOUNDARY_PASS" in result.stdout
+    assert git(checkout, "rev-parse", "origin/dev") == target
+    assert git(checkout, "rev-parse", "HEAD") == source
+
+
 @pytest.mark.parametrize(
     "scenario", ["valid", "reviewed", "unsafe", "modified", "deleted", "renamed", "not_ancestor"]
 )

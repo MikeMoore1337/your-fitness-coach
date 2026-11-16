@@ -398,6 +398,29 @@ ROTATION_INDEX_VALIDATIONS = {
     ),
 }
 
+NUTRITION_CATALOG_INDEX_VALIDATIONS = {
+    "uq_foods_community_shared_identity": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'foods'::regclass "
+        "AND indnkeyatts = 1 AND indnatts = 1 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'catalog_identity' "
+        "AND pg_get_expr(indpred, indrelid) = "
+        "'((catalog_identity IS NOT NULL) AND ((food_type)::text = ANY "
+        "((ARRAY[''system''::character varying, ''branded''::character varying])::text[])) "
+        "AND ((source_name)::text = ''yfc_community''::text))' "
+        "FROM pg_index WHERE indexrelid = 'uq_foods_community_shared_identity'::regclass"
+    ),
+    "uq_nutrition_import_owner_catalog_confirm": (
+        "SELECT indisvalid AND indisready AND indisunique "
+        "AND indrelid = 'nutrition_import_drafts'::regclass "
+        "AND indnkeyatts = 2 AND indnatts = 2 "
+        "AND pg_get_indexdef(indexrelid, 1, true) = 'owner_user_id' "
+        "AND pg_get_indexdef(indexrelid, 2, true) = 'catalog_confirm_key_hash' "
+        "AND indpred IS NULL "
+        "FROM pg_index WHERE indexrelid = 'uq_nutrition_import_owner_catalog_confirm'::regclass"
+    ),
+}
+
 
 def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict, path: Path) -> bool:
     if not (
@@ -430,6 +453,11 @@ def _is_index_validation(call: ast.Call, upgrade: ast.AST, links: dict, path: Pa
     if name is None and path.name == "0147_session_rotation.py":
         name = next(
             (key for key, value in ROTATION_INDEX_VALIDATIONS.items() if value == sql), None
+        )
+    if name is None and path.name == "0155_nutrition_catalog_indexes.py":
+        name = next(
+            (key for key, value in NUTRITION_CATALOG_INDEX_VALIDATIONS.items() if value == sql),
+            None,
         )
     return bool(
         name

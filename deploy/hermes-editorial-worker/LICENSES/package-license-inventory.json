@@ -11,9 +11,9 @@
   },
   "base": {
     "image": "python:3.13-alpine",
-    "digest": "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee",
+    "digest": "sha256:d76f585fb0d5107dd47143da5e61554fd9cae656a30f3470f815cb8475769b6a",
     "platform": "linux/amd64",
-    "alpine": "3.24.1",
+    "alpine": "3.24.4",
     "licenseSource": "alpine-installed-packages.txt"
   },
   "pythonPackages": [

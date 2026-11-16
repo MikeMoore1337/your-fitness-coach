@@ -458,7 +458,7 @@ def test_russian_search_never_exposes_unlocalized_external_title(client) -> None
     assert response.json()["provider_statuses"][0]["result_count"] == 1
 
 
-def test_external_deduplication_uses_gtin_provider_identity_and_bounded_weak_identity() -> None:
+def test_external_deduplication_preserves_distinct_provider_identities() -> None:
     barcode = _provider_food(name="Same GTIN")
     same_barcode_other_provider = ProviderFood(
         **{
@@ -483,6 +483,8 @@ def test_external_deduplication_uses_gtin_provider_identity_and_bounded_weak_ide
             "carbs_g_per_100g": Decimal("19"),
         }
     )
+    conflicting_brand = ProviderFood(**{**generic.__dict__, "brand": "Different brand"})
+    conflicting_gtin = ProviderFood(**{**barcode.__dict__, "barcode": "12345670"})
 
     kept, removed = deduplicate_provider_foods(
         [],
@@ -493,15 +495,23 @@ def test_external_deduplication_uses_gtin_provider_identity_and_bounded_weak_ide
             generic,
             same_generic_other_provider,
             distinct_generic,
+            conflicting_brand,
+            conflicting_gtin,
         ],
     )
 
-    assert removed == 3
+    assert removed == 1
     assert [(item.provider, item.external_id) for item in kept] == [
         ("fake_food_catalog", "3017620422003"),
+        ("second_provider", "second-1"),
         ("fake_food_catalog", "generic-rice,-cooked"),
+        ("second_provider", "second-2"),
         ("second_provider", "second-3"),
+        ("fake_food_catalog", "generic-rice,-cooked"),
+        ("fake_food_catalog", "3017620422003"),
     ]
+    assert kept[-2].brand == "Different brand"
+    assert kept[-1].barcode == "12345670"
 
 
 def test_external_ranking_is_deterministic_and_not_provider_priority() -> None:

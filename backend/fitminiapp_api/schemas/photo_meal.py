@@ -175,4 +175,4 @@ class PhotoMealConfirmRequest(StrictModel):
 class PhotoMealConfirmResponse(StrictModel):
     draft_id: str
     entry: FoodDiaryEntryResponse
-    replayed: Literal[False] = False
+    replayed: bool = False

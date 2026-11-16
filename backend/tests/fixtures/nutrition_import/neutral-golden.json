@@ -1,0 +1,94 @@
+{
+  "schema_version": "nutrition-import-v1",
+  "source": {
+    "provider": "fatsecret",
+    "source": "diary_export",
+    "source_version": null,
+    "adapter_version": "synthetic-v1",
+    "source_format": "csv",
+    "transport": "upload",
+    "publication_rights": "owner_reported"
+  },
+  "completeness": "partial",
+  "rows": [
+    {
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 7},
+      "quantity_coordinates": [{"section": "report_details", "section_kind": "detail", "row": 8}],
+      "diary_date": "2024-03-02",
+      "timezone": null,
+      "meal_type": "breakfast",
+      "food": {"name": "Тестовый продукт Альфа", "brand": null, "kind": "standard_food"},
+      "quantity": "100.00",
+      "amount_unit": "g",
+      "nutrition": {
+        "basis": "per_100_g",
+        "facts": {
+          "energy_kcal": {"value": "12.30", "unit": "kcal", "evidence": "read"},
+          "protein_g": {"value": "0.00", "unit": "g", "evidence": "read"},
+          "fat_g": {"value": null, "unit": "g", "evidence": "ambiguous"},
+          "carbohydrate_g": null,
+          "fiber_g": null
+        }
+      },
+      "diagnostics": [{"code": "fat_ambiguous", "severity": "warning"}]
+    },
+    {
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 9},
+      "quantity_coordinates": [{"section": "report_details", "section_kind": "detail", "row": 10}],
+      "diary_date": "2024-03-02",
+      "meal_type": "breakfast",
+      "food": {"name": "Тестовый напиток Бета", "kind": "standard_food"},
+      "quantity": "100",
+      "amount_unit": "ml",
+      "nutrition": {"basis": "per_100_ml", "facts": {}}
+    },
+    {
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 11},
+      "quantity_coordinates": [{"section": "report_details", "section_kind": "detail", "row": 12}],
+      "diary_date": "2024-03-02",
+      "meal_type": "breakfast",
+      "food": {"name": "Тестовый товар Гамма", "brand": "Бренд Тест", "kind": "branded_food", "identity_source": "source_a", "source_id": "item-1"},
+      "quantity": "2",
+      "amount_unit": "piece",
+      "nutrition": {"basis": "per_serving", "facts": {"protein_g": {"value": "1.25", "unit": "g", "evidence": "read"}}}
+    },
+    {
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 13},
+      "quantity_coordinates": [{"section": "report_details", "section_kind": "detail", "row": 14}],
+      "diary_date": "2024-03-02",
+      "meal_type": "breakfast",
+      "food": {"name": "Тестовый товар Гамма", "brand": "Бренд Тест", "kind": "branded_food", "identity_source": "source_b", "source_id": "item-1"},
+      "quantity": "1.5",
+      "amount_unit": "serving",
+      "serving_measure": null,
+      "nutrition": {"basis": "per_serving", "facts": {"fiber_g": null}},
+      "diagnostics": [{"code": "serving_weight_unknown", "severity": "warning"}]
+    },
+    {
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 15},
+      "quantity_coordinates": [{"section": "report_details", "section_kind": "detail", "row": 16}],
+      "diary_date": "2024-03-02",
+      "meal_type": "breakfast",
+      "food": {"name": "Тестовый продукт Альфа", "kind": "standard_food"},
+      "quantity": "100.00",
+      "amount_unit": "g",
+      "nutrition": {"basis": "per_100_g", "facts": {}},
+      "diagnostics": [{"code": "possible_duplicate_row", "severity": "warning"}]
+    }
+  ],
+  "original_totals": [
+    {
+      "scope": "entry",
+      "coordinates": {"section": "report_details", "section_kind": "detail", "row": 7},
+      "diary_date": "2024-03-02",
+      "meal_type": "breakfast",
+      "facts": {"energy_kcal": {"value": "12.30", "unit": "kcal", "evidence": "read"}}
+    },
+    {
+      "scope": "period",
+      "coordinates": {"section": "period_summary", "section_kind": "summary", "row": 3},
+      "facts": {"energy_kcal": {"value": "9999.0", "unit": "kcal", "evidence": "read"}}
+    }
+  ],
+  "diagnostics": [{"code": "partial_export", "severity": "warning"}]
+}

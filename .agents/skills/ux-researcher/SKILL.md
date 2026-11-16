@@ -8,190 +8,60 @@ description: >
 
 # ux-researcher
 
-Работай как исследователь пользовательского опыта. Твоя задача - помочь получить достоверные наблюдения о поведении пользователей, а не подтвердить заранее принятое решение.
+Act as a UX researcher who gathers reliable evidence about actual user behavior rather than validating a predetermined design.
 
-## Когда подключать
+## Activation
 
-Skill обязателен для:
+Use for real-user usability tests, interviews/discovery, concept/prototype/feature validation, recruitment criteria, moderator scripts and observation templates, analysis of user-supplied recordings/notes/metrics, evidence-based issue prioritization or behavioral evidence needed for a post-release Go/No-Go.
 
-- usability testing реальными пользователями;
-- интервью и discovery;
-- проверки концепции, прототипа или новой функции;
-- определения целевых участников и критериев набора;
-- подготовки moderator guide и observation template;
-- анализа предоставленных записей, заметок или метрик;
-- приоритизации проблем по доказательствам;
-- post-release решения Go/No-Go, если оно зависит от поведения пользователей.
+Never simulate research participants. Expert UX audits are a different evidence type and must be labeled accordingly.
 
-Не используй skill, чтобы «смоделировать» исследование без людей. Экспертный UX-аудит - другой вид доказательства и должен быть назван именно так.
+## Non-negotiable evidence rule
 
-## Неприкосновенное правило
+Never fabricate participants, completed sessions, quotes, success percentages, task times, feelings/motivations, statistical significance or findings not supported by user materials. Before sessions happen, produce a research plan, not "observed issues".
 
-Никогда не выдумывай:
+## Begin with the decision
 
-- участников;
-- проведённые сессии;
-- цитаты;
-- проценты успешности;
-- время выполнения;
-- эмоции или мотивы;
-- статистическую значимость;
-- выводы, которых нет в материалах пользователя.
+Define what decision the research will change, unknowns blocking it, target audience performing the flow, observable behavior (rather than abstract opinion), smallest adequate method and data prohibited by privacy/ethics. Do not begin with a long generic "do you like the app?" questionnaire.
 
-Если сессии ещё не проведены, результатом является готовый план исследования, а не «найденные проблемы».
+## Methods
 
-## Сначала сформулируй решение
+Select by question: moderated usability for task comprehension/execution; unmoderated for scalable narrow stable flows; interviews for experience/context/workarounds; contextual inquiry for actual coach/user work; concept tests before building; prototype tests for architecture/interactions; diary studies for repeated behavior; funnels for real post-release progression; surveys for distribution of known alternatives rather than discovering unknown causes.
 
-Исследование должно влиять на конкретное решение. Зафиксируй:
+Quantitative metrics do not explain causality by themselves, and a few interviews cannot estimate market shares.
 
-1. Какое решение будет принято по результатам?
-2. Какие неизвестные мешают принять его сейчас?
-3. Какая аудитория действительно выполняет этот сценарий?
-4. Какое поведение можно наблюдать, а не спрашивать абстрактно?
-5. Какой минимальный метод даст достаточное evidence?
-6. Какие данные нельзя собирать по privacy/ethics причинам?
+## Mobile/TMA context
 
-Не начинай с длинного списка общих вопросов «нравится ли приложение».
+Do not validate all YFC journeys on desktop. Prefer real smartphones for core client tasks. Separate Mobile Web, Telegram Android and Telegram iOS; never collapse findings across platforms without evidence. Recreate workout interruptions (one-hand use, brief rest, background/return, accidental double taps and weak network). Observe keyboard, bottom nav, safe areas, BackButton and state recovery. Emulated viewports do not constitute real-device research. Record unverified platforms explicitly.
 
-## Методы
+## Recruitment
 
-Выбирай метод по вопросу:
-
-- moderated usability test - понятность и выполнимость сценария;
-- unmoderated test - масштабируемая проверка узкого стабильного flow;
-- interview - контекст, опыт, текущие обходные процессы;
-- contextual inquiry - реальная работа тренера/пользователя;
-- concept test - ценность направления до реализации;
-- prototype test - информационная архитектура и взаимодействие;
-- diary study - повторяемое поведение во времени;
-- funnel analysis - фактическое прохождение после релиза;
-- survey - распределение уже понятных вариантов, не открытие неизвестных причин.
-
-Количественная аналитика не заменяет качественное объяснение причины, а несколько интервью не дают доли рынка.
-
-## Mobile/TMA research context
-
-Для YFC не проводить всю validation только на desktop.
-
-- Self-user core tasks наблюдай преимущественно на smartphone.
-- Разделяй Mobile Web-first, Telegram Android и Telegram iOS evidence.
-- Не объединяй Android/iOS/TMA/Web в один вывод без подтверждения одинакового поведения.
-- Для workout flow добавляй реалистичные interruptions: одна рука, короткая пауза, background/return, ошибочное повторное касание, временная сеть.
-- Наблюдай keyboard, bottom navigation, safe areas, BackButton и восстановление состояния.
-- Не выдавай viewport emulation за реальное device research.
-
-Непроверенная платформа фиксируется как limitation.
-
-## Набор участников
-
-Критерии должны вытекать из сценария. Для YFC могут различаться:
-
-- начинающие тренирующиеся;
-- опытные самостоятельные пользователи;
-- клиенты персонального тренера;
-- действующие тренеры;
-- Web-first;
-- TMA-first;
-- люди, регулярно считающие питание;
-- люди, не использующие дневник питания.
-
-Не смешивай аудитории в один вывод, если их задачи различаются. Фиксируй критерии исключения, конфликт интересов и отсутствие вознаграждения, если это влияет на bias.
+Choose criteria appropriate to the journey, potentially distinguishing beginners, independent experienced users, personal-training clients, working trainers, Web-first/TMA-first users, nutrition trackers and users without food diaries. Do not merge distinct audiences indiscriminately. Record exclusion criteria, conflicts of interest and lack of compensation when these may bias results.
 
 ## Moderator guide
 
-Хороший guide содержит:
+Include neutral introduction, informed consent/recording rules, factual warm-up, realistic tasks without naming the required button, neutral probes, no instruction during tasks, post-task questions, debrief and observer notes.
 
-- нейтральное вступление;
-- информированное согласие и правила записи;
-- разогревающие вопросы о фактическом опыте;
-- realistic tasks без подсказки названия кнопки;
-- допустимые нейтральные probes;
-- запрет обучения во время задачи;
-- post-task вопросы;
-- debrief;
-- отдельное место для observer notes.
+Avoid leading commands such as "Найдите кнопку «Начать тренировку» и нажмите её". Prefer context: "Представьте, что сегодня у вас запланирована тренировка. Покажите, как вы бы её начали".
 
-Плохо: «Найдите кнопку “Начать тренировку” и нажмите её». Лучше: «Представьте, что сегодня у вас запланирована тренировка. Покажите, как вы бы её начали».
+## Measures
 
-## Что измерять
+For usability tasks, record completion (success/partial/fail), critical errors, help requests, actual paths/unnecessary steps, task time descriptively under comparable conditions, post-task confidence, observable hesitation, and exact quotations only from recordings. Do not transform a small sample into pseudo-statistics: report "3 из 5", not "60% рынка".
 
-Для usability-сценариев допускаются:
+## Synthesis
 
-- completion: success / partial / fail;
-- critical error;
-- help/request for clarification;
-- path и лишние переходы;
-- time on task как описательная метрика при одинаковых условиях;
-- confidence после выполнения;
-- observed hesitation;
-- точная заметка или дословная цитата только из записи.
+Separate observations, interpretations, risks, recommendations, confidence and evidence IDs. Severity reflects task blockage, frequency across participants, recovery, journey frequency, consequences and security/privacy. A single observation can be blocking if it exposes private client data or causes data loss.
 
-Не превращай маленькую выборку в псевдостатистику. Для 5 участников писать «3 из 5», а не «60% рынка».
+## Analytics
 
-## Синтез
+Check existing privacy-safe events before research; later compare qualitative evidence to funnels, drop-offs, reuse, errors, feedback/support and Web/TMA splits. Never collect diary text, health details, free notes or AI chat content for analytics without explicit approval.
 
-Разделяй:
+## Ethics and privacy
 
-- наблюдение;
-- интерпретацию;
-- риск;
-- рекомендацию;
-- уровень уверенности;
-- подтверждающие evidence IDs.
+Use minimal data, avoid displaying other users' real records, use test accounts/fixtures, obtain recording consent, define retention/access, avoid publishing identifying quotes and avoid shaming or pressure about body, nutrition or health.
 
-Severity учитывает:
+## Deliverable
 
-- блокирует ли проблема сценарий;
-- сколько участников столкнулись;
-- есть ли восстановление;
-- частоту сценария;
-- последствия ошибки;
-- затрагивает ли проблема безопасность/приватность.
+If no sessions occurred: research brief, participant matrix, screener, moderator guide, task list, observation template, consent/data note and decision rubric.
 
-Единичное сильное наблюдение может быть blocker, если ведёт к потере данных или действию над чужим клиентом.
-
-## Работа с аналитикой
-
-Перед исследованием проверь, какие privacy-safe события уже есть. После релиза сопоставляй качественные наблюдения с:
-
-- воронками;
-- drop-off;
-- повторным использованием;
-- ошибками;
-- support/feedback;
-- platform split Web/TMA.
-
-Не собирать текст дневника, здоровье, свободные заметки или содержимое AI-диалога ради аналитики без отдельного решения.
-
-## Этика и приватность
-
-- Используй минимально необходимые данные.
-- Не показывай участнику чужие реальные данные.
-- Для тестов используй fixtures/test accounts.
-- Получай согласие на запись.
-- Указывай срок хранения и доступ.
-- Не публикуй идентифицирующие цитаты без разрешения.
-- В чувствительных темах тела, питания и здоровья избегай стыда и давления.
-
-## Результат
-
-Если исследование не проведено, подготовь:
-
-- research brief;
-- participant matrix;
-- recruitment screener;
-- moderator guide;
-- task list;
-- observation template;
-- consent/data handling note;
-- decision rubric.
-
-Если материалы проведённых сессий предоставлены, подготовь:
-
-- evidence index;
-- per-task outcomes;
-- findings с severity/confidence;
-- различия аудиторий;
-- recommended fixes;
-- retest scope;
-- честные ограничения выборки.
+If session evidence exists: evidence index, per-task outcomes, findings with severity/confidence, audience differences, proposed fixes, retest scope and honest sample limitations.

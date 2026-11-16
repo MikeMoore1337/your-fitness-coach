@@ -24,7 +24,7 @@ for (const theme of themes) {
       await expect(page.getByText('План питания', { exact: true })).toBeVisible();
       await expect(page.getByText('Список покупок', { exact: true })).toBeVisible();
       const planningDetails = page.locator(
-        '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+        '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
       );
       await expect(planningDetails).toHaveCount(2);
       if (phase === 'after') {
@@ -48,14 +48,13 @@ for (const theme of themes) {
           expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
           expect(style.borderRadius).not.toBe('0px');
         }
-        // The planning cards use the same corner radius and heading typography
-        // as the nutrition settings card, rather than the large desktop headings.
-        const settings = page.locator('.nutrition-target-settings');
-        const settingsRadius = await settings.evaluate(
+        // The two planning cards keep a shared frame and heading typography.
+        const reference = planningDetails.first();
+        const settingsRadius = await reference.evaluate(
           (element) => getComputedStyle(element).borderTopLeftRadius,
         );
-        const settingsHeadingStyle = await settings
-          .locator(':scope > summary')
+        const settingsHeadingStyle = await reference
+          .locator(':scope > summary strong')
           .evaluate((element) => {
             const style = getComputedStyle(element);
             return {
@@ -81,12 +80,9 @@ for (const theme of themes) {
             });
           expect(headingStyle).toEqual(settingsHeadingStyle);
         }
-        // All three mobile sections must have the same frame color and spacing,
-        // regardless of whether #1048 puts KBJU settings first or last.
+        // The planning sections retain their shared frame color and spacing.
         const sectionLayout = await page
-          .locator(
-            '.nutrition-experience > :is(.meal-planner, .grocery-list, .nutrition-target-settings)',
-          )
+          .locator('.nutrition-extras__body > :is(.meal-planner, .grocery-list)')
           .evaluateAll((elements) =>
             elements.map((element) => {
               const bounds = element.getBoundingClientRect();
@@ -105,17 +101,15 @@ for (const theme of themes) {
               };
             }),
           );
-        expect(sectionLayout).toHaveLength(3);
-        const settingsLayout = sectionLayout.find((item) =>
-          item.className.includes('nutrition-target-settings'),
-        );
+        expect(sectionLayout).toHaveLength(2);
+        const settingsLayout = sectionLayout[0];
         expect(settingsLayout).toBeDefined();
         for (const item of sectionLayout) {
           expect(item.borderColors).toEqual(settingsLayout!.borderColors);
           expect(item.backgroundColor).toBe(settingsLayout!.backgroundColor);
         }
         for (let index = 1; index < sectionLayout.length; index++) {
-          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(16, 0);
+          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(12, 0);
         }
       }
       for (const detail of await planningDetails.all()) {
@@ -140,12 +134,18 @@ for (const theme of themes) {
         await expect(detail).not.toHaveAttribute('open', '');
         if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'false');
       }
+      const settingsButton = page.getByRole('button', { name: 'Настройки КБЖУ' });
+      await expect(settingsButton).toBeVisible();
+      expect((await settingsButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await settingsButton.click();
+      await expect(page.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
+      await page.getByRole('button', { name: 'К дневнику' }).click();
       await hydration.scrollIntoViewIfNeeded();
       await hydration.screenshot({
         path: testInfo.outputPath(`${phase}-869-hydration-${theme}-${width}.png`),
       });
       const planning = page.locator(
-        '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+        '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
       );
       await expect(planning).toHaveCount(2);
       await planning.first().scrollIntoViewIfNeeded();
@@ -173,7 +173,7 @@ for (const theme of themes) {
             .locator('strong')
             .evaluate((node) => getComputedStyle(node).whiteSpace),
         ).toBe('nowrap');
-        await page.route('**/api/v1/nutrition/hydration/entries', async (route) => {
+        await page.route('**/api/v1/nutrition/hydration/entries/v2', async (route) => {
           if (route.request().method() !== 'POST') return route.fallback();
           await route.fulfill({
             status: 201,
@@ -298,7 +298,7 @@ for (const theme of themes) {
     await page.goto('/app?section=nutrition&date=2026-10-10');
 
     const planningDetails = page.locator(
-      '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+      '.nutrition-extras__body > .meal-planner, .nutrition-extras__body > .grocery-list',
     );
     await expect(planningDetails).toHaveCount(2);
     const cardStyles = await planningDetails.evaluateAll((elements) =>

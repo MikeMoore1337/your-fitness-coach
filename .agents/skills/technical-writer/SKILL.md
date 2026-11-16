@@ -9,51 +9,20 @@ description: >
 
 # technical-writer
 
-Документация должна позволить другому инженеру выполнить действие без устного контекста.
+Documentation should enable another engineer to perform the work without oral context.
 
-По необходимости документируй:
+When relevant document prerequisites, local setup, environment variables **without secret values**, run/test/lint/build commands, migrations, architecture, API contracts, integration setup, deployment, troubleshooting, operational runbooks and limitations.
 
-- prerequisites;
-- local setup;
-- environment variables без секретных значений;
-- run/test/lint/build commands;
-- migrations;
-- architecture overview;
-- API contracts;
-- integration setup;
-- deployment;
-- troubleshooting;
-- operational runbooks;
-- limitations.
+Verify commands against the real repository; never invent them. Do not duplicate library documentation or obvious source code. Update relevant documentation in the same task whenever behavior changes.
 
-Проверяй команды по реальному репозиторию, не выдумывай их.
+## Structure
 
-Не дублируй документацию библиотеки или очевидный код.
+First inspect and follow the existing documentation structure. Do not add another directory hierarchy unnecessarily. If durable technical docs have no organization, propose a minimal purpose-based structure (architecture, features, operations), but do not impose it on a small change. Check subsystem docs before edits; document significant architecture, nonobvious business rules, security, operations and tradeoffs.
 
-Если поведение изменилось - обнови документацию в той же задаче.
+## Language and audience
 
+Follow the root `AGENTS.md` and project language policy. Preserve the existing human-documentation language (Russian) and original API/library/command/identifier names. Write for concrete actions/decisions, not as code narration.
 
-## Структура документации
+## Audit artifacts
 
-Сначала изучи существующую структуру документации и следуй ей. Не создавай новую иерархию
-каталогов без необходимости. Если долговременная техническая документация ещё не организована,
-предложи минимальную структуру по назначению (например architecture, features, operations), но
-не навязывай её простому локальному изменению.
-
-Перед изменением существующей подсистемы проверь связанную с ней документацию. Документируй
-значимые архитектурные решения, неочевидные бизнес-правила, security constraints, operational
-procedures и существенные trade-offs.
-
-## Язык и аудитория
-
-Следуй языку документации, закреплённому в root `AGENTS.md`/project rules. Не смешивай языки без
-причины; названия API, библиотек, команд и identifiers оставляй в их исходном виде.
-
-Пиши документацию для конкретного действия/решения, а не как пересказ кода.
-
-## Audit material
-
-Treat detailed audit output as internal by default. Generated/raw audit reports should go to the repository's configured artifact/scratch location
-and should not be committed by default. Keep a durable audit document in project documentation
-only when the task explicitly requires a persistent audit record. Never expose internal audit
-material through a public application or published user documentation.
+Detailed/raw audit output is internal by default and belongs in the project's configured artifacts/scratch area, not committed documentation. Keep a durable audit document only when explicitly required. Never expose internal audit material through public app pages or published user docs.

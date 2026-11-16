@@ -8,106 +8,48 @@ disable-model-invocation: true
 
 # ui-prototyper
 
-Используй только по явному запросу на варианты/эксперимент.
+Use **only** after an explicit request for variants or experiments.
 
-## Цель
+## Goal
 
-Не сделать 3 оттенка одной идеи, а исследовать разные сильные ответы на одну задачу.
+Explore genuinely different strong solutions to the same task, not three shades of one concept.
 
 ## Design freedom
 
-В dedicated exploration можно полностью отойти от Design V2/V2.1.
+Dedicated explorations may depart completely from Design V2/V2.1 while retaining sport-tech, mobile-first, lime/black/white brand core, product truth, accessibility and feasible performance.
 
-Сохраняй только:
-
-- sport-tech;
-- mobile-first;
-- lime/black/white brand core;
-- product truth;
-- accessibility;
-- performance feasibility.
-
-Каждый вариант должен ощущаться потенциально ship-ready, а не "crazy concept ради количества".
+Each direction should plausibly be shippable rather than a novelty concept made only to fill a quota.
 
 ## Workflow
 
 ### 1. Scope
 
-Одна meaningful surface/flow за раз.
+Explore one meaningful surface or journey at a time.
 
-### 2. Recon
+### 2. Reconnaissance
 
-Проверь:
-
-- real product behavior;
-- current stack;
-- existing reusable components;
-- current baseline;
-- target user;
-- mobile context.
+Inspect actual product behavior, current stack, reusable components, baseline, target audience and mobile context.
 
 ### 3. Directions
 
-По умолчанию 3 варианта, максимум 5.
-
-Каждый отличается по названной оси, например:
-
-- composition;
-- density;
-- interaction model;
-- visual material;
-- typography;
-- motion;
-- data representation;
-- personality.
+Default to three, at most five. Differentiate explicitly by composition, density, interaction model, visual material, typography, motion, data representation or personality.
 
 ### 4. Isolation
 
-Не менять production implementation во время exploration.
-
-Используй:
-
-- isolated route;
-- prototype folder;
-- standalone harness;
-- temporary dev-only surface.
-
-Prototype не импортируется production code.
+Never modify production implementation during exploration. Use an isolated route, prototype folder, standalone harness or temporary development-only surface. Production code must not import prototypes.
 
 ### 5. Realistic context
 
-- реальные product-shaped labels/data;
-- working interactions;
-- mobile-first viewport;
-- light/dark, если это важная часть решения;
-- full-size context, не только thumbnails.
+Use realistic product-shaped labels/data, functioning interactions, mobile-first viewports, both themes when relevant and full-size previews rather than thumbnails alone.
 
 ### 6. Comparison
 
-Для каждого направления укажи:
+For each direction describe its core idea, distinguishing features, strengths, costs/risks, mobile behavior, motion role and implementation complexity. Do not choose for the owner unless asked for a recommendation.
 
-- core idea;
-- what makes it different;
-- strengths;
-- costs/risks;
-- mobile behavior;
-- motion role;
-- implementation complexity.
+### 7. Promotion
 
-Не выбирай победителя за владельца, если не попросили рекомендацию.
-
-### 7. Promote
-
-Только после owner selection:
-
-- перенеси выбранное решение через normal implementation task;
-- удали/архивируй prototype по правилам task;
-- обнови design source, если выбор меняет production visual system.
+Only after owner selection, implement the chosen solution in a normal task, remove/archive the prototype as instructed, and update the design source when the choice changes the production visual system.
 
 ## Collaboration
 
-- `$product-designer` - quality/direction;
-- `$motion-design-engineer` - motion-heavy variants;
-- `$landing-art-director` - Landing;
-- `$frontend-engineer` - production promotion;
-- `$ui-audit` - финальная rendered validation.
+`$product-designer` for quality/direction; `$motion-design-engineer` for motion-heavy options; `$landing-art-director` for Landing; `$frontend-engineer` for production; `$ui-audit` for final rendered validation.

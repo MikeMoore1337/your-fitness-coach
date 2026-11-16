@@ -9,307 +9,82 @@ description: >
 
 # product-analytics-engineer
 
-Начинай не с события, а с продуктового вопроса. Каждое событие должно помогать принять решение.
+Begin with the product question, not a proposed event. Every event must inform a decision.
 
-## Граница с observability
+## Distinction from observability
 
-Product analytics отвечает:
+Product analytics explains where users start, finish, abandon, reach first value, return and respond to product variants. Observability explains service health, errors, latency, throughput and resources. Do not copy operational logs into analytics or raw product content into metrics. Use `$observability-engineer` for runtime signals.
 
-- где пользователь начинает и завершает ключевой сценарий;
-- где теряется;
-- получает ли первую ценность;
-- возвращается ли;
-- какие product variants работают лучше.
+## Before instrumentation
 
-Observability отвечает:
+For each feature define product question, decision, journey/states, success/failure/abandonment, event owner (client/server), minimal properties, privacy/consent limits and dashboard/validation plan.
 
-- работает ли сервис;
-- почему произошла ошибка;
-- какова latency/throughput/resource health.
-
-Не копируй operational logs в product analytics и не передавай raw product content в metrics.
-Используй `$observability-engineer` для runtime signals.
-
-## Сначала
-
-Для каждой feature сформулируй:
-
-1. Product question.
-2. Decision, которую изменит ответ.
-3. User journey и expected states.
-4. Success/failure/abandonment definitions.
-5. Event owner: client или server.
-6. Минимальные свойства.
-7. Privacy/consent ограничения.
-8. Validation/dashboard plan.
-
-Проверь current analytics/SEO measurement stack, consent/legal path, environments, account model,
-Demo, Web/TMA и existing events. Не создавай второй event pipeline без причины.
-
-Актуальные юридические требования и consent policy проверяй по официальным источникам и фактической
-юрисдикции. Не делай legal guess в skill или коде.
+Inspect actual analytics/SEO stack, legal/consent path, environments, accounts, Demo/Web/TMA and existing events. Do not add a parallel pipeline without need. Verify legal requirements against official sources and actual jurisdiction rather than guessing.
 
 ## Event taxonomy
 
-Event name описывает устойчивое business occurrence, а не случайный DOM action.
+Describe stable business occurrences instead of incidental DOM actions. Appropriate levels include landing/demo/login/onboarding, program/workout, nutrition logging, measurements/check-ins, coach/admin flows, suggestion shown/accepted/dismissed, export/delete lifecycle and high-level AI request/outcome without text. Avoid tracking every click/hover/scroll without a clear decision.
 
-Предпочитай события уровня:
+For each event define canonical name/version, semantics and trigger, producer, required/optional allowlisted properties, dedupe/idempotency, subject identity class, environment/surface, retention/consent, examples/prohibited payloads and dependent metrics/funnels.
 
-- landing/demo/login/onboarding;
-- program/workout;
-- nutrition log;
-- measurement/check-in;
-- coach/admin workflow;
-- suggestion shown/accepted/dismissed;
-- export/delete lifecycle;
-- AI high-level request/result state без текста.
+## Neutral event envelope
 
-Не отправляй every click, hover, scroll или component implementation detail без конкретного вопроса.
+Use a provider-neutral internal contract with fields as warranted: event ID/name/version, occurred_at/received_at, environment, client surface, scoped anonymous/authenticated subject, optional session/journey/correlation, producer and allowlisted properties. Vendor payload formats must not become the sole source of truth.
 
-Для каждого event зафиксируй:
+## Client versus server events
 
-- canonical name;
-- schema version;
-- definition и trigger boundary;
-- producer/owner;
-- required/optional properties;
-- dedupe/idempotency key;
-- subject identity class;
-- environment/surface;
-- retention/consent classification;
-- examples и prohibited payload;
-- downstream metric/funnel.
+Client can capture impressions, visible prompts, user intent and relevant validation/abandonment. Server should record completed authentication, real program/workout/food/measurement saves, permission/admin actions, export/deletion jobs and high-level accepted/completed AI requests.
 
-## Event envelope
-
-Используй provider-neutral internal contract. Поля выбирай по проекту, но обычно нужны:
-
-- event id;
-- event name/version;
-- occurred_at и received_at;
-- environment;
-- surface/client type;
-- anonymous/authenticated scoped subject id;
-- session/journey/correlation id, если нужен;
-- source/producer;
-- allowlisted properties.
-
-Не делай vendor payload единственным source of truth. Provider adapter преобразует internal event.
-
-## Client vs server ownership
-
-Client подходит для:
-
-- page/screen impression;
-- visible prompt/banner;
-- button intent;
-- validation/UI abandonment signal, если он действительно нужен.
-
-Server подходит для:
-
-- auth завершён;
-- program/workout создан/завершён;
-- food/measurement/check-in реально сохранены;
-- permission/admin action выполнены;
-- export/delete job принят/завершён;
-- AI request принят/завершён на high level.
-
-Не считай client click успешным business outcome. Не дублируй одно завершение client и server events
-без dedupe и чёткой причины.
+A client click is not success. Avoid client/server double counts without clear ownership and dedupe.
 
 ## Identity lifecycle
 
-Разделяй:
+Distinguish anonymous visitor, pre-auth/demo, authenticated account, device/session, trainer/admin capabilities and Web/TMA. On anonymous -> authenticated, use trusted canonical mapping rather than client-side email/Telegram-ID linking; avoid duplicate conversions, cross-user leakage after logout on shared devices and treating Demo fixtures as real users. Capability is not identity.
 
-- anonymous visitor;
-- pre-auth/demo session;
-- authenticated account;
-- device/session;
-- trainer/admin capabilities;
-- Web и Telegram Mini App surfaces.
+Do not send raw DB/user/Telegram IDs externally unless necessary; use policy-approved scoped/pseudonymous identifiers.
 
-При anonymous -> authenticated transition:
+## Private fields
 
-- не сливай пользователей по email/Telegram id на клиенте;
-- используй canonical account mapping на доверенной стороне;
-- не создавай duplicate conversion;
-- не переносись через logout к следующему пользователю на shared device;
-- Demo fixture interactions не становятся реальными user actions;
-- role/capability не заменяют account identity.
+Default-prohibited event properties include food/recipe content, exact calories/macros/weight/measurements/HR/distance, trainer comments, notes, support messages, AI prompts/answers/tools, private custom exercise names, tokens/initData/email/phone, secrets/stack traces, file contents and arbitrary URLs/query parameters containing personal information.
 
-Raw database/user/Telegram ids не отправляй во внешний analytics provider без необходимости. Используй
-scoped/pseudonymous identifiers по privacy policy.
+An event like `measurement_logged` usually needs no measurement value; `cardio_logged` needs no distance/HR. Use allowlists and sensitive-field regression tests. For privacy review load `$privacy-engineer`.
 
-## Privacy-safe properties
+## Consent and failure
 
-По умолчанию запрещены:
+Never enable hidden tracking as a side effect of SEO/UI work. Apply consent/opt-out before external delivery. Analytics outages must not fail product actions. Bound queue/retry, deduplicate safely and limit offline buffer size/age without private content. Observe provider outages but do not block users. Isolate staging/test from production reports.
 
-- содержимое food diary/recipe;
-- exact calories/macros, weight, measurements, HR, distance;
-- trainer comments и notes;
-- support messages;
-- AI conversation/prompt/answer/tool payload;
-- exercise free text/custom names, если они могут быть private;
-- auth tokens, initData, emails, phones;
-- secrets/internal stack traces;
-- uploaded file content;
-- arbitrary URL/query params с PII.
+## Compatibility
 
-Событие `measurement_logged` обычно не требует самого значения. `cardio_logged` не требует distance/HR.
-`notification_preferences_changed` не требует exact quiet hours, если вопрос лишь о факте изменения.
+Change the event version/name when semantics change. Optional fields must not silently alter meaning. Plan required-field rollout for mixed client/server versions. Version consumers/dashboards; assign owners/removal dates for deprecated events. Never reuse old names for new product questions.
 
-Используй allowlist properties и automated sensitive-payload regression tests.
+## Dedupe and time
 
-Для privacy review используй `$privacy-engineer`.
+Handle SPA rerenders/route transitions, double clicks, retries/reloads, back/forward, multiple tabs/devices, offline/delayed events, server retries, timezones and clock skew. `occurred_at` and `received_at` are distinct; record funnel windows/reporting timezones. Do not deduplicate two genuinely repeated user actions using only user + event name; use appropriate journey/business keys.
 
-## Consent и failure behavior
+## Funnels, activation, retention
 
-- Не включай hidden tracking как побочный эффект SEO/UI task.
-- Consent/opt-out state применяется до external delivery по project policy.
-- Product-critical action не должен падать из-за analytics provider.
-- Queue/retry bounded; duplicate delivery безопасна.
-- Offline buffering, если нужен, имеет size/age limits и не хранит sensitive content.
-- Provider unavailable наблюдаем, но не блокирует пользователя.
-- Test/staging data не загрязняет production reports.
-
-## Versioning и compatibility
-
-- Изменение смысла event требует новой version или нового имени по проектной policy.
-- Добавление optional property не должно менять старую семантику.
-- Required property migration имеет rollout order для mixed frontend/backend versions.
-- Consumers/dashboards фиксируют используемую version.
-- Deprecated event имеет owner и removal date.
-- Не переиспользуй старое имя для другого product question.
-
-## Dedupe, order и time
-
-Учитывай:
-
-- React/SPA rerender и route transitions;
-- double click;
-- retry/reload;
-- browser back/forward;
-- multiple tabs/devices;
-- offline/late events;
-- server retry;
-- timezone boundaries;
-- clock skew.
-
-`occurred_at` и `received_at` не взаимозаменяемы. Funnel window и reporting timezone должны быть
-зафиксированы.
-
-Dedupe не должна удалять два реальных повторных действия пользователя. Используй business/journey key,
-а не только event name + user.
-
-## Funnels, activation и retention
-
-Для funnel зафиксируй:
-
-- population/denominator;
-- entry event;
-- ordered/unordered steps;
-- completion definition;
-- allowed repeats;
-- time window;
-- cross-device/account behavior;
-- exclusions;
-- timezone;
-- version/date range.
-
-Activation - первое достижение конкретной ценности, а не просто регистрация. Пример для fitness
-продукта может включать завершение onboarding и реальное полезное действие, но точное определение должно
-следовать product decision.
-
-Retention определяй по meaningful return action, а не любому page view. Не меняй definition после
-просмотра данных ради красивой метрики.
+Define populations/denominators, entry, ordered/unordered steps, completion, allowed repeats, windows, cross-device behavior, exclusions, timezone, versions and dates. Activation means first real value, not merely registration. Retention means meaningful return behavior, not any page view. Do not redefine metrics after seeing data to produce attractive numbers.
 
 ## Experiments
 
-Если появляется experiment:
+When explicitly needed, assign variants once at a trusted boundary, keep them stable, record exposure only on actual exposure, exclude sensitive outcome payloads, monitor sample ratio/contamination and predefine stopping rules/primary metrics. Analytics failures must not alter variants. Do not add an experimentation platform speculatively.
 
-- assignment происходит один раз на доверенной границе;
-- variant сохраняется и стабилен;
-- exposure event отправляется только при фактическом exposure;
-- outcome не содержит sensitive payload;
-- sample ratio mismatch и contamination проверяются;
-- stopping rule/primary metric задаются до анализа;
-- analytics failure не меняет product variant.
+## Data-quality checks
 
-Не добавляй experimentation platform без task.
+Validate schemas, required properties, unknown event/field rate, duplicates, late/out-of-order events, environment contamination, anonymous/auth transitions, client/server reconciliation, provider failures, volume anomalies, funnel invariants and sensitive payloads. Dashboards without data-quality checks create false certainty.
 
-## Data quality
+## AI and fitness
 
-Проверь:
-
-- schema validation;
-- required property coverage;
-- unknown event/property rate;
-- duplicate rate;
-- late/out-of-order rate;
-- environment contamination;
-- anonymous/auth transition;
-- client/server count reconciliation;
-- provider delivery failures;
-- sudden volume drop/spike;
-- funnel invariant violations;
-- sensitive property scan.
-
-Dashboard без data-quality checks создаёт ложную уверенность.
-
-## AI и health/fitness features
-
-AI product analytics может хранить:
-
-- request started/completed/failed;
-- general vs personalized high-level class;
-- unavailable/tool-unavailable state;
-- memory/rationale UI interaction;
-- latency bucket или error class, если это не operational duplication.
-
-Не хранит raw conversation, prompt, answer, tool args/results или exact user facts.
-
-Fitness analytics events не содержат exact health/fitness measurements. Числовые данные остаются в
-canonical product/reporting storage с соответствующим authorization.
+AI analytics may record start/completion/failure, generic/personalized class, unavailable/tool-unavailable states, memory/rationale UI interactions and relevant latency buckets/error classes where not duplicated operationally. Never store raw AI conversations, prompts, answers, tool arguments/results or exact user facts. Exact fitness/health measurements remain in authorized canonical product/reporting storage, not analytics event properties.
 
 ## Tests
 
-Минимально:
+Cover valid/invalid schemas, prohibited-field rejection/redaction, rerender/double-click dedupe, server outcomes versus client intent, anonymous/auth continuity without cross-user merge, Web/TMA/Demo distinctions, environment isolation, consent/opt-out, provider nonblocking outages, late events, version compatibility, funnels and absence of raw AI/support/fitness content.
 
-- schema valid/invalid;
-- prohibited property rejected/redacted according to explicit policy;
-- SPA rerender/double click/dedupe;
-- server outcome vs client intent;
-- anonymous -> auth continuity без cross-user merge;
-- Web/TMA/Demo distinction;
-- dev/test/prod isolation;
-- consent/opt-out;
-- provider unavailable/non-blocking behavior;
-- late/out-of-order;
-- event version compatibility;
-- representative funnels;
-- no raw AI/support/fitness content.
+Use `references/PRODUCT_ANALYTICS_CHECKLIST.md`.
 
-Для полного review используй `references/PRODUCT_ANALYTICS_CHECKLIST.md`.
+## Deliverable
 
-## Формат результата
+Document product questions, event-catalog changes, funnel/activation/retention definitions, identity/privacy decisions, implementation ownership, dashboard/validation changes, checks and blind spots.
 
-Опиши:
-
-- product questions;
-- event catalog changes;
-- funnel/activation/retention definitions;
-- identity и privacy decisions;
-- implementation owners;
-- validation/dashboard changes;
-- tests и known blind spots.
-
-## Не делай
-
-- every-click tracking;
-- sensitive session replay;
-- full request/response logging в analytics;
-- raw PII/health/fitness content;
-- vendor lock-in в domain event contract;
-- registration-as-activation без product rationale;
-- dashboard без metric definition;
-- legal/consent assumptions без проверки.
+Never implement indiscriminate click tracking, sensitive session replay, full analytics request/response logging, raw health/PII, domain vendor lock-in, registration-as-activation without rationale, undefined metrics or unverified consent/legal assumptions.

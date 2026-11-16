@@ -7,28 +7,14 @@ description: >
 
 # api-testing
 
-Проверяй API как контракт, а не только status code.
+Test APIs as contracts, not just HTTP status codes.
 
 ## Minimum contract
 
-По применимости проверяй:
-
-- method/path/query/body semantics;
-- status code;
-- response schema и business fields;
-- auth/authz;
-- validation boundaries;
-- error shape;
-- idempotency/retry behavior;
-- pagination/filter/sort;
-- concurrency/race-sensitive writes;
-- backward compatibility;
-- observability-safe failure behavior.
+When relevant, verify method/path/query/body semantics, status codes, response schemas/business fields, authentication/authorization, validation boundaries, error shapes, idempotency/retry behavior, pagination/filtering/sorting, concurrency-sensitive writes, backward compatibility and safe failure observability.
 
 ## Evidence
 
-Для write-flow докажи нужный side effect через ответ, DB/state/event или последующий read.
-Не считай `200` доказательством корректной бизнес-операции.
+For writes, prove the required side effect through the response, database/state/event or a subsequent read. HTTP `200` alone does not prove the business operation succeeded.
 
-Для FastAPI/Pydantic schema-sensitive изменений подключай `$pydantic-contracts`.
-Для persistence - `$database-validation`.
+For FastAPI/Pydantic schema-sensitive changes, load `$pydantic-contracts`; for persistence, load `$database-validation`.

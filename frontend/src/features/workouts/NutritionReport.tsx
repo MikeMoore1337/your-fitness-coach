@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, apiFile } from '../../shared/api/client';
 import type { NutritionReport, NutritionReportPeriod } from '../../shared/api/types';
 import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
@@ -204,23 +204,24 @@ function MetricRow({
   unit: string;
 }) {
   const deviation = comparison.average_deviation;
+  const digits = unit === 'г' ? 3 : 2;
   return (
     <div className="nutrition-report-metric">
       <dt>{label}</dt>
       <dd>
         <strong>
-          {formatNumber(metric.average, 2)} <span>{unit}</span>
+          {formatNumber(metric.average, digits)} <span>{unit}</span>
         </strong>
         <small>
           {metric.sample_days
-            ? `минимум ${formatNumber(metric.minimum, 2)} · максимум ${formatNumber(metric.maximum, 2)} · по ${metric.sample_days} дн.`
+            ? `минимум ${formatNumber(metric.minimum, digits)} · максимум ${formatNumber(metric.maximum, digits)} · по ${metric.sample_days} дн.`
             : 'Нет данных по показателю'}
         </small>
       </dd>
       <dd>
         <span>Ориентир в среднем</span>
         <strong>
-          {formatNumber(comparison.average_target, 2)}{' '}
+          {formatNumber(comparison.average_target, digits)}{' '}
           {comparison.average_target == null ? '' : <span>{unit}</span>}
         </strong>
         <small>
@@ -233,7 +234,7 @@ function MetricRow({
         <span>Отклонение</span>
         <strong>
           {deviation != null && deviation > 0 ? '+' : ''}
-          {formatNumber(deviation, 2)} {deviation == null ? '' : <span>{unit}</span>}
+          {formatNumber(deviation, digits)} {deviation == null ? '' : <span>{unit}</span>}
         </strong>
       </dd>
     </div>
@@ -268,7 +269,7 @@ function ReportMetrics({ report }: { report: NutritionReport }) {
           <dt>Клетчатка</dt>
           <dd>
             <strong>
-              {formatNumber(summary.fiber_g.average, 2)} <span>г</span>
+              {formatNumber(summary.fiber_g.average, 3)} <span>г</span>
             </strong>
             <small>
               {summary.fiber_g.sample_days
@@ -329,9 +330,11 @@ function NutritionChart({
 function NutritionReportInsights({
   report,
   canOpenDiary,
+  diaryDate,
 }: {
   report: NutritionReport;
   canOpenDiary: boolean;
+  diaryDate: string;
 }) {
   const insights = report.insights ?? [];
   if (!insights.length) return null;
@@ -349,7 +352,13 @@ function NutritionReportInsights({
           <p key={insight.metric}>
             <strong>{metricLabels[insight.metric]}</strong>
             <span>{insight.message}</span>
-            {canOpenDiary && <AppLink to="/app?section=nutrition">Открыть питание</AppLink>}
+            {canOpenDiary && (
+              <AppLink to={diaryLink(diaryDate)}>
+                {insight.action_code === 'open_meal_suggestions'
+                  ? 'Посмотреть варианты на сегодня'
+                  : 'Открыть дневник на сегодня'}
+              </AppLink>
+            )}
           </p>
         ))}
       </div>
@@ -489,12 +498,10 @@ function DailyTable({
                   {point.calories == null ? '—' : `${formatNumber(point.calories, 2)} ккал`}
                 </td>
                 <td data-label="Б / Ж / У">
-                  {point.protein_g == null
+                  {point.protein_g == null && point.fat_g == null && point.carbs_g == null
                     ? '—'
-                    : `${formatNumber(point.protein_g, 2)} / ${formatNumber(point.fat_g, 2)} / ${formatNumber(point.carbs_g, 2)} г`}
-                  {point.fiber_g != null && (
-                    <small>Клетчатка: {formatNumber(point.fiber_g, 2)} г</small>
-                  )}
+                    : `${formatNumber(point.protein_g, 3)} / ${formatNumber(point.fat_g, 3)} / ${formatNumber(point.carbs_g, 3)} г`}
+                  <small>Клетчатка: {formatNumber(point.fiber_g, 3)} г</small>
                 </td>
                 <td data-label="Цель">
                   {point.target_calories == null ? 'Не задана' : `${point.target_calories} ккал`}
@@ -529,19 +536,28 @@ export function NutritionPeriodReport({
   clientId,
   controlledPeriod,
   showSelector = true,
+  compact = false,
+  onAccessDenied,
 }: {
   canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
+  compact?: boolean;
+  onAccessDenied?: () => void;
 }) {
   const initial = useMemo(
     () =>
       clientId == null
         ? initialReportState()
-        : { period: 'days_30' as const, dateFrom: '', dateTo: '' },
-    [clientId],
+        : {
+            period: compact ? ('days_7' as const) : ('days_30' as const),
+            dateFrom: '',
+            dateTo: '',
+          },
+    [clientId, compact],
   );
+  const [showFullReport, setShowFullReport] = useState(false);
   const [period, setPeriod] = useState<NutritionReportPeriod>(initial.period);
   const [selectedPeriod, setSelectedPeriod] = useState<NutritionReportPeriod>(initial.period);
   const [dateFrom, setDateFrom] = useState(initial.dateFrom);
@@ -566,6 +582,13 @@ export function NutritionPeriodReport({
       api<NutritionReport>(reportPath(activePeriod, activeDateFrom, activeDateTo, false, clientId)),
     placeholderData: keepPreviousData,
   });
+  useEffect(() => {
+    if (
+      clientId != null &&
+      [403, 404].includes((report.error as { status?: number } | null)?.status ?? 0)
+    )
+      onAccessDenied?.();
+  }, [clientId, report.error, onAccessDenied]);
   const today = report.data
     ? dateInputValue(new Date(), report.data.timezone)
     : dateInputValue(new Date());
@@ -634,12 +657,97 @@ export function NutritionPeriodReport({
   const pointsByDate = new Map(report.data?.daily.map((point) => [point.diary_date, point]));
   const showWeek = report.data && ['days_7', 'current_week'].includes(report.data.period);
 
+  if (compact && !showFullReport) {
+    return (
+      <section
+        className="nutrition-section-card coach-nutrition-report"
+        aria-labelledby="coach-nutrition-report-title"
+      >
+        <h3 id="coach-nutrition-report-title">Отчёт о питании</h3>
+        <SegmentedControl
+          ariaLabel="Период отчёта по питанию"
+          value={selectedPeriod}
+          options={reportPeriods.slice(0, 3)}
+          onChange={selectPeriod}
+        />
+        {report.isLoading && !report.data ? (
+          <LoadingState label="Собираем отчёт по питанию…" />
+        ) : report.error ? (
+          <ErrorState
+            message={(report.error as Error).message}
+            retry={() => void report.refetch()}
+          />
+        ) : (
+          report.data && (
+            <>
+              <p className="muted">
+                {periodLabel(report.data)} · {report.data.timezone}
+              </p>
+              {showWeek && (
+                <WeekStrip
+                  anchorDate={report.data.period_start}
+                  ariaLabel="Дни отчёта по питанию"
+                  getDayMeta={(date) => weekMeta(pointsByDate.get(date), null)}
+                  legend={NUTRITION_WEEK_LEGEND}
+                  mode="overview"
+                  rangeStart={report.data.period_start}
+                  title="Дни отчёта"
+                  today={report.data.daily.find((point) => point.is_current_day)?.diary_date ?? ''}
+                />
+              )}
+              <p className="muted">
+                {report.data.summary.complete_days} завершено ·{' '}
+                {report.data.summary.incomplete_days} не завершено ·{' '}
+                {report.data.summary.missing_days} нет данных
+              </p>
+              {report.data.summary.logged_days === 0 && (
+                <p>
+                  За выбранный период нет завершённых дней. Сравнить питание с целью пока нельзя.
+                </p>
+              )}
+              <dl className="coach-nutrition-metrics">
+                {(
+                  [
+                    ['Энергия', report.data.summary.calories, 'ккал'],
+                    ['Белки', report.data.summary.protein_g, 'г'],
+                    ['Жиры', report.data.summary.fat_g, 'г'],
+                    ['Углеводы', report.data.summary.carbs_g, 'г'],
+                  ] as const
+                ).map(([label, metric, unit]) => (
+                  <div key={label}>
+                    <dt>{label} · в среднем</dt>
+                    <dd>
+                      {formatNumber(metric.average)} {metric.average == null ? '' : unit}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <NutritionReportInsights
+                report={report.data}
+                canOpenDiary={false}
+                diaryDate={today}
+              />
+            </>
+          )
+        )}
+        <Button type="button" variant="secondary" onClick={() => setShowFullReport(true)}>
+          Подробный отчёт и история целей
+        </Button>
+      </section>
+    );
+  }
+
   return (
     <section
       className="progress-section nutrition-period-report"
       id="nutrition-period-report"
       aria-labelledby="nutrition-period-report-title"
     >
+      {compact && (
+        <Button type="button" variant="secondary" onClick={() => setShowFullReport(false)}>
+          К краткому отчёту
+        </Button>
+      )}
       <header className="progress-section__head nutrition-period-report__head">
         <div>
           <span className="progress-section__eyebrow">Фактический дневник</span>
@@ -717,7 +825,7 @@ export function NutritionPeriodReport({
 
       {report.isLoading && !report.data ? (
         <LoadingState label="Собираем отчёт по питанию…" />
-      ) : report.error && !report.data ? (
+      ) : report.error && (!report.data || clientId != null) ? (
         <ErrorState message={(report.error as Error).message} retry={() => void report.refetch()} />
       ) : report.data ? (
         <>
@@ -797,7 +905,7 @@ export function NutritionPeriodReport({
                 text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
               />
               {clientId == null && (
-                <AppLink className="button-link" to="/app?section=nutrition">
+                <AppLink className="button-link" to={diaryLink(today)}>
                   Открыть дневник питания
                 </AppLink>
               )}
@@ -805,7 +913,11 @@ export function NutritionPeriodReport({
           ) : (
             <>
               <ReportMetrics report={report.data} />
-              <NutritionReportInsights report={report.data} canOpenDiary={clientId == null} />
+              <NutritionReportInsights
+                report={report.data}
+                canOpenDiary={clientId == null}
+                diaryDate={today}
+              />
               <div className="nutrition-report-adherence" aria-label="Сравнение с целью">
                 <p>
                   <strong>

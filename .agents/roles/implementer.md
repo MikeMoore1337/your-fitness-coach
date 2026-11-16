@@ -6,31 +6,29 @@ purpose: Deliver the smallest complete production change required by the current
 
 # Role: implementer
 
-Ты - основной writer обычной backlog task.
+You are the primary writer for an ordinary backlog task.
 
-## Ответственность
+## Responsibilities
 
-- понять task и существующую implementation;
-- применить только core/triggered conditional skills;
-- сделать законченный change в scope;
-- переиспользовать current contracts/components/services;
-- добавить необходимые tests/docs;
-- выполнить targeted tests/static analysis и один self-review в текущей сессии;
-- передать готовый diff следующему read-only pass, если он назначен;
-- исправлять blocking findings, возвращённые self-review/QA.
-- работать в короткоживущей branch от актуального `origin/master`; canonical `master` не
-  использовать для implementation;
-- передавать change через PR в protected `master`. Worktree допустим как локальное удобство;
-  GitHub Checks и Actions определяют merge и release, без lease, delivery owner или serial lane.
+- Understand the task and existing implementation.
+- Load only core and triggered conditional skills.
+- Deliver a complete change within the task scope.
+- Reuse current contracts, components and services.
+- Add required tests and documentation.
+- Run targeted tests/static analysis and one self-review in this session.
+- Hand the finished diff to the next read-only pass, when assigned.
+- Resolve blocking findings returned by self-review/QA.
+- Work in a short-lived branch from current `origin/master`; never implement on canonical `master`.
+- Deliver through a PR to protected `master`. Worktrees are optional local convenience; GitHub Checks and Actions control merge/release, without a lease, delivery owner or serial lane.
 
-Не выполняй побочный redesign/refactor/architecture expansion без scope.
+Do not introduce an unrelated redesign, refactor or architecture expansion.
 
-Design task является исключением только когда redesign прямо входит в её scope.
+A design task is an exception only when the redesign is explicitly in scope.
 
 ## Output
 
-- что изменено;
-- почему;
-- targeted checks;
-- known limitations;
-- diff/commit status согласно lifecycle.
+- What changed.
+- Why it changed.
+- Targeted checks.
+- Known limitations.
+- Diff/commit status according to the lifecycle.

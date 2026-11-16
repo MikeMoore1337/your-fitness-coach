@@ -339,6 +339,51 @@ def test_handoff_retry_and_stale_notification_are_safe(client) -> None:
     assert revoked_retry.status_code == 404
 
 
+def test_handoff_becomes_unavailable_when_nutrition_access_is_revoked(client) -> None:
+    sender_headers = _auth(client, 83_941)
+    trainer_headers = _auth(client, 83_942, is_coach=True)
+    sender_id, trainer_id = _user_id(83_941), _user_id(83_942)
+    relation_id = _link(sender_id, trainer_id)
+    created = client.post(
+        "/api/v1/report-handoffs",
+        json={"period": "days_7"},
+        headers={**sender_headers, "Idempotency-Key": "handoff-nutrition-83941"},
+    )
+    assert created.status_code == 201, created.text
+    handoff_id = created.json()["id"]
+    with get_session_context() as db:
+        handoff = db.get(ReportHandoff, handoff_id)
+        notification_id = handoff.notification_id
+        db.get(CoachClient, relation_id).nutrition_access = False
+    with get_session_context() as db:
+        exported = build_account_export(db, db.get(User, sender_id))
+        assert exported["coaching_relationships"][0]["nutrition_access"] is False
+    assert (
+        client.get(f"/api/v1/report-handoffs/{handoff_id}", headers=trainer_headers).status_code
+        == 404
+    )
+    assert (
+        client.get(f"/api/v1/report-handoffs/{handoff_id}", headers=sender_headers).status_code
+        == 200
+    )
+    opened = client.post(f"/api/v1/notifications/{notification_id}/open", headers=trainer_headers)
+    assert opened.status_code == 200
+    assert opened.json()["stale"] is True
+    assert (
+        client.get(
+            f"/api/v1/coach/clients/{sender_id}/report-handoffs", headers=trainer_headers
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/report-handoffs/{handoff_id}/retry",
+            headers={**sender_headers, "Idempotency-Key": "handoff-revoked-83941"},
+        ).status_code
+        == 404
+    )
+
+
 def test_handoff_delivery_status_survives_notification_retention(client) -> None:
     sender_headers = _auth(client, 83_151)
     trainer_headers = _auth(client, 83_152, is_coach=True)

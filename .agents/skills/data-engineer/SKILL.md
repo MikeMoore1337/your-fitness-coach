@@ -8,63 +8,32 @@ description: >
 
 # data-engineer
 
-Сначала моделируй инварианты, затем таблицы/коллекции.
+Model invariants before modeling tables or collections.
 
-## Схема
+## Schema
 
-- подходящие типы данных;
-- NOT NULL/UNIQUE/FK/CHECK там, где инвариант должен обеспечиваться БД;
-- явные ownership/lifecycle rules;
-- timestamps и timezone semantics;
-- soft delete только при реальной необходимости.
+Use suitable types and `NOT NULL`/`UNIQUE`/`FK`/`CHECK` constraints when the database must enforce an invariant. Define ownership, lifecycle, timestamps and timezone semantics. Use soft deletion only when there is a real need.
 
-## Lifecycle и privacy
+## Lifecycle and privacy
 
-Для пользовательских/чувствительных данных явно определяй:
+For personal/sensitive data explicitly define owner/access boundary, retention/deletion semantics, cascade/orphan behavior, exportability when required, soft-delete effects on uniqueness/queries, backup implications and exclusion from analytics/debug copies. Coordinate with `$privacy-engineer`; soft deletion is not a universal substitute for proper deletion.
 
-- owner и access boundary;
-- retention/deletion semantics;
-- cascade/orphan behavior;
-- exportability, если требуется продуктом;
-- влияние soft delete на уникальность и запросы;
-- backup implications;
-- что не должно попадать в analytics/debug copies.
+## Indexing
 
-Согласуй lifecycle с `$privacy-engineer`; не используй soft delete как универсальную замену
-нормальному удалению.
+Add indexes for observed query patterns, not speculatively. Check selectivity, composite order, write cost and query plans for important queries.
 
-## Индексы
+## Migrations
 
-Добавляй по фактическим query patterns, а не "на всякий случай".
+Production migrations must be reproducible, safe for existing data, compatible with rolling deploys if used, have an explicit rollback/forward-fix strategy and avoid excessive long locks on large tables when relevant. For destructive changes, use expand/contract where appropriate.
 
-Проверяй:
+## Transactions
 
-- selectivity;
-- composite order;
-- write cost;
-- query plan для важных запросов.
+Define atomicity and isolation assumptions explicitly.
 
-## Миграции
+## Backups
 
-Production migration должна быть:
+Critical data requires backup plus tested restoration. An unverified restore does not constitute a complete backup strategy.
 
-- воспроизводимой;
-- безопасной для существующих данных;
-- совместимой с rolling deployment, если он используется;
-- с понятной стратегией rollback/forward fix;
-- без опасных долгих locks на больших таблицах, если это актуально.
+## Project adaptation
 
-Для destructive change используй expand/contract, когда требуется.
-
-## Транзакции
-
-Явно определяй атомарность и isolation assumptions.
-
-## Резервирование
-
-Для критичных данных учитывай backup + restore verification. Backup без проверяемого restore не считается полноценной стратегией.
-## Адаптация к проекту
-
-Сначала определи фактическую БД, data-access layer/ORM, migration tool, deployment model и размер
-затрагиваемых данных. Не переписывай уже применённые production migrations, если используемый
-migration tool предполагает неизменяемую историю; создавай новый корректирующий шаг.
+Inspect the actual database, ORM/data-access layer, migration tool, deployment topology and dataset size. Never rewrite already-applied production migrations when the migration system requires immutable history; create a corrective migration.

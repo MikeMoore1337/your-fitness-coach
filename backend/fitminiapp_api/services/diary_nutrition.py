@@ -80,12 +80,26 @@ def _sum_tracked(
 
 
 def diary_entry_source(entry: FoodDiaryEntry) -> str:
-    if entry.nutrition_source in {"catalog", "recipe", "manual", "restaurant", "photo"}:
+    if entry.nutrition_source in {
+        "catalog",
+        "recipe",
+        "manual",
+        "restaurant",
+        "photo",
+        "fatsecret",
+    }:
         return entry.nutrition_source
     return {"food": "catalog", "recipe": "recipe"}.get(entry.entry_kind, "manual")
 
 
 def diary_entry_confidence(entry: FoodDiaryEntry) -> str:
+    if entry.nutrition_source == "fatsecret":
+        facts = diary_entry_nutrition(entry)
+        return (
+            "exact"
+            if all(value is not None for value in (facts.protein_g, facts.fat_g, facts.carbs_g))
+            else "partial"
+        )
     if entry.entry_kind != "quick_add":
         return "exact"
     values = (entry.quick_protein_g, entry.quick_fat_g, entry.quick_carbs_g)

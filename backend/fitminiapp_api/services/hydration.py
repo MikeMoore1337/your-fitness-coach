@@ -17,6 +17,7 @@ from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, Hydra
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.hydration import (
     HydrationEntryCreate,
+    HydrationEntryDelete,
     HydrationEntryUpdate,
     HydrationGoalSave,
     HydrationGoalSource,
@@ -278,6 +279,7 @@ def update_hydration_entry(
     entry = (
         db.query(HydrationEntry)
         .filter(HydrationEntry.id == entry_id, HydrationEntry.user_id == user.id)
+        .with_for_update()
         .first()
     )
     if entry is None:
@@ -295,22 +297,35 @@ def update_hydration_entry(
     entry.diary_date = occurred.astimezone(zone).date()
     entry.timezone = timezone_name
     entry.source = "history_edit"
-    entry.updated_at = now_for_user_naive(user)
+    entry.updated_at = max(now_for_user_naive(user), entry.updated_at + timedelta(microseconds=1))
     db.commit()
     db.refresh(entry)
     return _entry_response(entry)
 
 
-def delete_hydration_entry(db: Session, user: User, entry_id: int) -> None:
-    entry = (
+def delete_hydration_entry(
+    db: Session, user: User, entry_id: int, expected: HydrationEntryDelete, *, undo: bool
+) -> None:
+    query = db.query(HydrationEntry).filter(
+        HydrationEntry.id == entry_id,
+        HydrationEntry.user_id == user.id,
+        HydrationEntry.created_at == expected.created_at,
+        HydrationEntry.updated_at == expected.updated_at,
+        HydrationEntry.diary_date == expected.diary_date,
+    )
+    if undo:
+        query = query.filter(HydrationEntry.source.in_(("quick_preset", "manual")))
+    if query.delete(synchronize_session=False):
+        db.commit()
+        return
+    exists = (
         db.query(HydrationEntry)
         .filter(HydrationEntry.id == entry_id, HydrationEntry.user_id == user.id)
         .first()
     )
-    if entry is None:
+    if exists is None:
         raise HydrationError("Запись не найдена")
-    db.delete(entry)
-    db.commit()
+    raise HydrationConflictError("Запись изменилась. Обновите данные и повторите действие.")
 
 
 def list_hydration_day(db: Session, user: User, diary_date: date) -> dict:

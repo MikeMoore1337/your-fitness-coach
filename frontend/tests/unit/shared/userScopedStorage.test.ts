@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
+  HYDRATION_PENDING_SESSION_PREFIX,
+  HYDRATION_PENDING_STORAGE_PREFIX,
+  NUTRITION_HISTORY_RECOVERY_SESSION_KEY,
+  NUTRITION_IMPORT_RECOVERY_SESSION_KEY,
   USER_SCOPED_PERSISTENT_STORAGE_REGISTRY,
   activeWorkoutPointerStorageKey,
   activeWorkoutQueueStorageKey,
@@ -22,6 +26,7 @@ describe('user-scoped browser storage registry', () => {
     localStorage.setItem('fit_access_token', 'legacy-access-token');
     localStorage.setItem('fit_refresh_token', 'legacy-refresh-token');
     sessionStorage.setItem(AUTHENTICATED_USER_ID_STORAGE_KEY, '7');
+    sessionStorage.setItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY, '{"private":true}');
     localStorage.setItem('app-theme', 'dark');
     localStorage.setItem('landing-theme', 'light');
     localStorage.setItem('fit_telegram_link_prompt_dismissed_7', 'true');
@@ -33,6 +38,7 @@ describe('user-scoped browser storage registry', () => {
     expect(localStorage.getItem('fit_access_token')).toBeNull();
     expect(localStorage.getItem('fit_refresh_token')).toBeNull();
     expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(NUTRITION_IMPORT_RECOVERY_SESSION_KEY)).toBeNull();
     expect(localStorage.getItem('app-theme')).toBe('dark');
     expect(localStorage.getItem('landing-theme')).toBe('light');
     expect(localStorage.getItem('fit_telegram_link_prompt_dismissed_7')).toBe('true');
@@ -103,5 +109,34 @@ describe('user-scoped browser storage registry', () => {
       expect(localStorage.getItem(key)).toBeNull();
     }
     expect(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)).toBeNull();
+  });
+
+  it('retains import recovery only for the same account during session expiry', () => {
+    const saved = JSON.stringify({ userId: '7', payload: 'synthetic' });
+    const keys = [NUTRITION_IMPORT_RECOVERY_SESSION_KEY, NUTRITION_HISTORY_RECOVERY_SESSION_KEY];
+    for (const key of keys) sessionStorage.setItem(key, saved);
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+    for (const key of keys) expect(sessionStorage.getItem(key)).toBe(saved);
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 8 });
+    for (const key of keys) expect(sessionStorage.getItem(key)).toBeNull();
+  });
+
+  it('retains pending hydration for the same account on expiry and clears it on logout', () => {
+    const same = `${HYDRATION_PENDING_SESSION_PREFIX}7`;
+    const other = `${HYDRATION_PENDING_SESSION_PREFIX}8`;
+    sessionStorage.setItem(same, 'pending');
+    sessionStorage.setItem(other, 'other account');
+    const shared = `${HYDRATION_PENDING_STORAGE_PREFIX}user_7`;
+    const sharedOther = `${HYDRATION_PENDING_STORAGE_PREFIX}user_8`;
+    localStorage.setItem(shared, 'pending');
+    localStorage.setItem(sharedOther, 'other account');
+    clearSensitiveUserScopedStorage({ pendingOnly: true, userId: 7 });
+    expect(sessionStorage.getItem(same)).toBe('pending');
+    expect(sessionStorage.getItem(other)).toBeNull();
+    expect(localStorage.getItem(shared)).toBe('pending');
+    expect(localStorage.getItem(sharedOther)).toBeNull();
+    clearSensitiveUserScopedStorage();
+    expect(sessionStorage.getItem(same)).toBeNull();
+    expect(localStorage.getItem(shared)).toBeNull();
   });
 });

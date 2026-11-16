@@ -1039,6 +1039,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/trainer/nutrition-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Trainer Nutrition Access */
+        get: operations["read_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_get"];
+        /** Set Trainer Nutrition Access */
+        put: operations["set_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/coach-invites/link/preview": {
         parameters: {
             query?: never;
@@ -2979,6 +2997,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach-nutrition-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Proposals */
+        get: operations["get_proposals_api_v1_coach_nutrition_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Proposal */
+        post: operations["post_proposal_api_v1_coach_nutrition_proposals_clients__client_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Day */
+        get: operations["get_client_day_api_v1_coach_nutrition_proposals_clients__client_id__day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/target-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Target History */
+        get: operations["get_client_target_history_api_v1_coach_nutrition_proposals_clients__client_id__target_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/clients/{client_id}/target-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Client Target Assignments */
+        get: operations["get_client_target_assignments_api_v1_coach_nutrition_proposals_clients__client_id__target_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-nutrition-proposals/{proposal_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Decision */
+        post: operations["post_decision_api_v1_coach_nutrition_proposals__proposal_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/progress/activity-heatmap": {
         parameters: {
             query?: never;
@@ -4262,8 +4382,28 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Reject Legacy Hydration Entry
+         * @deprecated
+         */
+        post: operations["reject_legacy_hydration_entry_api_v1_nutrition_hydration_entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/hydration/entries/v2": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /** Add Hydration Entry */
-        post: operations["add_hydration_entry_api_v1_nutrition_hydration_entries_post"];
+        post: operations["add_hydration_entry_api_v1_nutrition_hydration_entries_v2_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4777,6 +4917,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/plans/suggestions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Nutrition Plan Fill */
+        post: operations["preview_nutrition_plan_fill_api_v1_nutrition_plans_suggestions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/plans/fill": {
         parameters: {
             query?: never;
@@ -4897,6 +5054,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/diary/suggestions/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Diary Suggestion */
+        post: operations["preview_diary_suggestion_api_v1_nutrition_diary_suggestions_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/diary/suggestions/commit": {
         parameters: {
             query?: never;
@@ -4925,6 +5099,23 @@ export interface paths {
         put?: never;
         /** Preview Nutrition Natural Input */
         post: operations["preview_nutrition_natural_input_api_v1_nutrition_diary_natural_input_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/batch/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Diary Batch */
+        post: operations["preview_diary_batch_api_v1_nutrition_diary_batch_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5136,6 +5327,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/targets/dates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Date Override History */
+        get: operations["date_override_history_api_v1_nutrition_targets_dates_get"];
+        put?: never;
+        /** Save Date Override */
+        post: operations["save_date_override_api_v1_nutrition_targets_dates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schedule Rule History */
+        get: operations["schedule_rule_history_api_v1_nutrition_targets_schedule_get"];
+        put?: never;
+        /** Save Schedule Rule */
+        post: operations["save_schedule_rule_api_v1_nutrition_targets_schedule_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Schedule Rule */
+        post: operations["preview_schedule_rule_api_v1_nutrition_targets_schedule_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/program": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Schedule Program */
+        get: operations["nutrition_schedule_program_api_v1_nutrition_targets_schedule_program_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/for-date": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolved Nutrition Target */
+        get: operations["resolved_nutrition_target_api_v1_nutrition_targets_for_date_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Schedule Binding Status */
+        get: operations["schedule_binding_status_api_v1_nutrition_targets_schedule_binding_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Schedule Binding */
+        post: operations["preview_schedule_binding_api_v1_nutrition_targets_schedule_binding_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/schedule/binding/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Schedule Binding */
+        post: operations["confirm_schedule_binding_api_v1_nutrition_targets_schedule_binding_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/targets/program-day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Program Day */
+        get: operations["nutrition_program_day_api_v1_nutrition_targets_program_day_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/targets/current": {
         parameters: {
             query?: never;
@@ -5164,6 +5510,347 @@ export interface paths {
         get: operations["target_history_api_v1_nutrition_targets_history_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Consent */
+        get: operations["consent_api_v1_nutrition_notes_consent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/consent/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Consent */
+        post: operations["change_consent_api_v1_nutrition_notes_consent__action__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/{local_date}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_v1_nutrition_notes__local_date__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition-notes/{local_date}/{meal_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save */
+        put: operations["save_api_v1_nutrition_notes__local_date___meal_type__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_nutrition_notes__local_date___meal_type__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_v1_nutrition_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview */
+        get: operations["preview_api_v1_nutrition_imports__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview History */
+        get: operations["preview_history_api_v1_nutrition_imports__draft_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/history/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review History Import */
+        post: operations["review_history_import_api_v1_nutrition_imports__draft_id__history_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/history/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm History Import */
+        post: operations["confirm_history_import_api_v1_nutrition_imports__draft_id__history_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve */
+        post: operations["resolve_api_v1_nutrition_imports__draft_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/catalog/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Conflicts */
+        get: operations["catalog_conflicts_api_v1_nutrition_imports_catalog_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/catalog/conflicts/{contribution_id}/confirm-alias": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Catalog Confirm Alias */
+        post: operations["catalog_confirm_alias_api_v1_nutrition_imports_catalog_conflicts__contribution_id__confirm_alias_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/recurring-meals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Recurring Meals */
+        get: operations["preview_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/recurring-meals/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Recurring Meals */
+        post: operations["review_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/recurring-meals/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Recurring Meals */
+        post: operations["confirm_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Catalog */
+        get: operations["preview_catalog_api_v1_nutrition_imports__draft_id__catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/catalog/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Catalog */
+        post: operations["review_catalog_api_v1_nutrition_imports__draft_id__catalog_review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/catalog/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Catalog */
+        post: operations["confirm_catalog_api_v1_nutrition_imports__draft_id__catalog_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm_api_v1_nutrition_imports__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/imports/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_nutrition_imports__draft_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7954,6 +8641,13 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_api_v1_nutrition_imports_post */
+        Body_upload_api_v1_nutrition_imports_post: {
+            /** File */
+            file: string;
+            /** Adapter Id */
+            adapter_id: string;
+        };
         /** Body_upload_history_api_v1_workout_history_imports_post */
         Body_upload_history_api_v1_workout_history_imports_post: {
             /** File */
@@ -8473,6 +9167,187 @@ export interface components {
             zone: number;
             /** Duration Minutes */
             duration_minutes: number;
+        };
+        /** CatalogAliasConfirmRequest */
+        CatalogAliasConfirmRequest: {
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** CatalogAliasReceipt */
+        CatalogAliasReceipt: {
+            /** Food Id */
+            food_id: number;
+            /** Contribution Id */
+            contribution_id: number;
+        };
+        /** CatalogCandidate */
+        CatalogCandidate: {
+            /** Food Id */
+            food_id: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+        };
+        /** CatalogConflict */
+        CatalogConflict: {
+            /** Id */
+            id: number;
+            /** Food Id */
+            food_id: number;
+            /** Payload */
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogConflictChoice */
+        CatalogConflictChoice: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "reuse" | "skip";
+            /** Food Id */
+            food_id?: number | null;
+        };
+        /** CatalogImportConfirmRequest */
+        CatalogImportConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /** Row Indexes */
+            row_indexes: number[];
+            /** Corrections */
+            corrections?: components["schemas"]["CatalogProductCorrection"][];
+            /** Choices */
+            choices?: components["schemas"]["CatalogConflictChoice"][];
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** CatalogImportPreview */
+        CatalogImportPreview: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            source: components["schemas"]["ImportSource"];
+            /** Rows */
+            rows: components["schemas"]["CatalogImportPreviewRow"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogImportPreviewRow */
+        CatalogImportPreviewRow: {
+            /** Index */
+            index: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "reuse" | "publish" | "conflict" | "needs_review" | "private_only" | "skipped";
+            /** Reason */
+            reason: string | null;
+            /** Food Id */
+            food_id: number | null;
+            product: components["schemas"]["CatalogProductPreview"] | null;
+            /** Suggestions */
+            suggestions: components["schemas"]["CatalogCandidate"][];
+            /** Suggestions Evaluated */
+            suggestions_evaluated: boolean;
+        };
+        /** CatalogImportReceipt */
+        CatalogImportReceipt: {
+            /** Rows */
+            rows: components["schemas"]["CatalogImportRow"][];
+            /** Excluded Rows */
+            excluded_rows?: components["schemas"]["CatalogImportRow"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** CatalogImportRow */
+        CatalogImportRow: {
+            /** Index */
+            index: number;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "reuse" | "publish" | "conflict" | "needs_review" | "private_only" | "skipped";
+            /** Reason */
+            reason: string | null;
+            /** Food Id */
+            food_id: number | null;
+        };
+        /** CatalogProductCorrection */
+        CatalogProductCorrection: {
+            /** Index */
+            index: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food" | "personal_recipe" | "arbitrary";
+            nutrition?: components["schemas"]["NutritionLabelFactsEdit"] | null;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** CatalogProductPreview */
+        CatalogProductPreview: {
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Barcode */
+            barcode: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food";
+            /** Nutrition */
+            nutrition: {
+                [key: string]: unknown;
+            };
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+        };
+        /** CatalogReviewRequest */
+        CatalogReviewRequest: {
+            /** Revision */
+            revision: number;
+            /** Corrections */
+            corrections: components["schemas"]["CatalogProductCorrection"][];
+            /** Choices */
+            choices?: components["schemas"]["CatalogConflictChoice"][];
         };
         /** CheckInFieldCatalogItem */
         CheckInFieldCatalogItem: {
@@ -9208,6 +10083,127 @@ export interface components {
         CoachInviteTokenRequest: {
             /** Token */
             token: string;
+        };
+        /** CoachNutritionPlanPreview */
+        CoachNutritionPlanPreview: {
+            /** Target Id */
+            target_id: number | null;
+            day: components["schemas"]["NutritionPlanDayResponse"];
+            program: components["schemas"]["NutritionScheduleProgramContext"] | null;
+            program_day: components["schemas"]["NutritionProgramDayResponse"] | null;
+            binding: components["schemas"]["NutritionScheduleBindingStatus"] | null;
+        };
+        /** CoachNutritionProposalCreate */
+        "CoachNutritionProposalCreate-Input": {
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Expected Target Id */
+            expected_target_id: number | null;
+            /** Expected Plan Revision */
+            expected_plan_revision: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Item Id */
+            item_id?: number | null;
+            /** Item Amount */
+            item_amount?: number | string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** CoachNutritionProposalCreate */
+        "CoachNutritionProposalCreate-Output": {
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Expected Target Id */
+            expected_target_id: number | null;
+            /** Expected Plan Revision */
+            expected_plan_revision: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Item Id */
+            item_id?: number | null;
+            /** Item Amount */
+            item_amount?: string | null;
+            /** Comment */
+            comment?: string | null;
+        };
+        /** CoachNutritionProposalDecision */
+        CoachNutritionProposalDecision: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "accept" | "reject";
+            /** Version */
+            version: number;
+        };
+        /** CoachNutritionProposalResponse */
+        CoachNutritionProposalResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Target Id */
+            target_id: number | null;
+            /** Plan Revision */
+            plan_revision: number;
+            request: components["schemas"]["CoachNutritionProposalCreate-Output"];
+            /** Before */
+            before: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "accepted" | "rejected";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Decided At */
+            decided_at: string | null;
+        };
+        /** CoachNutritionTargetAssignments */
+        CoachNutritionTargetAssignments: {
+            /** Dates */
+            dates: components["schemas"]["NutritionDateOverrideResponse"][];
+            /** Schedule */
+            schedule: components["schemas"]["NutritionScheduleRuleResponse"][];
         };
         /** CoachOperationsTodayResponse */
         CoachOperationsTodayResponse: {
@@ -12263,7 +13259,7 @@ export interface components {
              */
             entry_kind: "food" | "recipe" | "quick_add";
             /** Nutrition Source */
-            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo") | null;
+            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo" | "fatsecret") | null;
             /** Nutrition Confidence */
             nutrition_confidence?: ("exact" | "approximate" | "partial") | null;
             /** Logged At */
@@ -12427,6 +13423,10 @@ export interface components {
             brand: string | null;
             /** Barcode */
             barcode: string | null;
+            /** Source Name */
+            source_name?: string | null;
+            /** External Id */
+            external_id?: string | null;
             /** Energy Kcal Per 100G */
             energy_kcal_per_100g: string | null;
             /** Protein G Per 100G */
@@ -12860,6 +13860,80 @@ export interface components {
             /** Web Article Potential Reasons */
             web_article_potential_reasons?: string[];
         };
+        /** HistoryConfirmRequest */
+        HistoryConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "keep" | "add_missing" | "manual";
+            /** Selected Rows */
+            selected_rows?: number[];
+            /** Decisions */
+            decisions?: components["schemas"]["HistoryConflictDecision"][];
+            /** Review Signature */
+            review_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** HistoryConflictDecision */
+        HistoryConflictDecision: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "skip";
+        };
+        /** HistoryExistingEntry */
+        HistoryExistingEntry: {
+            /** Id */
+            id: number;
+            /** Food Name */
+            food_name: string;
+            /** Amount */
+            amount: string;
+            /** Amount Unit */
+            amount_unit: string;
+            /** Serving Unit */
+            serving_unit: string | null;
+            nutrition: components["schemas"]["HistoryNutritionAmount"];
+        };
+        /** HistoryExistingMeal */
+        HistoryExistingMeal: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Entries */
+            entries: components["schemas"]["HistoryExistingEntry"][];
+        };
         /** HistoryImportCatalogSearch */
         HistoryImportCatalogSearch: {
             /** Q */
@@ -13165,6 +14239,108 @@ export interface components {
             /** Right Status */
             right_status?: string | null;
         };
+        /** HistoryNutritionAmount */
+        HistoryNutritionAmount: {
+            /** Energy Kcal */
+            energy_kcal: string | null;
+            /** Protein G */
+            protein_g: string | null;
+            /** Fat G */
+            fat_g: string | null;
+            /** Carbs G */
+            carbs_g: string | null;
+            /** Fiber G */
+            fiber_g: string | null;
+        };
+        /** HistoryPlanRow */
+        HistoryPlanRow: {
+            /** Index */
+            index: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add" | "skip" | "conflict" | "invalid";
+            /** Reason */
+            reason: string | null;
+            /** Conflict */
+            conflict: boolean;
+        };
+        /** HistoryPreview */
+        HistoryPreview: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /** Dates */
+            dates: string[];
+            /** Rows */
+            rows: components["schemas"]["HistoryPreviewRow"][];
+            /** Existing Meals */
+            existing_meals: components["schemas"]["HistoryExistingMeal"][];
+        };
+        /** HistoryPreviewRow */
+        HistoryPreviewRow: {
+            /** Index */
+            index: number;
+            source: components["schemas"]["ImportFoodRow"];
+            original_total: components["schemas"]["OriginalTotal"] | null;
+            /** Original Detail Cells */
+            original_detail_cells: components["schemas"]["OriginalDetailCell"][];
+            nutrition_amount: components["schemas"]["HistoryNutritionAmount"];
+            /** Ambiguous Facts */
+            ambiguous_facts: boolean;
+            /** Ambiguous Duplicate */
+            ambiguous_duplicate: boolean;
+        };
+        /** HistoryReceipt */
+        HistoryReceipt: {
+            /** Added */
+            added: number;
+            /** Skipped */
+            skipped: number;
+            /** Conflicts */
+            conflicts: number;
+            /** Entry Ids */
+            entry_ids: number[];
+            /** Review Signature */
+            review_signature: string;
+        };
+        /** HistoryReview */
+        HistoryReview: {
+            /** Preview Signature */
+            preview_signature: string;
+            /** Review Signature */
+            review_signature: string;
+            /** Rows */
+            rows: components["schemas"]["HistoryPlanRow"][];
+        };
+        /** HistoryReviewRequest */
+        HistoryReviewRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "keep" | "add_missing" | "manual";
+            /** Selected Rows */
+            selected_rows?: number[];
+            /** Decisions */
+            decisions?: components["schemas"]["HistoryConflictDecision"][];
+        };
         /**
          * HydrationBeverageType
          * @enum {string}
@@ -13210,6 +14386,24 @@ export interface components {
              * @default manual
              */
             source: string;
+        };
+        /** HydrationEntryDelete */
+        HydrationEntryDelete: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
         };
         /** HydrationEntryResponse */
         HydrationEntryResponse: {
@@ -13353,6 +14547,202 @@ export interface components {
             goal_evaluated_days: number;
             /** Trend Ml */
             trend_ml?: number | null;
+        };
+        /** ImportCancelRequest */
+        ImportCancelRequest: {
+            /** Revision */
+            revision: number;
+        };
+        /** ImportConfirmRequest */
+        ImportConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Preview Signature */
+            preview_signature: string;
+            /** Confirm Key */
+            confirm_key: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+        };
+        /** ImportDiagnostic */
+        ImportDiagnostic: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "warning" | "error";
+            coordinates?: components["schemas"]["SourceCoordinates"] | null;
+            /** Field */
+            field?: string | null;
+        };
+        /** ImportFoodIdentity */
+        ImportFoodIdentity: {
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /** Variant */
+            variant?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "standard_food" | "branded_food" | "personal_recipe" | "arbitrary" | "unknown";
+            /** Identity Source */
+            identity_source?: string | null;
+            /** Source Id */
+            source_id?: string | null;
+            /** Gtin */
+            gtin?: string | null;
+        };
+        /** ImportFoodRow */
+        ImportFoodRow: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Quantity Coordinates */
+            quantity_coordinates?: components["schemas"]["SourceCoordinates"][];
+            /** Diary Date */
+            diary_date: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Meal Type */
+            meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            food: components["schemas"]["ImportFoodIdentity"];
+            /** Quantity */
+            quantity: string | null;
+            /** Amount Unit */
+            amount_unit: ("g" | "ml" | "piece" | "serving") | null;
+            /** Source Unit */
+            source_unit?: string | null;
+            /** Serving Label */
+            serving_label?: string | null;
+            serving_measure?: components["schemas"]["ServingMeasure"] | null;
+            nutrition: components["schemas"]["ImportNutrition"];
+            /** Diagnostics */
+            diagnostics?: components["schemas"]["ImportDiagnostic"][];
+        };
+        /** ImportNutrients */
+        ImportNutrients: {
+            energy_kcal?: components["schemas"]["NutrientFact"] | null;
+            energy_kj?: components["schemas"]["NutrientFact"] | null;
+            protein_g?: components["schemas"]["NutrientFact"] | null;
+            fat_g?: components["schemas"]["NutrientFact"] | null;
+            saturated_fat_g?: components["schemas"]["NutrientFact"] | null;
+            trans_fat_g?: components["schemas"]["NutrientFact"] | null;
+            carbohydrate_g?: components["schemas"]["NutrientFact"] | null;
+            sugars_g?: components["schemas"]["NutrientFact"] | null;
+            added_sugars_g?: components["schemas"]["NutrientFact"] | null;
+            fiber_g?: components["schemas"]["NutrientFact"] | null;
+            salt_g?: components["schemas"]["NutrientFact"] | null;
+            sodium_mg?: components["schemas"]["NutrientFact"] | null;
+            cholesterol_mg?: components["schemas"]["NutrientFact"] | null;
+            potassium_mg?: components["schemas"]["NutrientFact"] | null;
+        };
+        /** ImportNutrition */
+        ImportNutrition: {
+            /** Basis */
+            basis: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            facts: components["schemas"]["ImportNutrients"];
+        };
+        /** ImportPreview */
+        ImportPreview: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Schema Version
+             * @enum {string}
+             */
+            schema_version: "nutrition-import-v1" | "nutrition-import-v2" | "nutrition-import-v3";
+            /** Parser Version */
+            parser_version: string;
+            /** Content Sha256 */
+            content_sha256: string;
+            /**
+             * Completeness
+             * @enum {string}
+             */
+            completeness: "complete" | "partial" | "unknown";
+            source: components["schemas"]["ImportSource"];
+            /** Rows */
+            rows: components["schemas"]["ImportPreviewRow"][];
+            /** Original Totals */
+            original_totals: components["schemas"]["OriginalTotal"][];
+            /** Original Summaries */
+            original_summaries: components["schemas"]["OriginalSummary"][];
+            /** Original Detail Cells */
+            original_detail_cells?: components["schemas"]["OriginalDetailCell"][];
+            /** Diagnostics */
+            diagnostics: components["schemas"]["ImportDiagnostic"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** ImportPreviewRow */
+        ImportPreviewRow: {
+            /** Index */
+            index: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "new" | "ambiguous" | "invalid" | "skipped" | "manual_resolution_required";
+            source: components["schemas"]["ImportFoodRow"];
+            /** Action */
+            action: {
+                [key: string]: unknown;
+            } | null;
+            /** Issues */
+            issues: string[];
+        };
+        /** ImportReceipt */
+        ImportReceipt: {
+            /** Entry Ids */
+            entry_ids: number[];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** ImportResolveRequest */
+        ImportResolveRequest: {
+            /** Revision */
+            revision: number;
+            /** Matches */
+            matches: components["schemas"]["RowResolution"][];
+            /** Skipped Rows */
+            skipped_rows: number[];
+        };
+        /** ImportSource */
+        ImportSource: {
+            /** Provider */
+            provider: string;
+            /** Source */
+            source: string;
+            /** Source Version */
+            source_version?: string | null;
+            /** Adapter Version */
+            adapter_version: string;
+            /** Source Format */
+            source_format: string;
+            /**
+             * Transport
+             * @enum {string}
+             */
+            transport: "upload" | "url";
+            /**
+             * Publication Rights
+             * @default unknown
+             * @enum {string}
+             */
+            publication_rights: "unknown" | "owner_reported" | "verified" | "prohibited";
         };
         /** LatestBodyMeasurement */
         LatestBodyMeasurement: {
@@ -13539,7 +14929,6 @@ export interface components {
             amount: number | string;
             /**
              * Amount Unit
-             * @default g
              * @enum {string}
              */
             amount_unit: "g" | "ml" | "serving";
@@ -13720,6 +15109,24 @@ export interface components {
             /** Quiet Hours End */
             quiet_hours_end?: string | null;
         };
+        /** NutrientFact */
+        NutrientFact: {
+            /** Value */
+            value: string | null;
+            /** Unit */
+            unit: ("g" | "mg" | "kcal" | "kJ") | null;
+            /** Source Unit */
+            source_unit?: string | null;
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "read" | "derived" | "absent" | "ambiguous" | "unreadable";
+            /** Derivation */
+            derivation?: string | null;
+            /** Derived From */
+            derived_from?: components["schemas"]["SourceFieldReference"][];
+        };
         /** NutrientFacts */
         NutrientFacts: {
             energy_kcal?: components["schemas"]["CanonicalFact"] | null;
@@ -13746,6 +15153,46 @@ export interface components {
             username?: string | null;
             /** Full Name */
             full_name?: string | null;
+        };
+        /** NutritionDateOverrideResponse */
+        NutritionDateOverrideResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Day Type */
+            day_type?: ("training" | "rest" | "recovery") | null;
+            target: components["schemas"]["NutritionTargetResponse"];
+        };
+        /** NutritionDateOverrideSave */
+        NutritionDateOverrideSave: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Day Type */
+            day_type?: ("training" | "rest" | "recovery") | null;
+            /** Expected Target Id */
+            expected_target_id?: number | null;
         };
         /** NutritionLabelConfirmRequest */
         NutritionLabelConfirmRequest: {
@@ -13882,6 +15329,17 @@ export interface components {
              * @default false
              */
             confirm_energy_mismatch: boolean;
+        };
+        /** NutritionMealNoteUpdate */
+        NutritionMealNoteUpdate: {
+            /** Hunger Before */
+            hunger_before?: ("none" | "low" | "medium" | "high") | null;
+            /** Fullness After */
+            fullness_after?: ("none" | "low" | "medium" | "high") | null;
+            /** Energy */
+            energy?: ("low" | "normal" | "high") | null;
+            /** Note */
+            note?: string | null;
         };
         /** NutritionMealTemplateCreate */
         NutritionMealTemplateCreate: {
@@ -14110,6 +15568,26 @@ export interface components {
              */
             amount_unit: "g" | "ml" | "serving";
         };
+        /** NutritionPlanFillPreviewRequest */
+        NutritionPlanFillPreviewRequest: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Candidate Id */
+            candidate_id: string;
+            /** Items */
+            items: components["schemas"]["NutritionPlanFillItem"][];
+            /** Expected Revision */
+            expected_revision: number;
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+        };
         /** NutritionPlanFillRequest */
         NutritionPlanFillRequest: {
             /**
@@ -14128,6 +15606,12 @@ export interface components {
             items: components["schemas"]["NutritionPlanFillItem"][];
             /** Expected Revision */
             expected_revision: number;
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+            /**
+             * Preview Token
+             * @description Нужен для нового заполнения; без него разрешён только повтор прежней операции.
+             */
+            preview_token?: string | null;
         };
         /** NutritionPlanItemActionRequest */
         NutritionPlanItemActionRequest: {
@@ -14269,6 +15753,22 @@ export interface components {
             remaining: components["schemas"]["FoodDiaryTargets"] | null;
             /** Nutrition Complete */
             nutrition_complete: boolean;
+        };
+        /** NutritionProgramDayResponse */
+        NutritionProgramDayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /** Day Type */
+            day_type: ("training" | "rest") | null;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
         };
         /** NutritionReportDailyPoint */
         NutritionReportDailyPoint: {
@@ -14475,6 +15975,314 @@ export interface components {
             /** Evaluated Days */
             evaluated_days: number;
         };
+        /** NutritionResolvedTargetResponse */
+        NutritionResolvedTargetResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            target: components["schemas"]["NutritionTargetResponse"] | null;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "base" | "schedule" | "date" | "none";
+            /** Day Type */
+            day_type: ("training" | "rest" | "recovery") | null;
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            /** Frozen */
+            frozen: boolean;
+        };
+        /** NutritionScheduleBindingConfirm */
+        NutritionScheduleBindingConfirm: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
+            /**
+             * Confirm
+             * @constant
+             */
+            confirm: true;
+        };
+        /** NutritionScheduleBindingResponse */
+        NutritionScheduleBindingResponse: {
+            /** Id */
+            id: number;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+        };
+        /** NutritionScheduleBindingStatus */
+        NutritionScheduleBindingStatus: {
+            /** Id */
+            id: number;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Program Changed */
+            program_changed: boolean;
+        };
+        /** NutritionSchedulePreviewChange */
+        NutritionSchedulePreviewChange: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            before: components["schemas"]["NutritionSchedulePreviewTarget"] | null;
+            after: components["schemas"]["NutritionSchedulePreviewTarget"] | null;
+        };
+        /** NutritionSchedulePreviewRequest */
+        NutritionSchedulePreviewRequest: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+        };
+        /** NutritionSchedulePreviewResponse */
+        NutritionSchedulePreviewResponse: {
+            /** Expected Binding Id */
+            expected_binding_id: number | null;
+            /** Expected Target Version */
+            expected_target_version: number | null;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Changes */
+            changes: components["schemas"]["NutritionSchedulePreviewChange"][];
+        };
+        /** NutritionSchedulePreviewTarget */
+        NutritionSchedulePreviewTarget: {
+            /** Id */
+            id: number;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+        };
+        /** NutritionScheduleProgramContext */
+        NutritionScheduleProgramContext: {
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /** Title */
+            title: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /**
+             * Schedule Mode
+             * @enum {string}
+             */
+            schedule_mode: "calendar" | "rotation";
+            /** Week Types */
+            week_types: ("light" | "medium" | "heavy")[];
+        };
+        /** NutritionScheduleRulePreviewRequest */
+        NutritionScheduleRulePreviewRequest: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "template" | "future" | "recovery";
+            /**
+             * Day Type
+             * @enum {string}
+             */
+            day_type: "training" | "rest" | "recovery";
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+        };
+        /** NutritionScheduleRuleResponse */
+        NutritionScheduleRuleResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "template" | "future" | "recovery";
+            /**
+             * Day Type
+             * @enum {string}
+             */
+            day_type: "training" | "rest" | "recovery";
+            /** Week Type */
+            week_type: ("light" | "medium" | "heavy") | null;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Program Id */
+            program_id: number | null;
+            /** Source Cycle Week */
+            source_cycle_week: number | null;
+            /** Cycle Boundary */
+            cycle_boundary: number | null;
+            /** Weekday */
+            weekday: number | null;
+            target: components["schemas"]["NutritionTargetResponse"];
+        };
+        /** NutritionScheduleRuleSave */
+        NutritionScheduleRuleSave: {
+            /** Target Telegram User Id */
+            target_telegram_user_id?: number | null;
+            /** Calories */
+            calories: number;
+            /** Protein G */
+            protein_g: number;
+            /** Fat G */
+            fat_g: number;
+            /** Carbs G */
+            carbs_g: number;
+            /**
+             * Effective From
+             * Format: date
+             */
+            effective_from: string;
+            /** Note */
+            note?: string | null;
+            /**
+             * Confirm Energy Mismatch
+             * @default false
+             */
+            confirm_energy_mismatch: boolean;
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "template" | "future" | "recovery";
+            /**
+             * Day Type
+             * @enum {string}
+             */
+            day_type: "training" | "rest" | "recovery";
+            /** Week Type */
+            week_type?: ("light" | "medium" | "heavy") | null;
+            /** Expected Binding Id */
+            expected_binding_id?: number | null;
+            /** Expected Target Version */
+            expected_target_version?: number | null;
+        };
         /** NutritionSuggestionCandidate */
         NutritionSuggestionCandidate: {
             /** Candidate Id */
@@ -14515,6 +16323,27 @@ export interface components {
             meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
             /** Items */
             items: components["schemas"]["FoodDiaryBatchItem"][];
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+            /**
+             * Preview Token
+             * @description Нужен для новой записи; без него разрешён только повтор прежней операции.
+             */
+            preview_token?: string | null;
+        };
+        /** NutritionSuggestionConstraints */
+        NutritionSuggestionConstraints: {
+            /** Max Energy Kcal */
+            max_energy_kcal?: number | string | null;
+            /** Max Protein G */
+            max_protein_g?: number | string | null;
+            /** Max Fat G */
+            max_fat_g?: number | string | null;
+            /** Max Carbs G */
+            max_carbs_g?: number | string | null;
+            /** Excluded Food Ids */
+            excluded_food_ids?: number[];
+            /** Preferred Food Ids */
+            preferred_food_ids?: number[];
         };
         /** NutritionSuggestionItem */
         NutritionSuggestionItem: {
@@ -14547,6 +16376,76 @@ export interface components {
              */
             nutrition_confidence: "exact" | "approximate" | "partial";
         };
+        /** NutritionSuggestionPreviewRequest */
+        NutritionSuggestionPreviewRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["FoodDiaryBatchItem"][];
+            constraints?: components["schemas"]["NutritionSuggestionConstraints"] | null;
+        };
+        /** NutritionSuggestionPreviewResponse */
+        NutritionSuggestionPreviewResponse: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["NutritionSuggestionItem"][];
+            before: components["schemas"]["FoodDiaryNutrition"];
+            addition: components["schemas"]["FoodDiaryNutrition"];
+            after: components["schemas"]["FoodDiaryNutrition"];
+            diary: components["schemas"]["FoodDiaryNutrition"];
+            planned: components["schemas"]["FoodDiaryNutrition"] | null;
+            projected_after: components["schemas"]["FoodDiaryNutrition"] | null;
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining_after: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Target Id */
+            target_id: number | null;
+            /** Target Source */
+            target_source: string | null;
+            /** Target Effective From */
+            target_effective_from: string | null;
+            /** Target Weight Kg */
+            target_weight_kg: string | null;
+            /** Target Goal */
+            target_goal: string | null;
+            /**
+             * Target Estimated Bmr Kcal
+             * @description Расчётный BMR сохранённой цели.
+             */
+            target_estimated_bmr_kcal: number | null;
+            /**
+             * Target Estimated Tdee Kcal
+             * @description Расчётный TDEE сохранённой цели.
+             */
+            target_estimated_tdee_kcal: number | null;
+            /**
+             * Constraint Status
+             * @enum {string}
+             */
+            constraint_status: "not_set" | "satisfied" | "violated" | "unknown";
+            /** Constraint Messages */
+            constraint_messages: string[];
+            /** Preference Message */
+            preference_message: string | null;
+            /** Preview Token */
+            preview_token: string;
+        };
         /** NutritionSuggestionsResponse */
         NutritionSuggestionsResponse: {
             /**
@@ -14564,6 +16463,16 @@ export interface components {
             remaining: components["schemas"]["FoodDiaryTargets"] | null;
             /** Remaining Confidence */
             remaining_confidence: ("exact" | "approximate" | "partial") | null;
+            /**
+             * Remaining Includes Plan
+             * @default false
+             */
+            remaining_includes_plan: boolean;
+            /**
+             * Not Calculable
+             * @default false
+             */
+            not_calculable: boolean;
             /** Limitations */
             limitations?: string[];
             /** Candidates */
@@ -14818,6 +16727,90 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** OriginalDetailCell */
+        OriginalDetailCell: {
+            /** Source Column */
+            source_column: number;
+            /** Source Header */
+            source_header?: string | null;
+            /** Source Value */
+            source_value?: string | null;
+            /** Nutrient Field */
+            nutrient_field?: string | null;
+            /**
+             * Mapping Evidence
+             * @default unknown
+             * @enum {string}
+             */
+            mapping_evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            fact: components["schemas"]["NutrientFact"];
+            coordinates: components["schemas"]["SourceCoordinates"];
+        };
+        /** OriginalSummary */
+        OriginalSummary: {
+            header_coordinates: components["schemas"]["SourceCoordinates"];
+            /** Header Label */
+            header_label?: string | null;
+            aggregation: components["schemas"]["SummaryAggregation"];
+            /** Period Label */
+            period_label?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            period_coordinates?: components["schemas"]["SourceCoordinates"] | null;
+            /** Timezone */
+            timezone?: string | null;
+            /** Rows */
+            rows: components["schemas"]["OriginalSummaryRow"][];
+        };
+        /** OriginalSummaryRow */
+        OriginalSummaryRow: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Source Label */
+            source_label?: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "meal" | "overall" | "unknown";
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Values */
+            values: components["schemas"]["OriginalSummaryValue"][];
+        };
+        /** OriginalSummaryValue */
+        OriginalSummaryValue: {
+            /** Source Column */
+            source_column?: number | null;
+            /** Source Header */
+            source_header?: string | null;
+            /** Source Value */
+            source_value?: string | null;
+            /** Nutrient Field */
+            nutrient_field?: string | null;
+            /**
+             * Mapping Evidence
+             * @default unknown
+             * @enum {string}
+             */
+            mapping_evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            fact: components["schemas"]["NutrientFact"];
+        };
+        /** OriginalTotal */
+        OriginalTotal: {
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "entry" | "meal" | "day" | "period" | "unknown";
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Diary Date */
+            diary_date?: string | null;
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            facts: components["schemas"]["SourceNutrients"];
         };
         /**
          * OwnerArticleReviewDetail
@@ -15108,9 +17101,8 @@ export interface components {
             /**
              * Replayed
              * @default false
-             * @constant
              */
-            replayed: false;
+            replayed: boolean;
         };
         /** PhotoMealDraftResponse */
         PhotoMealDraftResponse: {
@@ -17691,6 +19683,146 @@ export interface components {
             /** Final Weight G */
             final_weight_g?: number | string | null;
         };
+        /** RecurringImportMeal */
+        RecurringImportMeal: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Repeat Days */
+            repeat_days: number;
+            /** Occurrences */
+            occurrences: components["schemas"]["RecurringImportMealOccurrence"][];
+        };
+        /** RecurringImportMealItem */
+        RecurringImportMealItem: {
+            /** Source Index */
+            source_index: number;
+            /** Food Id */
+            food_id: number;
+            source: components["schemas"]["ImportFoodRow"];
+            original_total: components["schemas"]["OriginalTotal"] | null;
+            /** Original Detail Cells */
+            original_detail_cells: components["schemas"]["OriginalDetailCell"][];
+        };
+        /** RecurringImportMealOccurrence */
+        RecurringImportMealOccurrence: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Items */
+            items: components["schemas"]["RecurringImportMealItem"][];
+        };
+        /** RecurringImportMeals */
+        RecurringImportMeals: {
+            /** Observed Days */
+            observed_days: number;
+            /** Items */
+            items: components["schemas"]["RecurringImportMeal"][];
+        };
+        /** RecurringMealChoice */
+        "RecurringMealChoice-Input": {
+            /** Source Index */
+            source_index?: number | null;
+            /** Food Id */
+            food_id: number;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** RecurringMealChoice */
+        "RecurringMealChoice-Output": {
+            /** Source Index */
+            source_index?: number | null;
+            /** Food Id */
+            food_id: number;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** RecurringMealComparison */
+        RecurringMealComparison: {
+            item: components["schemas"]["RecurringMealChoice-Output"];
+            source: components["schemas"]["RecurringImportMealItem"] | null;
+            /** Catalog Nutrition */
+            catalog_nutrition: {
+                [key: string]: string | null;
+            };
+            /** Comparison */
+            comparison: {
+                [key: string]: "equal" | "different" | "unknown";
+            };
+        };
+        /** RecurringMealConfirmRequest */
+        RecurringMealConfirmRequest: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["RecurringMealChoice-Input"][];
+            /** Preview Signature */
+            preview_signature: string;
+            /**
+             * Confirmed
+             * @constant
+             */
+            confirmed: true;
+            /**
+             * Acknowledge Nutrition
+             * @constant
+             */
+            acknowledge_nutrition: true;
+        };
+        /** RecurringMealReceipt */
+        RecurringMealReceipt: {
+            template: components["schemas"]["NutritionMealTemplateResponse"];
+            /** Existing */
+            existing: boolean;
+        };
+        /** RecurringMealReview */
+        RecurringMealReview: {
+            /** Items */
+            items: components["schemas"]["RecurringMealComparison"][];
+            /** Preview Signature */
+            preview_signature: string;
+        };
+        /** RecurringMealReviewRequest */
+        RecurringMealReviewRequest: {
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["RecurringMealChoice-Input"][];
+        };
         /** RefreshRequest */
         RefreshRequest: {
             /** Refresh Token */
@@ -18016,6 +20148,23 @@ export interface components {
             /** Distribution */
             distribution: components["schemas"]["RirDistributionBucket"][];
         };
+        /** RowResolution */
+        RowResolution: {
+            /** Index */
+            index: number;
+            /** Food Id */
+            food_id: number;
+        };
+        /** ServingMeasure */
+        ServingMeasure: {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
         /** ServingSize */
         "ServingSize-Input": {
             /** Amount */
@@ -18301,6 +20450,20 @@ export interface components {
             left: components["schemas"]["SideProgressionGuidance"];
             right: components["schemas"]["SideProgressionGuidance"];
         };
+        /** SourceCoordinates */
+        SourceCoordinates: {
+            /** Section */
+            section: string;
+            /**
+             * Section Kind
+             * @enum {string}
+             */
+            section_kind: "detail" | "summary" | "unknown";
+            /** Page */
+            page?: number | null;
+            /** Row */
+            row?: number | null;
+        };
         /** SourceFact */
         SourceFact: {
             /** Value */
@@ -18322,6 +20485,12 @@ export interface components {
              * @enum {string}
              */
             evidence: "read" | "ambiguous" | "unreadable";
+        };
+        /** SourceFieldReference */
+        SourceFieldReference: {
+            coordinates: components["schemas"]["SourceCoordinates"];
+            /** Field */
+            field: string;
         };
         /** SourceNutrientFacts */
         SourceNutrientFacts: {
@@ -18351,6 +20520,40 @@ export interface components {
             sodium_mg?: components["schemas"]["SourceFact"][] | null;
             /** Cholesterol Mg */
             cholesterol_mg?: components["schemas"]["SourceFact"][] | null;
+        };
+        /** SourceNutrients */
+        SourceNutrients: {
+            energy_kcal?: components["schemas"]["NutrientFact"] | null;
+            energy_kj?: components["schemas"]["NutrientFact"] | null;
+            protein_g?: components["schemas"]["NutrientFact"] | null;
+            fat_g?: components["schemas"]["NutrientFact"] | null;
+            saturated_fat_g?: components["schemas"]["NutrientFact"] | null;
+            trans_fat_g?: components["schemas"]["NutrientFact"] | null;
+            carbohydrate_g?: components["schemas"]["NutrientFact"] | null;
+            sugars_g?: components["schemas"]["NutrientFact"] | null;
+            added_sugars_g?: components["schemas"]["NutrientFact"] | null;
+            fiber_g?: components["schemas"]["NutrientFact"] | null;
+            salt_g?: components["schemas"]["NutrientFact"] | null;
+            sodium_mg?: components["schemas"]["NutrientFact"] | null;
+            cholesterol_mg?: components["schemas"]["NutrientFact"] | null;
+            potassium_mg?: components["schemas"]["NutrientFact"] | null;
+        };
+        /** SummaryAggregation */
+        SummaryAggregation: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "unknown" | "total" | "daily_average" | "target";
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "unknown" | "source_label" | "source_profile" | "provider_documentation";
+            /** Denominator */
+            denominator?: ("unknown" | "calendar_days" | "logged_days") | null;
+            /** Denominator Days */
+            denominator_days?: number | null;
         };
         /** TelegramInitRequest */
         TelegramInitRequest: {
@@ -18442,6 +20645,13 @@ export interface components {
             data_sufficiency: components["schemas"]["ProgressDataSufficiency"];
             /** Client Name */
             client_name?: string | null;
+        };
+        /** TrainerNutritionAccess */
+        TrainerNutritionAccess: {
+            /** Relationship Id */
+            relationship_id: number;
+            /** Nutrition Access */
+            nutrition_access: boolean;
         };
         /** TrainerResponse */
         TrainerResponse: {
@@ -22853,6 +25063,59 @@ export interface operations {
             };
         };
     };
+    read_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainerNutritionAccess"];
+                };
+            };
+        };
+    };
+    set_trainer_nutrition_access_api_v1_me_trainer_nutrition_access_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainerNutritionAccess"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainerNutritionAccess"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     preview_invite_link_api_v1_me_coach_invites_link_preview_post: {
         parameters: {
             query?: never;
@@ -26973,6 +29236,206 @@ export interface operations {
             };
         };
     };
+    get_proposals_api_v1_coach_nutrition_proposals_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_proposal_api_v1_coach_nutrition_proposals_clients__client_id__post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachNutritionProposalCreate-Input"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_day_api_v1_coach_nutrition_proposals_clients__client_id__day_get: {
+        parameters: {
+            query: {
+                target_date: string;
+            };
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionPlanPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_target_history_api_v1_coach_nutrition_proposals_clients__client_id__target_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionTargetHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_target_assignments_api_v1_coach_nutrition_proposals_clients__client_id__target_assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionTargetAssignments"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_decision_api_v1_coach_nutrition_proposals__proposal_id__decision_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                proposal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachNutritionProposalDecision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachNutritionProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     workout_activity_heatmap_api_v1_workouts_progress_activity_heatmap_get: {
         parameters: {
             query?: {
@@ -29799,7 +32262,27 @@ export interface operations {
             };
         };
     };
-    add_hydration_entry_api_v1_nutrition_hydration_entries_post: {
+    reject_legacy_hydration_entry_api_v1_nutrition_hydration_entries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    add_hydration_entry_api_v1_nutrition_hydration_entries_v2_post: {
         parameters: {
             query?: never;
             header: {
@@ -29839,11 +32322,15 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                entry_id: number;
+                entry_id: number | string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["HydrationEntryDelete"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -31181,6 +33668,53 @@ export interface operations {
             };
         };
     };
+    preview_nutrition_plan_fill_api_v1_nutrition_plans_suggestions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanFillPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionPreviewResponse"];
+                };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale plan or day */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fill_nutrition_plan_api_v1_nutrition_plans_fill_post: {
         parameters: {
             query?: never;
@@ -31204,6 +33738,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NutritionPlanDayResponse"];
                 };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview or request conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -31457,6 +34005,53 @@ export interface operations {
             };
         };
     };
+    preview_diary_suggestion_api_v1_nutrition_diary_suggestions_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSuggestionPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionPreviewResponse"];
+                };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Day is not editable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post: {
         parameters: {
             query?: never;
@@ -31480,6 +34075,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FoodDiaryBatchResponse"];
                 };
+            };
+            /** @description Source not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Preview or request conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -31512,6 +34121,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NaturalInputPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_diary_batch_api_v1_nutrition_diary_batch_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NaturalInputCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryNutrition"];
                 };
             };
             /** @description Validation Error */
@@ -31631,9 +34273,11 @@ export interface operations {
     delete_diary_entry_api_v1_nutrition_diary_entries__entry_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Diary-Entry-Version"?: string | null;
+            };
             path: {
-                entry_id: number;
+                entry_id: number | string;
             };
             cookie?: never;
         };
@@ -31831,6 +34475,7 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": string;
+                "X-Require-Empty-Meal"?: boolean;
             };
             path?: never;
             cookie?: never;
@@ -31962,6 +34607,368 @@ export interface operations {
             };
         };
     };
+    date_override_history_api_v1_nutrition_targets_dates_get: {
+        parameters: {
+            query?: {
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionDateOverrideResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_date_override_api_v1_nutrition_targets_dates_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionDateOverrideSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionDateOverrideResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_rule_history_api_v1_nutrition_targets_schedule_get: {
+        parameters: {
+            query?: {
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleRuleResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_schedule_rule_api_v1_nutrition_targets_schedule_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionScheduleRuleSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleRuleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_schedule_rule_api_v1_nutrition_targets_schedule_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionScheduleRulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSchedulePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_schedule_program_api_v1_nutrition_targets_schedule_program_get: {
+        parameters: {
+            query?: {
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleProgramContext"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolved_nutrition_target_api_v1_nutrition_targets_for_date_get: {
+        parameters: {
+            query: {
+                target_date: string;
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionResolvedTargetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_binding_status_api_v1_nutrition_targets_schedule_binding_get: {
+        parameters: {
+            query: {
+                target_date: string;
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleBindingStatus"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_schedule_binding_api_v1_nutrition_targets_schedule_binding_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSchedulePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSchedulePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_schedule_binding_api_v1_nutrition_targets_schedule_binding_confirm_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionScheduleBindingConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionScheduleBindingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_program_day_api_v1_nutrition_targets_program_day_get: {
+        parameters: {
+            query: {
+                program_id: number;
+                revision_number: number;
+                target_date: string;
+                target_telegram_user_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionProgramDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     current_target_api_v1_nutrition_targets_current_get: {
         parameters: {
             query?: never;
@@ -32001,6 +35008,693 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NutritionTargetHistoryResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_api_v1_nutrition_notes_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    change_consent_api_v1_nutrition_notes_consent__action__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                action: "enable" | "disable" | "revoke";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_v1_nutrition_notes__local_date__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_api_v1_nutrition_notes__local_date___meal_type__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+                meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionMealNoteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_nutrition_notes__local_date___meal_type__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                local_date: string;
+                meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_api_v1_nutrition_imports_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_nutrition_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_v1_nutrition_imports__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_history_api_v1_nutrition_imports__draft_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_history_import_api_v1_nutrition_imports__draft_id__history_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_history_import_api_v1_nutrition_imports__draft_id__history_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoryConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_api_v1_nutrition_imports__draft_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_conflicts_api_v1_nutrition_imports_catalog_conflicts_get: {
+        parameters: {
+            query?: {
+                after_id?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogConflict"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_confirm_alias_api_v1_nutrition_imports_catalog_conflicts__contribution_id__confirm_alias_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contribution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogAliasConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogAliasReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringImportMeals"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringMealReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringMealReview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_recurring_meals_api_v1_nutrition_imports__draft_id__recurring_meals_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringMealConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringMealReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_catalog_api_v1_nutrition_imports__draft_id__catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_catalog_api_v1_nutrition_imports__draft_id__catalog_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_catalog_api_v1_nutrition_imports__draft_id__catalog_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CatalogImportConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogImportReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_v1_nutrition_imports__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_nutrition_imports__draft_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

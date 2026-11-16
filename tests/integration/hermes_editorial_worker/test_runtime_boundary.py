@@ -11,7 +11,7 @@ WORKER_ROOT = WORKSPACE / "deploy" / "hermes-editorial-worker"
 def test_dockerfile_keeps_the_hardened_runtime_boundary() -> None:
     dockerfile = (WORKER_ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert (
-        "FROM python:3.13-alpine@sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee"
+        "FROM python:3.13-alpine@sha256:d76f585fb0d5107dd47143da5e61554fd9cae656a30f3470f815cb8475769b6a"
         in dockerfile
     )
     assert (
@@ -37,6 +37,23 @@ def test_license_bundle_has_a_deterministic_notice_generator() -> None:
     bundle = (WORKER_ROOT / "license_bundle.py").read_text(encoding="utf-8")
     assert 'output / "NOTICE"' in bundle
     assert 'newline="\\n"' in bundle
+
+
+def test_hermes_base_provenance_matches_both_license_inventories() -> None:
+    components = (
+        (WORKER_ROOT, "hermes-provenance.json"),
+        (WORKSPACE / "deploy" / "hermes-discovery", "hermes-discovery-provenance.json"),
+    )
+    bases = []
+    for root, filename in components:
+        provenance = json.loads((root / filename).read_text(encoding="utf-8"))["base"]
+        inventory = json.loads(
+            (root / "LICENSES" / "package-license-inventory.json").read_text(encoding="utf-8")
+        )["base"]
+        base = {key: provenance[key] for key in ("image", "digest", "platform", "alpine")}
+        assert {key: inventory[key] for key in base} == base
+        bases.append(base)
+    assert bases[0] == bases[1]
 
 
 def test_provenance_and_dependency_inventory_are_exact() -> None:

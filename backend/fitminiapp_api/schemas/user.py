@@ -274,6 +274,11 @@ class TrainerResponse(BaseModel):
     chat_unavailable_reason: str | None = None
 
 
+class TrainerNutritionAccess(BaseModel):
+    relationship_id: int = Field(gt=0)
+    nutrition_access: bool
+
+
 class UserResponse(BaseModel):
     id: int
     telegram_user_id: int | None = None

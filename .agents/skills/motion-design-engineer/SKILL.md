@@ -7,160 +7,57 @@ description: >
 
 # motion-design-engineer
 
-Работай как Senior Motion Design Engineer.
-
-Motion в YFC должен сочетать:
-
-- responsiveness;
-- sport-tech energy;
-- precision;
-- spatial continuity;
-- delight;
-- data truth;
-- mobile performance.
-
-"Вау" разрешён и желателен в product UI, если он не делает действие хуже.
+Act as Senior Motion Design Engineer. Motion must balance responsiveness, sport-tech energy, precision, spatial continuity, delight, data truth and mobile performance. "Wow" is welcome when it improves rather than delays the task.
 
 ## Workflow
 
-Перед implementation ответь:
+Before implementation ask: what users do/understand; motion's purpose; interaction frequency; interruptibility; simplest reliable runtime; reduced-motion alternative; and where to validate actual feel/performance.
 
-1. Что пользователь делает/понимает?
-2. Какую роль играет motion?
-3. Насколько часто interaction повторяется?
-4. Нужно ли движение быть interruptible?
-5. Какой runtime дешевле и надёжнее?
-6. Что увидит reduced-motion пользователь?
-7. Где performance/feel нужно проверить в браузере или на устройстве?
+## Valid motion purposes
 
-## Допустимые цели motion
-
-- feedback;
-- state transition;
-- spatial continuity;
-- data change;
-- hierarchy;
-- progress;
-- completion/celebration;
-- explanation;
-- brand personality;
-- delight.
-
-Декоративная цель допустима, если она осознанная и не мешает primary action.
+Feedback, state changes, spatial continuity, data changes, hierarchy, progress, celebration, explanation, brand expression and delight. Deliberate decoration is acceptable when it does not obstruct primary actions.
 
 ## Tool choice
 
-По умолчанию выбирай самый простой механизм, который сохраняет нужное качество:
+Start with the simplest high-quality option: CSS transition, CSS animation, WAAPI, existing motion library, then a new dependency only when necessary. Do not add a library for a routine short transition.
 
-- CSS transition;
-- CSS animation;
-- WAAPI;
-- existing project motion library;
-- новая motion dependency только при явной необходимости.
+## Repeated actions
 
-Не добавляй библиотеку для обычной короткой transition.
-
-## Frequent interactions
-
-Частое interaction не означает автоматический запрет animation.
-
-Чем чаще действие, тем важнее:
-
-- малый latency;
-- короткая/тонкая реакция;
-- interruptibility;
-- отсутствие накопленного раздражения.
-
-Если эффект ощущается медленным после 20 повторов - пересмотри его.
+Frequent actions do not automatically prohibit animation. Optimize latency, subtlety and interruptibility to prevent fatigue. Revisit any effect that feels slow after 20 repetitions.
 
 ## Properties
 
-Предпочитай `transform`, `opacity` и compositor-friendly подходы.
+Prefer `transform`, `opacity` and compositor-friendly work. Measured layout animation is acceptable when UX requires it; do not turn performance guidance into an aesthetic ban.
 
-Layout animation допустима, если она нужна UX и измерена.
+## Easing and timing
 
-Не превращай performance guideline в эстетический запрет.
-
-## Easing / timing
-
-Используй `references/MOTION_STANDARDS.md` как starting point, а не догму.
-
-Feel проверяется в реальном контексте.
+Use `references/MOTION_STANDARDS.md` as a starting point, not doctrine; judge feel in real context.
 
 ## Apple physical interaction reference
 
-Для Apple-like fluid interaction - interruptible springs, velocity handoff, momentum projection,
-rubber-banding, direct manipulation, sheet/drawer physicality - подключай `$apple-design` как
-специализированный reference.
-
-Не загружай его для любой animation автоматически. YFC motion language и фактический product context
-остаются authoritative.
+For Apple-like interruptible springs, velocity handoff, momentum, rubber-banding, direct manipulation and physical sheets/drawers, selectively load `$apple-design`. Do not load it for every animation; YFC design language and product context remain authoritative.
 
 ## Gestures
 
-Gesture-driven motion должно:
-
-- следовать pointer/finger;
-- быть interruptible;
-- учитывать velocity;
-- иметь predictable snap/return;
-- не блокировать input во время animation.
+Gesture-driven motion should track the finger/pointer, allow interruption, account for velocity, snap/return predictably and avoid blocking input during animation.
 
 ## Data animation
 
-Nutrition/progress/workout data может анимироваться выразительно.
+Nutrition/progress/workout data may animate expressively but must not change meaning, hide declines, manufacture precision or delay access to numbers for spectacle.
 
-Нельзя:
+## Sport-tech moments
 
-- менять смысл данных;
-- скрывать отрицательную динамику;
-- создавать fake precision;
-- откладывать доступ к числу ради шоу.
-
-## Sport-tech wow
-
-Подходящие направления:
-
-- energy build-up;
-- progress pulses;
-- precise number transitions;
-- kinetic chart changes;
-- confident state morphing;
-- completion moments;
-- spatial workout progression;
-- lime light/accent choreography;
-- haptics в TMA, если platform contract это позволяет.
-
-Не обязательно использовать все эффекты одновременно.
+Possible directions include energy buildup, progress pulses, precise number transitions, kinetic charts, state morphing, completion moments, spatial workout progression, lime accent choreography and TMA haptics where allowed. Do not combine all effects automatically.
 
 ## Accessibility
 
-`prefers-reduced-motion` обязателен.
-
-Reduced motion не означает "убрать весь feedback":
-
-- оставь opacity/color/state;
-- убери или уменьши large travel/parallax/bounce;
-- сохрани понимание причинно-следственной связи.
+Honor `prefers-reduced-motion`. Preserve necessary feedback via opacity/color/state; reduce large travel, parallax and bouncing without losing causality.
 
 ## Review mode
 
-При review существующего motion:
-
-- оцени purpose;
-- feel;
-- timing;
-- easing;
-- spatial origin;
-- interruption;
-- repeat-use fatigue;
-- mobile/device performance;
-- reduced motion;
-- YFC character.
-
-Не исправляй animation только потому, что значение отличается от таблицы. Finding требует наблюдаемого или вероятного impact.
+Assess purpose, feel, timing, easing, spatial origin, interruption, repetition fatigue, mobile performance, reduced motion and YFC character. A duration differing from a reference table is not alone a defect; findings need observable or plausible impact.
 
 ## References
 
-- `references/MOTION_STANDARDS.md`;
+- `references/MOTION_STANDARDS.md`.
 - `references/MOTION_PATTERNS.md`.

@@ -401,6 +401,129 @@ def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercis
     )
 
 
+def test_demo_hydration_rejects_delayed_request_after_reset(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries/v2"
+    day = _transport(client, token, "/api/v1/nutrition/hydration").json()
+    generation = day["demo_generation"]
+    body = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "source": "quick_preset",
+        "_hydration_retry_key": "before-reset",
+        "_hydration_generation": generation,
+    }
+    # An old tab still using the legacy transport path must be denied.
+    assert (
+        _transport(client, token, "/api/v1/nutrition/hydration/entries", "POST", body).status_code
+        == 409
+    )
+    assert _transport(client, token, path, "POST", body).status_code == 200
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    assert _transport(client, token, path, "POST", body).status_code == 409
+    next_day = _transport(client, token, "/api/v1/nutrition/hydration").json()
+    assert next_day["demo_generation"] != generation
+    assert next_day["total_ml"] == 1350
+    assert (
+        _transport(client, token, path, "POST", {**body, "_hydration_generation": True}).status_code
+        == 403
+    )
+    assert (
+        _transport(
+            client,
+            token,
+            path,
+            "POST",
+            {
+                **body,
+                "_hydration_retry_key": "after-reset",
+                "_hydration_generation": next_day["demo_generation"],
+            },
+        ).status_code
+        == 200
+    )
+    assert _transport(client, token, "/api/v1/nutrition/hydration").json()["total_ml"] == 1600
+
+
+def test_demo_hydration_retry_reuses_entry_and_rejects_key_conflicts(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    other_token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries/v2"
+    body = {
+        "volume_ml": 250,
+        "beverage_type": "water",
+        "source": "quick_preset",
+        "diary_date": "2026-09-01",
+        "_hydration_retry_key": "synthetic-key",
+    }
+
+    first = _transport(client, token, path, "POST", body)
+    retry = _transport(client, token, path, "POST", body)
+    assert first.status_code == retry.status_code == 200
+    assert retry.json() == first.json()
+    assert "_hydration_retry_key" not in first.json()
+    assert _transport(client, token, path, "POST", {**body, "volume_ml": 500}).status_code == 409
+    assert (
+        _transport(client, other_token, path, "POST", {**body, "volume_ml": 500}).status_code == 200
+    )
+    another = _transport(client, token, path, "POST", {**body, "_hydration_retry_key": "new-key"})
+    assert another.status_code == 200
+    assert another.json()["id"] != first.json()["id"]
+
+
+def test_demo_hydration_undo_rejects_edits_and_reset_reuse(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries"
+    generation = _transport(client, token, "/api/v1/nutrition/hydration").json()["demo_generation"]
+    create = {"volume_ml": 250, "beverage_type": "water", "source": "manual"}
+    entry = _transport(client, token, path + "/v2", "POST", create).json()
+    snapshot = {
+        **{key: entry[key] for key in ("created_at", "updated_at", "diary_date")},
+        "_hydration_generation": generation,
+    }
+    entry_path = f"{path}/{entry['id']}"
+    assert _transport(client, token, entry_path, "DELETE").status_code == 409
+    edited = _transport(
+        client,
+        token,
+        entry_path,
+        "PATCH",
+        {"volume_ml": 400, "beverage_type": "tea", "occurred_at": "2026-08-20T08:30:00Z"},
+    )
+    assert edited.status_code == 200
+    assert _transport(client, token, entry_path + "-undo", "DELETE", snapshot).status_code == 409
+    assert (
+        _transport(client, token, "/api/v1/nutrition/hydration?diary_date=2026-08-20").json()[
+            "entries"
+        ][0]["volume_ml"]
+        == 400
+    )
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    replacement = _transport(client, token, path + "/v2", "POST", create).json()
+    assert replacement["id"] == entry["id"]
+    assert _transport(client, token, entry_path + "-undo", "DELETE", snapshot).status_code == 409
+    new_generation = _transport(client, token, "/api/v1/nutrition/hydration").json()[
+        "demo_generation"
+    ]
+    new_snapshot = {
+        **{key: replacement[key] for key in ("created_at", "updated_at", "diary_date")},
+        "_hydration_generation": new_generation,
+    }
+    assert (
+        _transport(client, token, entry_path + "-undo", "DELETE", new_snapshot).status_code == 200
+    )
+
+
 def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
     client,
 ) -> None:
@@ -409,7 +532,7 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     added_water = _transport(
         client,
         nutrition_token,
-        "/api/v1/nutrition/hydration/entries",
+        "/api/v1/nutrition/hydration/entries/v2",
         "POST",
         {"volume_ml": 350, "beverage_type": "water", "source": "quick_preset"},
     )
@@ -422,7 +545,17 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     assert any(item.id == entry.id for item in after.entries)
     assert (
         _transport(
-            client, nutrition_token, f"/api/v1/nutrition/hydration/entries/{entry.id}", "DELETE"
+            client,
+            nutrition_token,
+            f"/api/v1/nutrition/hydration/entries/{entry.id}-delete",
+            "DELETE",
+            {
+                **{
+                    key: added_water.json()[key]
+                    for key in ("created_at", "updated_at", "diary_date")
+                },
+                "_hydration_generation": before["demo_generation"],
+            },
         ).status_code
         == 200
     )

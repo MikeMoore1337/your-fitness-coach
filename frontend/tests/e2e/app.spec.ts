@@ -5,10 +5,177 @@ import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
 import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
-import { installTelegramHarness } from './fixtures/mobile-tma';
+import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { scrollIntoStablePosition } from './fixtures/stable-position';
 
 test.use({ serviceWorkers: 'block' });
+
+for (const decision of ['accept', 'reject'] as const) {
+  for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+    test(`Issue 954: клиент выбирает ${decision} (${surface})`, async ({ page }, testInfo) => {
+      const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+      const captureSurface =
+        surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+      if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+      const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+      const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (evidence)
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockApi(page);
+      let status = 'pending';
+      const proposal = {
+        id: 1,
+        version: 1,
+        target_date: '2030-01-10',
+        before: {
+          target: { calories: 1900, protein_g: 110, fat_g: 70, carbs_g: 210 },
+          item: { name: 'Творог', amount: '100', amount_unit: 'g' },
+        },
+        request: {
+          target_date: '2030-01-10',
+          calories: 2000,
+          protein_g: 150,
+          fat_g: 70,
+          carbs_g: 180,
+          item_amount: '150',
+          comment: 'Посмотри, подходит ли тебе такой вариант.',
+        },
+      };
+      await page.route('**/api/v1/coach-nutrition-proposals**', async (route) => {
+        if (route.request().method() === 'POST') {
+          expect(route.request().postDataJSON()).toEqual({ decision, version: 1 });
+          status = decision === 'accept' ? 'accepted' : 'rejected';
+          return route.fulfill({ json: { ...proposal, status } });
+        }
+        return route.fulfill({ json: [{ ...proposal, status }] });
+      });
+      await page.goto('/app?section=nutrition');
+      if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Открыть предложения' }).click();
+      await expect(
+        page.getByRole('heading', { name: 'Предложения тренера', level: 1 }),
+      ).toBeFocused();
+      if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await expect(page.getByRole('heading', { name: 'Проверьте изменения' })).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (evidence && decision === 'accept') {
+        mkdirSync(evidence, { recursive: true });
+        if (surface !== 'desktop')
+          await page.screenshot({
+            path: path.join(
+              evidence,
+              `${testInfo.project.name}-${captureSurface}-${theme}-client-review-viewport.png`,
+            ),
+          });
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-review.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+      }
+      await page
+        .getByRole('button', { name: decision === 'accept' ? 'Принять изменения' : 'Отклонить' })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: decision === 'accept' ? 'Принято' : 'Отклонено' }),
+      ).toBeVisible();
+      if (evidence)
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-${decision}.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+      if (surface === 'tma') {
+        await new TelegramHarness(page).clickBack();
+        await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+      }
+    });
+  }
+}
+
+for (const code of [404, 409] as const) {
+  for (const surface of ['desktop', 'mobile', 'tma'] as const) {
+    test(`Issue 954: недоступное предложение ${code} (${surface})`, async ({ page }, testInfo) => {
+      const mobileWidth = Number(process.env.ISSUE_954_MOBILE_WIDTH ?? 390);
+      const captureSurface =
+        surface === 'mobile' && mobileWidth !== 390 ? `mobile-${mobileWidth}` : surface;
+      if (surface !== 'desktop') await page.setViewportSize({ width: mobileWidth, height: 844 });
+
+      const evidence = process.env.ISSUE_954_EVIDENCE_DIR;
+      const theme = process.env.ISSUE_954_THEME === 'dark' ? 'dark' : 'light';
+      if (surface === 'tma') await installTelegramHarness(page, { colorScheme: theme });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (evidence)
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockApi(page);
+      await page.route('**/api/v1/coach-nutrition-proposals**', async (route) => {
+        if (route.request().method() === 'POST')
+          return route.fulfill({
+            status: code,
+            json: { detail: code === 409 ? 'Цель изменилась' : 'Предложение недоступно' },
+          });
+        return route.fulfill({
+          json: [
+            {
+              id: 1,
+              version: 1,
+              status: 'pending',
+              target_date: '2030-01-10',
+              before: { target: null, item: null },
+              request: {
+                target_date: '2030-01-10',
+                calories: 2000,
+                protein_g: 150,
+                fat_g: 70,
+                carbs_g: 180,
+              },
+            },
+          ],
+        });
+      });
+      await page.goto('/app?section=nutrition');
+      if (surface !== 'tma') await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Открыть предложения' }).click();
+      if (evidence) await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await page.getByRole('button', { name: 'Принять изменения' }).click();
+      await expect(page.locator('.coach-nutrition-focused').getByRole('alert')).toContainText(
+        code === 409 ? 'Данные изменились' : 'Предложение недоступно',
+      );
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (evidence) {
+        mkdirSync(evidence, { recursive: true });
+        if (surface !== 'desktop')
+          await page.screenshot({
+            path: path.join(
+              evidence,
+              `${testInfo.project.name}-${captureSurface}-${theme}-client-${code === 409 ? 'stale' : 'unavailable'}-viewport.png`,
+            ),
+          });
+        await page.screenshot({
+          path: path.join(
+            evidence,
+            `${testInfo.project.name}-${captureSurface}-${theme}-client-${code === 409 ? 'stale' : 'unavailable'}.png`,
+          ),
+          fullPage: true,
+          style: '#appBottomNav, #appBottomNav * { visibility: hidden !important; }',
+        });
+      }
+    });
+  }
+}
 
 test.describe('универсальная геометрия предпросмотра #1185', () => {
   test.use({ hasTouch: true });
@@ -602,6 +769,22 @@ async function mockApi(
         json: emptyHydrationDay(url.searchParams.get('diary_date') || '2030-01-10'),
       });
     }
+    if (
+      path.endsWith('/nutrition/targets/schedule/program') ||
+      path.endsWith('/nutrition/targets/schedule/binding')
+    )
+      return route.fulfill({ json: null });
+    if (path.endsWith('/nutrition/targets/for-date'))
+      return route.fulfill({
+        json: {
+          date: url.searchParams.get('target_date'),
+          target: null,
+          origin: 'none',
+          day_type: null,
+          week_type: null,
+          frozen: false,
+        },
+      });
     if (path.endsWith('/nutrition/diary'))
       return route.fulfill({
         json: {
@@ -2175,8 +2358,11 @@ test('notification nutrition deep links open the intended quick entry context', 
   await page.getByRole('button', { name: 'Закрыть добавление' }).click();
 
   await page.goto('/app?section=nutrition&date=2030-01-10&hydration=quick');
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await expect(hydration.getByRole('button', { name: /Стакан.*250 мл/ })).toBeFocused();
+  await hydration.getByText('Другой напиток или объём').click();
   await expect(
-    page.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+    hydration.getByRole('region', { name: 'Другой напиток или объём' }).getByLabel('Объём, мл'),
   ).toBeVisible();
 });
 
@@ -2787,27 +2973,12 @@ test('поля профиля и питания выровнены на деск
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAppDestination(page, 'Питание');
-  const nutritionSettings = page.locator('details.nutrition-target-settings');
-  await expect(nutritionSettings).toHaveCount(1);
-  await expect(nutritionSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
-  const nutritionSectionOrder = await page
-    .locator('.nutrition-experience > *')
-    .evaluateAll((nodes) => nodes.map((node) => String(node.className)));
-  const settingsIndex = nutritionSectionOrder.findIndex((name) =>
-    name.includes('nutrition-target-settings'),
-  );
-  const mealPlannerIndex = nutritionSectionOrder.findIndex((name) => name.includes('meal-planner'));
-  const groceryListIndex = nutritionSectionOrder.findIndex((name) => name.includes('grocery-list'));
-  expect(settingsIndex).toBeGreaterThanOrEqual(0);
-  expect(settingsIndex).toBeLessThan(mealPlannerIndex);
-  expect(settingsIndex).toBeLessThan(groceryListIndex);
-  await nutritionSettings.locator(':scope > summary').click();
-  await expect(nutritionSettings).toHaveAttribute('open', '');
-  await expect(nutritionSettings.locator(':scope > summary')).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
-  await expect(nutritionSettings.locator('details.card-disclosure')).toHaveCount(0);
+  await expect(page.locator('.meal-planner')).toBeVisible();
+  await expect(page.locator('.grocery-list')).toBeVisible();
+  await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+  const nutritionSettings = page.locator('#nutrition-target-settings');
+  await expect(nutritionSettings.getByRole('heading', { name: 'Цели по дням' })).toBeVisible();
+  await nutritionSettings.getByRole('button', { name: 'Изменить', exact: true }).first().click();
   await expect(
     nutritionSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
   ).toBeVisible();

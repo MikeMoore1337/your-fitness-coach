@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 from fastapi import (
@@ -8,10 +8,12 @@ from fastapi import (
     Header,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
     status,
 )
+from pydantic import StringConstraints
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan, require_user
@@ -42,6 +44,7 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryEntryCreate,
     FoodDiaryEntryResponse,
     FoodDiaryEntryUpdate,
+    FoodDiaryNutrition,
     MealType,
 )
 from fitminiapp_api.schemas.grocery_list import (
@@ -53,6 +56,7 @@ from fitminiapp_api.schemas.grocery_list import (
 from fitminiapp_api.schemas.hydration import (
     HydrationDayResponse,
     HydrationEntryCreate,
+    HydrationEntryDelete,
     HydrationEntryResponse,
     HydrationEntryUpdate,
     HydrationGoalResponse,
@@ -64,7 +68,20 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationDecision,
     EnergyCalibrationHistoryResponse,
     EnergyCalibrationResponse,
+    NutritionDateOverrideResponse,
+    NutritionDateOverrideSave,
     NutritionManualTargetSave,
+    NutritionProgramDayResponse,
+    NutritionResolvedTargetResponse,
+    NutritionScheduleBindingConfirm,
+    NutritionScheduleBindingResponse,
+    NutritionScheduleBindingStatus,
+    NutritionSchedulePreviewRequest,
+    NutritionSchedulePreviewResponse,
+    NutritionScheduleProgramContext,
+    NutritionScheduleRulePreviewRequest,
+    NutritionScheduleRuleResponse,
+    NutritionScheduleRuleSave,
     NutritionTargetHistoryResponse,
     NutritionTargetResponse,
     NutritionTargetSave,
@@ -77,6 +94,7 @@ from fitminiapp_api.schemas.nutrition_label import (
 from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanCopyRequest,
     NutritionPlanDayResponse,
+    NutritionPlanFillPreviewRequest,
     NutritionPlanFillRequest,
     NutritionPlanItemActionRequest,
     NutritionPlanItemActionResponse,
@@ -99,6 +117,8 @@ from fitminiapp_api.schemas.nutrition_power import (
     NutritionMealTemplateResponse,
     NutritionMealTemplateUpdate,
     NutritionSuggestionCommitRequest,
+    NutritionSuggestionPreviewRequest,
+    NutritionSuggestionPreviewResponse,
     NutritionSuggestionsResponse,
 )
 from fitminiapp_api.schemas.photo_meal import (
@@ -184,8 +204,11 @@ from fitminiapp_api.services.nutrition import (
     NutritionError,
     build_nutrition_target_response_for_user,
     get_current_nutrition_target,
+    list_nutrition_date_overrides,
     list_nutrition_target_history,
+    read_nutrition_program_day,
     save_manual_nutrition_target,
+    save_nutrition_date_override,
     save_nutrition_target,
 )
 from fitminiapp_api.services.nutrition_label import (
@@ -207,6 +230,7 @@ from fitminiapp_api.services.nutrition_plan import (
     get_plan_fill_suggestions,
     get_plan_week,
     perform_plan_item_action,
+    preview_plan_fill,
     update_plan_item,
 )
 from fitminiapp_api.services.nutrition_power import (
@@ -223,12 +247,24 @@ from fitminiapp_api.services.nutrition_power import (
     list_food_search_aliases,
     list_meal_templates,
     preview_natural_input,
+    preview_selected_foods,
     update_food_search_alias,
     update_meal_template,
 )
+from fitminiapp_api.services.nutrition_schedule_write import (
+    confirm_nutrition_schedule_binding,
+    list_nutrition_schedule_rules,
+    preview_nutrition_schedule_binding,
+    preview_nutrition_schedule_rule,
+    read_nutrition_schedule_binding,
+    read_nutrition_schedule_program,
+    read_resolved_nutrition_target,
+    save_nutrition_schedule_rule,
+)
 from fitminiapp_api.services.nutrition_suggestions import (
-    commit_nutrition_suggestion,
+    confirm_nutrition_suggestion,
     get_nutrition_suggestions,
+    preview_nutrition_suggestion,
 )
 from fitminiapp_api.services.photo_meal import (
     PhotoMealError,
@@ -520,15 +556,39 @@ def hydration_day(
 
 @router.post(
     "/hydration/entries",
+    status_code=status.HTTP_409_CONFLICT,
+    deprecated=True,
+)
+def reject_legacy_hydration_entry(
+    current_user: User = Depends(require_user),
+) -> None:
+    # The old browser cannot coordinate retries with a new tab. Never accept
+    # the legacy URL after the v2 backend becomes available.
+    raise HTTPException(
+        status_code=409,
+        detail="Обновите приложение для безопасной записи воды.",
+    )
+
+
+@router.post(
+    "/hydration/entries/v2",
     response_model=HydrationEntryResponse,
     status_code=status.HTTP_201_CREATED,
 )
 def add_hydration_entry(
+    request: Request,
     payload: HydrationEntryCreate,
     idempotency_key: IdempotencyKey,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # This route does not exist on the previous backend. If the frontend is
+    # deployed first, the old backend fails closed rather than double-writing.
+    if request.headers.get("X-YFC-Hydration-Protocol") != "2":
+        raise HTTPException(
+            status_code=409,
+            detail="Обновите приложение для безопасной записи воды.",
+        )
     try:
         return create_hydration_entry(db, current_user, payload, idempotency_key)
     except HydrationError as exc:
@@ -550,12 +610,18 @@ def edit_hydration_entry(
 
 @router.delete("/hydration/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_hydration_entry(
-    entry_id: int,
+    entry_id: int | Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]*-(undo|delete)$")],
+    payload: HydrationEntryDelete | None = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    if isinstance(entry_id, int):
+        raise HTTPException(status_code=409, detail="Обновите приложение для безопасного удаления.")
+    if payload is None:
+        raise HTTPException(status_code=422, detail="Укажите версию записи.")
+    raw_id, mode = entry_id.split("-")
     try:
-        delete_hydration_entry(db, current_user, entry_id)
+        delete_hydration_entry(db, current_user, int(raw_id), payload, undo=mode == "undo")
     except HydrationError as exc:
         _raise_hydration_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -1099,9 +1165,31 @@ def get_plan_suggestions(
 
 
 @router.post(
+    "/plans/suggestions/preview",
+    response_model=NutritionSuggestionPreviewResponse,
+    responses={404: {"description": "Source not found"}, 409: {"description": "Stale plan or day"}},
+)
+def preview_nutrition_plan_fill(
+    payload: NutritionPlanFillPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_plan_fill(db, current_user, payload)
+    except NutritionPlanError as exc:
+        _raise_nutrition_plan_http_error(exc)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
     "/plans/fill",
     response_model=NutritionPlanDayResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Preview or request conflict"},
+    },
 )
 def fill_nutrition_plan(
     payload: NutritionPlanFillRequest,
@@ -1226,9 +1314,32 @@ def get_diary_suggestions(
 
 
 @router.post(
+    "/diary/suggestions/preview",
+    response_model=NutritionSuggestionPreviewResponse,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Day is not editable"},
+    },
+)
+def preview_diary_suggestion(
+    payload: NutritionSuggestionPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_suggestion(db, current_user, payload)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
     "/diary/suggestions/commit",
     response_model=FoodDiaryBatchResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        404: {"description": "Source not found"},
+        409: {"description": "Preview or request conflict"},
+    },
 )
 def commit_diary_suggestion(
     payload: NutritionSuggestionCommitRequest,
@@ -1237,7 +1348,7 @@ def commit_diary_suggestion(
     db: Session = Depends(get_db),
 ):
     try:
-        return commit_nutrition_suggestion(db, current_user, payload, idempotency_key)
+        return confirm_nutrition_suggestion(db, current_user, payload, idempotency_key)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 
@@ -1253,6 +1364,18 @@ def preview_nutrition_natural_input(
 ):
     try:
         return preview_natural_input(db, current_user, payload.text)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.post("/diary/batch/preview", response_model=FoodDiaryNutrition)
+def preview_diary_batch(
+    payload: NaturalInputCommitRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_selected_foods(db, current_user, payload)
     except NutritionPowerError as exc:
         _raise_nutrition_power_http_error(exc)
 
@@ -1320,12 +1443,18 @@ def update_diary_entry(
 
 @router.delete("/diary/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_diary_entry(
-    entry_id: int,
+    entry_id: int | Annotated[str, StringConstraints(pattern=r"^[1-9][0-9]*~undo$")],
+    expected_version: Annotated[datetime | None, Header(alias="X-Diary-Entry-Version")] = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # The suffix makes older servers reject guarded deletes instead of ignoring the version.
+    if isinstance(entry_id, str):
+        if expected_version is None:
+            raise HTTPException(status_code=422, detail="entry version is required")
+        entry_id = int(entry_id.removesuffix("~undo"))
     try:
-        delete_food_diary_entry(db, current_user, entry_id)
+        delete_food_diary_entry(db, current_user, entry_id, expected_version)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -1401,11 +1530,19 @@ def copy_product(
 def copy_meal(
     payload: FoodDiaryCopyMeal,
     idempotency_key: IdempotencyKey,
+    require_empty_meal: Annotated[bool, Header(alias="X-Require-Empty-Meal")] = False,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # Older servers cannot accept the suffixed preview token and therefore cannot duplicate a meal.
+    if require_empty_meal:
+        if not payload.preview_token.endswith("~quick"):
+            raise HTTPException(status_code=422, detail="guarded preview token is required")
+        payload = payload.model_copy(
+            update={"preview_token": payload.preview_token.removesuffix("~quick")}
+        )
     try:
-        return copy_diary_meal(db, current_user, payload, idempotency_key)
+        return copy_diary_meal(db, current_user, payload, idempotency_key, require_empty_meal)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 
@@ -1473,6 +1610,198 @@ def save_manual_target(
         if isinstance(exc, NutritionConflictError):
             raise HTTPException(status_code=409, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
+
+
+@router.post("/targets/dates", response_model=NutritionDateOverrideResponse)
+def save_date_override(
+    payload: NutritionDateOverrideSave,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_nutrition_date_override(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        detail = str(exc)
+        if detail == "Target user not found":
+            raise HTTPException(status_code=404, detail=detail)
+        if detail == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=detail)
+        if isinstance(exc, NutritionEnergyMismatchError):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "nutrition_energy_mismatch",
+                    "message": detail,
+                    "implied_energy_kcal": exc.implied_energy_kcal,
+                    "difference_kcal": exc.difference_kcal,
+                },
+            )
+        if isinstance(exc, NutritionConflictError):
+            raise HTTPException(status_code=409, detail=detail)
+        raise HTTPException(status_code=400, detail=detail)
+
+
+@router.get("/targets/dates", response_model=list[NutritionDateOverrideResponse])
+def date_override_history(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_nutrition_date_overrides(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        if str(exc) == "Target user not found":
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _raise_schedule_http_error(exc: NutritionError) -> None:
+    detail = str(exc)
+    if detail in {"Target user not found", "Program not found", "Program revision not found"}:
+        raise HTTPException(status_code=404, detail=detail)
+    if detail == "No permission to manage this user":
+        raise HTTPException(status_code=403, detail=detail)
+    if isinstance(exc, NutritionEnergyMismatchError):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "nutrition_energy_mismatch",
+                "message": detail,
+                "implied_energy_kcal": exc.implied_energy_kcal,
+                "difference_kcal": exc.difference_kcal,
+            },
+        )
+    if isinstance(exc, NutritionConflictError):
+        raise HTTPException(status_code=409, detail=detail)
+    raise HTTPException(status_code=400, detail=detail)
+
+
+@router.post("/targets/schedule", response_model=NutritionScheduleRuleResponse)
+def save_schedule_rule(
+    payload: NutritionScheduleRuleSave,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_nutrition_schedule_rule(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/preview", response_model=NutritionSchedulePreviewResponse)
+def preview_schedule_rule(
+    payload: NutritionScheduleRulePreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_schedule_rule(db, current_user, payload)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule", response_model=list[NutritionScheduleRuleResponse])
+def schedule_rule_history(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_nutrition_schedule_rules(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule/program", response_model=NutritionScheduleProgramContext | None)
+def nutrition_schedule_program(
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_schedule_program(db, current_user, target_telegram_user_id)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/for-date", response_model=NutritionResolvedTargetResponse)
+def resolved_nutrition_target(
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_resolved_nutrition_target(
+            db, current_user, target_telegram_user_id, target_date
+        )
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/schedule/binding", response_model=NutritionScheduleBindingStatus | None)
+def schedule_binding_status(
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_schedule_binding(
+            db, current_user, target_telegram_user_id, target_date
+        )
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/binding/preview", response_model=NutritionSchedulePreviewResponse)
+def preview_schedule_binding(
+    payload: NutritionSchedulePreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_nutrition_schedule_binding(db, current_user, payload)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.post("/targets/schedule/binding/confirm", response_model=NutritionScheduleBindingResponse)
+def confirm_schedule_binding(
+    payload: NutritionScheduleBindingConfirm,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_nutrition_schedule_binding(db, current_user, payload, idempotency_key)
+    except NutritionError as exc:
+        _raise_schedule_http_error(exc)
+
+
+@router.get("/targets/program-day", response_model=NutritionProgramDayResponse)
+def nutrition_program_day(
+    program_id: int = Query(ge=1),
+    revision_number: int = Query(ge=1),
+    target_date: date = Query(),
+    target_telegram_user_id: int | None = Query(default=None, ge=1),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return read_nutrition_program_day(
+            db, current_user, target_telegram_user_id, program_id, revision_number, target_date
+        )
+    except NutritionError as exc:
+        if str(exc) in {"Target user not found", "Program not found", "Program revision not found"}:
+            raise HTTPException(status_code=404, detail=str(exc))
+        if str(exc) == "No permission to manage this user":
+            raise HTTPException(status_code=403, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/targets/current", response_model=NutritionTargetResponse | None)

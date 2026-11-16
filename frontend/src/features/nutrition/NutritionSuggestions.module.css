@@ -1,0 +1,200 @@
+.compactCard {
+  gap: 6px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  overflow-wrap: anywhere;
+}
+
+.facts,
+.note,
+.details {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.note {
+  margin: 14px 0 0;
+}
+
+.context {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.diarySection header {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.diarySection header > div {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sectionToggle:focus-visible {
+  outline: 2px solid var(--v2-lime);
+  outline-offset: 2px;
+}
+
+.sectionToggle[aria-expanded='true'] :global(.disclosure-icon .yfc-icon) {
+  transform: rotate(90deg);
+}
+
+.details summary {
+  min-height: 44px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+
+.details summary > span:first-child {
+  min-width: 0;
+}
+
+.details p {
+  margin: 4px 0 0;
+}
+
+.toggle {
+  margin-top: var(--v2-space-3, 12px);
+}
+
+.constraints {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.constraints summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.limitGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3, 12px);
+}
+
+.limitGrid > div,
+.choiceRow > div {
+  min-width: 0;
+}
+
+.foodChoices h4 {
+  margin: 16px 0 8px;
+}
+
+.choiceHint {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.choiceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--v2-space-2, 8px);
+}
+
+.choiceRow button:disabled:hover {
+  background: transparent;
+}
+
+.selectedFoods {
+  display: grid;
+  gap: var(--v2-space-2, 8px);
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selectedFoods li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2, 8px);
+  overflow-wrap: anywhere;
+}
+
+.selectedFoods li > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 9px 3px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.previewTable th:first-child {
+  width: 34%;
+  text-align: left;
+}
+
+@media (max-width: 360px) {
+  .choiceRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .previewTable {
+    font-size: 0.75rem;
+  }
+
+  .previewTable th:first-child {
+    width: 30%;
+  }
+
+  .previewTable thead th:first-child {
+    font-size: 0.7rem;
+  }
+
+  .previewTable th,
+  .previewTable td {
+    padding-inline: 1px;
+  }
+}
+
+@media (max-width: 640px) {
+  .diarySection {
+    /* shortcut: caps this section while the diary grid can overflow; remove when that grid shrinks. */
+    max-width: calc(
+      100vw - max(var(--v2-space-3), env(safe-area-inset-left, 0px)) -
+        max(var(--v2-space-3), env(safe-area-inset-right, 0px))
+    );
+  }
+}

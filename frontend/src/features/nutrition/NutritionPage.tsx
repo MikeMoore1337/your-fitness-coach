@@ -1,13 +1,19 @@
-import { DisclosureIcon } from '../../shared/ui/common';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NutritionTarget } from '../../shared/api/types';
+import type { components } from '../../shared/api/schema';
+import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
+import { Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
+import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
-import { NutritionForm } from './NutritionForm';
+import { NutritionTargets } from './NutritionTargets';
 import type { MealType } from './FoodPickerDialog';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MealPlanner } from './MealPlanner';
 import { GroceryList } from './GroceryList';
+import { NutritionImport } from './NutritionImport';
 
 export function NutritionPage({
   initial,
@@ -34,10 +40,26 @@ export function NutritionPage({
   returnPath?: string;
   timeZone?: string | null;
 }) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [view, setView] = useState<'day' | 'settings' | 'override' | 'proposal' | 'import'>('day');
+  const root = useRef<HTMLDivElement>(null);
+  const closeProposal = useCallback(() => {
+    setView('day');
+    requestAnimationFrame(() =>
+      root.current?.querySelector<HTMLButtonElement>('.coach-nutrition-entry button')?.focus(),
+    );
+  }, []);
+  useTelegramOverlayBackButton(view === 'proposal', closeProposal);
+  const dayView = useRef<HTMLDivElement>(null);
+  const extrasSettingsFocus = useRef(false);
+  const [selectedDate, setSelectedDate] = useState(
+    initialDate || dateInputValue(new Date(), timeZone || undefined),
+  );
+  const [dateTarget, setDateTarget] = useState<NutritionTarget | null>(null);
+  const [dateDayType, setDateDayType] =
+    useState<components['schemas']['NutritionResolvedTargetResponse']['day_type']>(null);
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === '#nutrition-target-settings') setSettingsOpen(true);
+      if (window.location.hash === '#nutrition-target-settings') setView('settings');
     };
     openFromHash();
     window.addEventListener('hashchange', openFromHash);
@@ -45,7 +67,7 @@ export function NutritionPage({
   }, []);
 
   return (
-    <div className="nutrition-experience">
+    <div className="nutrition-experience" ref={root}>
       {returnPath && (
         <nav aria-label="Возврат к отчёту по питанию" className="nutrition-report-return">
           <AppLink className="button-link secondary-link" to={returnPath}>
@@ -53,49 +75,122 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
-      <NutritionDiary
-        initialDate={initialDate}
-        initialFoodQuickAdd={initialFoodQuickAdd}
-        initialMealType={initialMealType}
-        initialHydrationOpen={initialHydrationOpen}
-        demoSafeMode={demoSafeMode}
-        readOnlyEntries={readOnlyEntries}
-        timeZone={timeZone}
-      />
-      <details
-        id="nutrition-target-settings"
-        className="nutrition-target-settings"
-        open={settingsOpen}
-        onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
-      >
-        <summary
-          className="yfc-disclosure-summary"
-          aria-controls="nutrition-target-settings-body"
-          aria-expanded={settingsOpen}
+      {!demoSafeMode && (view === 'day' || view === 'proposal') && (
+        <ClientNutritionProposals
+          focused={view === 'proposal'}
+          onOpen={() => setView('proposal')}
+          onClose={closeProposal}
+        />
+      )}
+      <div className="nutrition-day-content" ref={dayView} hidden={view !== 'day'}>
+        <NutritionDiary
+          initialDate={initialDate}
+          selectedDate={selectedDate}
+          initialFoodQuickAdd={initialFoodQuickAdd}
+          initialMealType={initialMealType}
+          initialHydrationOpen={initialHydrationOpen}
+          demoSafeMode={demoSafeMode}
+          readOnlyEntries={readOnlyEntries}
+          readOnlyTargets={readOnlyTargets}
+          onOpenSettings={() => setView('settings')}
+          onDateChange={setSelectedDate}
+          onOverride={(date, target, dayType) => {
+            setSelectedDate(date);
+            setDateTarget(target);
+            setDateDayType(dayType);
+            setView('override');
+          }}
+          timeZone={timeZone}
+        />
+        <section
+          className="nutrition-extras"
+          data-testid="nutrition-extras"
+          aria-labelledby="nutrition-extras-title"
         >
-          Настройки КБЖУ
-          <DisclosureIcon />
-        </summary>
-        <div id="nutrition-target-settings-body" className="nutrition-target-settings__body">
-          <NutritionForm
-            embedded
-            initial={initial}
-            readOnly={readOnlyTargets}
-            timeZone={timeZone}
-            onSaved={onSaved}
-          />
-        </div>
-      </details>
-      {!demoSafeMode && (
-        <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+          <header className="nutrition-extras__label">
+            <span className="eyebrow">Настройки и инструменты</span>
+            <h2 id="nutrition-extras-title">Дополнительно</h2>
+          </header>
+          <div className="nutrition-extras__body">
+            <Button
+              className="nutrition-extras__setting"
+              data-nutrition-focus="extras-settings"
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                extrasSettingsFocus.current = true;
+                setView('settings');
+              }}
+            >
+              <span>
+                <strong>Настройки КБЖУ</strong>
+                <small>Рассчитать ориентиры или указать вручную</small>
+              </span>
+              <Icon name="chevron-right" size={20} />
+            </Button>
+            {!demoSafeMode && !readOnlyEntries && (
+              <Button
+                className="nutrition-extras__setting"
+                type="button"
+                variant="secondary"
+                onClick={() => setView('import')}
+              >
+                <span>
+                  <strong>Импорт питания</strong>
+                  <small>Добавить продукты из экспорта FatSecret</small>
+                </span>
+                <Icon name="chevron-right" size={20} />
+              </Button>
+            )}
+            {!demoSafeMode && (
+              <MealPlanner
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
+            )}
+            {!demoSafeMode && (
+              <GroceryList
+                initialDate={initialDate}
+                readOnly={readOnlyEntries}
+                timeZone={timeZone}
+              />
+            )}
+          </div>
+        </section>
+        <AiCoachContextualEntry
+          context={{ surface: 'nutrition', periodDays: 7 }}
+          entryPoint="nutrition"
+        />
+      </div>
+      {view === 'import' && (
+        <NutritionImport diaryDate={selectedDate} onClose={() => setView('day')} />
       )}
-      {!demoSafeMode && (
-        <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      {view !== 'day' && view !== 'proposal' && view !== 'import' && (
+        <NutritionTargets
+          mode={view}
+          date={selectedDate}
+          initial={initial}
+          dateTarget={dateTarget}
+          initialDayType={dateDayType}
+          timeZone={timeZone}
+          readOnly={readOnlyTargets}
+          onClose={(savedDate) => {
+            const returnTo = view;
+            if (savedDate) setSelectedDate(savedDate);
+            setView('day');
+            requestAnimationFrame(() => {
+              const focusSelector =
+                returnTo === 'settings' && extrasSettingsFocus.current
+                  ? '[data-nutrition-focus="extras-settings"]'
+                  : `[data-nutrition-focus="${returnTo}"]`;
+              dayView.current?.querySelector<HTMLButtonElement>(focusSelector)?.focus();
+              extrasSettingsFocus.current = false;
+            });
+          }}
+          onSaved={onSaved}
+        />
       )}
-      <AiCoachContextualEntry
-        context={{ surface: 'nutrition', periodDays: 7 }}
-        entryPoint="nutrition"
-      />
     </div>
   );
 }

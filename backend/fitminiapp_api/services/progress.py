@@ -45,6 +45,8 @@ from fitminiapp_api.services.data_quality import (
     collect_training_data_counts,
 )
 from fitminiapp_api.services.diary_nutrition import DiaryDayNutrition, aggregate_diary_entries
+from fitminiapp_api.services.nutrition import load_nutrition_targets_and_date_overrides
+from fitminiapp_api.services.nutrition_schedule import load_scheduled_nutrition_targets
 from fitminiapp_api.services.period_bounds import (
     MAX_REPORT_DAYS,
     resolve_progress_bounds,
@@ -291,9 +293,9 @@ def _active_clients(
     *,
     limit: int,
     offset: int,
-) -> tuple[list[tuple[User, str | None]], int]:
+) -> tuple[list[tuple[User, str | None, bool]], int]:
     query = (
-        db.query(User, CoachClient.private_name)
+        db.query(User, CoachClient.private_name, CoachClient.nutrition_access)
         .join(CoachClient, CoachClient.client_user_id == User.id)
         .filter(
             CoachClient.coach_user_id == coach.id,
@@ -313,7 +315,9 @@ def _active_clients(
         .limit(limit)
         .all()
     )
-    return [(client, private_name) for client, private_name in rows], total
+    return [
+        (client, private_name, access is not False) for client, private_name, access in rows
+    ], total
 
 
 def build_trainer_client_summaries(
@@ -327,7 +331,7 @@ def build_trainer_client_summaries(
     date_to: date | None = None,
 ) -> dict:
     client_rows, total = _active_clients(db, coach, limit=limit, offset=offset)
-    clients = [client for client, _private_name in client_rows]
+    clients = [client for client, _private_name, _access in client_rows]
     period_bounds = None
     effective_period_days = 30 if period_days is None else int(period_days)
     if date_from is not None or date_to is not None:
@@ -362,12 +366,12 @@ def build_trainer_client_summaries(
         db,
         clients,
         effective_period_days,
-        nutrition_visible_user_ids={client.id for client in clients},
+        nutrition_visible_user_ids={client.id for client, _, access in client_rows if access},
         period_bounds=period_bounds,
     )
     names = {
         client.id: private_name or (client.profile.full_name if client.profile else None)
-        for client, private_name in client_rows
+        for client, private_name, _access in client_rows
     }
     for summary in summaries:
         summary["client_name"] = names[summary["user_id"]]
@@ -395,6 +399,8 @@ def build_progress_summary_for_range(
     user: User,
     period_start: date,
     period_end: date,
+    *,
+    nutrition_visible: bool = True,
 ) -> dict:
     if period_end < period_start:
         raise ValueError("period_end must not be before period_start")
@@ -405,7 +411,7 @@ def build_progress_summary_for_range(
         db,
         [user],
         period_days,
-        nutrition_visible_user_ids={user.id},
+        nutrition_visible_user_ids={user.id} if nutrition_visible else set(),
         period_bounds={user.id: (period_start, period_end)},
     )[0]
 
@@ -710,18 +716,25 @@ def build_progress_summaries(
         }
 
     visible_nutrition_ids = set(user_ids) & nutrition_visible_user_ids
-    targets = (
-        db.query(NutritionTarget).filter(NutritionTarget.user_id.in_(visible_nutrition_ids)).all()
-        if visible_nutrition_ids
-        else []
+    targets, snapshots, scheduled_users = load_nutrition_targets_and_date_overrides(
+        db, visible_nutrition_ids, min(start_by_user.values()), max(today_by_user.values())
+    )
+    scheduled_targets = load_scheduled_nutrition_targets(
+        db, scheduled_users, min(start_by_user.values()), max(today_by_user.values())
     )
     target_history_by_user: dict[int, list[NutritionTarget]] = defaultdict(list)
     for target_row in sorted(targets, key=lambda row: (row.effective_from, row.id), reverse=True):
-        target_history_by_user[target_row.user_id].append(target_row)
-    targets_by_user = {
-        user_id: next((row for row in rows if row.effective_to is None), None)
-        for user_id, rows in target_history_by_user.items()
-    }
+        if target_row.target_scope is None:
+            target_history_by_user[target_row.user_id].append(target_row)
+
+    def nutrition_target_for_day(user_id: int, target_date: date) -> NutritionTarget | None:
+        key = (user_id, target_date)
+        if key in snapshots:
+            return snapshots[key]
+        if key in scheduled_targets:
+            return scheduled_targets[key]
+        return _effective_nutrition_target(target_history_by_user[user_id], target_date)
+
     nutrition_end_by_user = {
         user_id: min(current_day, actual_today_by_user[user_id] - timedelta(days=1))
         for user_id, current_day in today_by_user.items()
@@ -915,7 +928,7 @@ def build_progress_summaries(
         )
 
         nutrition_visible = user.id in visible_nutrition_ids
-        target = targets_by_user.get(user.id)
+        target = nutrition_target_for_day(user.id, current_day)
         diary_days = diary_by_user[user.id]
         complete_diary_days = [
             row
@@ -925,13 +938,7 @@ def build_progress_summaries(
         adherence_target_days = [
             (row, effective_target)
             for row in complete_diary_days
-            if (
-                effective_target := _effective_nutrition_target(
-                    target_history_by_user[user.id],
-                    row.diary_date,
-                )
-            )
-            is not None
+            if (effective_target := nutrition_target_for_day(user.id, row.diary_date)) is not None
         ]
         protein_adherence_days = [
             (row, effective_target)

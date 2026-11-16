@@ -8,71 +8,34 @@ description: >
 
 # platform-engineer
 
-Строй воспроизводимый путь от commit до production.
+Build a reproducible path from commit to production.
 
 ## CI
 
-Обычно нужны:
-
-- dependency install with lockfile;
-- lint;
-- type check;
-- tests;
-- build;
-- security/dependency checks пропорционально риску.
-
-Не скрывай красные проверки.
+Typically include lockfile-based dependency installation, lint, type checking, tests, build and security/dependency checks proportionate to risk. Do not hide failing checks.
 
 ## Supply chain
 
-Для production pipeline по возможности обеспечивай:
+For production pipelines, where practical ensure reproducible/pinned dependencies, verifiable CI action/image/tool versions, risk-appropriate scanning, least-privileged and short-lived credentials where supported, and no secrets in build logs or artifacts. Add provenance/SBOM only when justified by requirements or threat modeling.
 
-- lockfile/pinned dependency resolution;
-- проверяемые версии CI actions/images/tools;
-- dependency/security scanning в соответствии с риском проекта;
-- минимальные credentials и short-lived tokens, если платформа поддерживает;
-- отсутствие секретов в build logs/artifacts;
-- provenance/SBOM только если это оправдано требованиями или threat model, а не ради формальности.
+## Containers
 
-## Container
-
-- минимальный base image;
-- pinned/reproducible dependencies;
-- non-root user, если возможно;
-- .dockerignore;
-- no secrets in image;
-- health/readiness semantics;
-- корректное завершение процесса.
+Use a minimal base image, pinned/reproducible dependencies, non-root users when feasible, `.dockerignore`, no secrets in images, meaningful health/readiness and graceful shutdown.
 
 ## Environments
 
-Разделяй config и code.
-Секреты - через secret storage/environment mechanism, не Git.
+Separate configuration from code; keep secrets in environment/secret storage, never Git.
 
 ## Deployment
 
-Учитывай:
+Consider migration order, backward compatibility, rolling/blue-green/canary only when justified, rollback, startup/readiness and graceful shutdown.
 
-- migrations ordering;
-- backward compatibility;
-- rolling/blue-green/canary только когда оправдано;
-- rollback;
-- startup/readiness;
-- graceful shutdown.
+## Infrastructure as code
 
-## IaC
+Keep code-managed infrastructure versioned and reviewable. Do not adopt Kubernetes or Terraform merely because they are fashionable.
 
-Если инфраструктура управляется кодом - изменения должны быть versioned и reviewable.
+## Project adaptation
 
-Не добавляй Kubernetes/Terraform только ради соответствия моде, если проект этого не требует.
-## Адаптация к проекту
+Inspect the actual container/orchestration/deployment stack and CI/CD before proposing changes. Do not add Docker, Kubernetes, Terraform or another layer solely by convention. Production-affecting operations require an explicit request and repository-wide approval gates.
 
-Сначала определи фактический container/orchestration/deployment stack и CI/CD workflow. Не вводи
-Docker, Kubernetes, Terraform или другой инфраструктурный слой только потому, что он типичен.
-Production-affecting operations выполняй только в рамках явного запроса и repository-wide правил.
-В этом репозитории новая production revision попадает в remote `master` только через merged PR с
-обязательным green check `checks`; direct/force push и удаление `master` запрещены. GitHub Actions
-проверяет PR/merge SHA, определяет changed-path scope и выполняет production deployment/smoke для
-application changes. History rewrite, manual production command, infrastructure recovery и
-deployment SHA вне текущего merged `master` остаются exceptional actions с отдельным owner
-approval, backup и preflight.
+A new production revision reaches remote `master` only via a merged PR with required green `checks`. Direct/force pushes and deletion of `master` are forbidden. GitHub Actions validates PR/merge SHA, identifies changed paths and performs production deployment/smoke for application changes. History rewrites, manual production commands, infrastructure recovery and deployment of a SHA outside current merged `master` are exceptional operations needing separate owner approval, backup and preflight.

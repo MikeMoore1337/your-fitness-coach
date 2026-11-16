@@ -52,6 +52,7 @@ from fitminiapp_api.schemas.user import (
     HeartRateZoneResponse,
     OAuthLinkCreateResponse,
     TelegramLinkCreateResponse,
+    TrainerNutritionAccess,
     TrainerResponse,
     UserProfileResponse,
     UserProfileUpdate,
@@ -98,6 +99,7 @@ from fitminiapp_api.services.coach_clients import (
     get_current_trainer,
     preview_coach_invite_link,
     remove_current_trainer,
+    trainer_nutrition_access,
 )
 from fitminiapp_api.services.equipment_profiles import (
     EquipmentProfilesConflict,
@@ -825,6 +827,34 @@ def delete_own_account(
 def detach_trainer(db: Session = Depends(get_db), user=Depends(get_current_user)):
     remove_current_trainer(db, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/trainer/nutrition-access", response_model=TrainerNutritionAccess)
+def read_trainer_nutrition_access(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> TrainerNutritionAccess:
+    try:
+        return TrainerNutritionAccess(**trainer_nutrition_access(db, user))
+    except ProgramError as exc:
+        raise HTTPException(status_code=404, detail="Тренер не подключён") from exc
+
+
+@router.put("/trainer/nutrition-access", response_model=TrainerNutritionAccess)
+def set_trainer_nutrition_access(
+    payload: TrainerNutritionAccess,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TrainerNutritionAccess:
+    try:
+        return TrainerNutritionAccess(
+            **trainer_nutrition_access(db, user, payload.nutrition_access, payload.relationship_id)
+        )
+    except ProgramError as exc:
+        if str(exc) == "Trainer changed":
+            raise HTTPException(
+                status_code=409, detail="Тренер изменился; обновите страницу"
+            ) from exc
+        raise HTTPException(status_code=404, detail="Тренер не подключён") from exc
 
 
 @router.post(

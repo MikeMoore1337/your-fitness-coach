@@ -141,7 +141,29 @@ class Food(Base):
         CheckConstraint(
             "status <> 'active' OR (energy_kcal_per_100g IS NOT NULL "
             "AND protein_g_per_100g IS NOT NULL AND fat_g_per_100g IS NOT NULL "
-            "AND carbs_g_per_100g IS NOT NULL) OR canonical_complete = true",
+            "AND carbs_g_per_100g IS NOT NULL) "
+            "OR (canonical_complete IS TRUE "
+            "AND (source_name IS NULL OR source_name <> 'yfc_community' OR ("
+            "canonical_facts IS NOT NULL AND nutrition_basis_kind IS NOT NULL "
+            "AND nutrition_basis_kind IN ('per_100_g', 'per_100_ml', 'per_serving') "
+            "AND ((canonical_facts ->> 'source_basis') = nutrition_basis_kind OR ("
+            "(canonical_facts ->> 'source_basis') = 'per_serving' "
+            "AND ((nutrition_basis_kind = 'per_100_g' AND "
+            "(canonical_facts -> 'serving_size' ->> 'unit') = 'g') OR "
+            "(nutrition_basis_kind = 'per_100_ml' AND "
+            "(canonical_facts -> 'serving_size' ->> 'unit') = 'ml')) "
+            "AND standard_serving_unit = (canonical_facts -> 'serving_size' ->> 'unit') "
+            "AND standard_serving_amount > 0 AND standard_serving_amount < 10000000 "
+            "AND CAST(canonical_facts -> 'serving_size' ->> 'amount' AS NUMERIC) = standard_serving_amount)) "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'basis_ref') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'basis_ref') = nutrition_basis_kind "
+            "AND (canonical_facts -> 'normalized_facts' -> 'energy_kcal' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'protein_g' ->> 'basis_ref') = nutrition_basis_kind "
+            "AND (canonical_facts -> 'normalized_facts' -> 'protein_g' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'fat_g' ->> 'basis_ref') = nutrition_basis_kind "
+            "AND (canonical_facts -> 'normalized_facts' -> 'fat_g' ->> 'value') IS NOT NULL "
+            "AND (canonical_facts -> 'normalized_facts' -> 'carbohydrate_g' ->> 'basis_ref') = nutrition_basis_kind "
+            "AND (canonical_facts -> 'normalized_facts' -> 'carbohydrate_g' ->> 'value') IS NOT NULL)) IS TRUE)",
             name="ck_foods_active_nutrients",
         ),
         CheckConstraint(
@@ -212,6 +234,19 @@ class Food(Base):
             ),
             sqlite_where=text(
                 "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+        ),
+        Index(
+            "uq_foods_community_shared_identity",
+            "catalog_identity",
+            unique=True,
+            postgresql_where=text(
+                "catalog_identity IS NOT NULL AND food_type IN ('system', 'branded') "
+                "AND source_name = 'yfc_community'"
+            ),
+            sqlite_where=text(
+                "catalog_identity IS NOT NULL AND food_type IN ('system', 'branded') "
                 "AND source_name = 'yfc_community'"
             ),
         ),

@@ -191,6 +191,17 @@ pg_restore --dbname=yfc_recovery --no-owner --no-privileges --exit-on-error \
   --single-transaction /restore/database.dump
 ```
 
+До запуска приложения после любого восстановления применить защиту личных отметок #956.
+Штатный `scripts/db_maintenance.py restore` делает это после `pg_restore`: аннулирует
+архивы экспорта владельцев отметок и ставит согласия в `recovery_hold`; при ошибке требует
+оставить writers остановленными. При ручном `pg_restore` в изолированном контуре выполнить
+тот же SQL из `NOTES_RECOVERY_HOLD_SQL` на восстановленной БД до application smoke.
+Если это невозможно или результат не проверен, приложение и выдачу экспортов не открывать.
+Снять `recovery_hold` можно только после отдельной ручной сверки с достоверными данными об
+удалениях и отзывах после снимка. Если такой сверки нет, заметки остаются закрытыми;
+владелец аккаунта может отозвать согласие и удалить восстановленные отметки. Сам backup и
+блокировка не доказывают полноту сведений об удалениях.
+
 Проверить Alembic revision до миграций, согласованные counts/invariants, binary columns,
 FK/unique constraints и sequence; затем отдельно разрешённый application smoke на exact
 release/image. Не запускать bot/background writers/provider egress. Зафиксировать начало,

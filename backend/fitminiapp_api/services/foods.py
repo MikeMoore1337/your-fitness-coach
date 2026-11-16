@@ -247,10 +247,19 @@ def calculate_food_amount(
             expected_basis = "per_100_g" if canonical.serving_size.unit == "g" else "per_100_ml"
             if target_basis != expected_basis:
                 raise FoodError("food cannot be converted between grams and millilitres")
+            if any(
+                _canonical_fact_value(canonical, field_name, target_basis) is not None
+                for field_name in ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
+            ):
+                factor = amount / Decimal(100)
+            else:
+                factor = amount / canonical.serving_size.amount
+                target_basis = "per_serving"
         elif source_basis != target_basis:
             raise FoodError("food cannot be converted between grams and millilitres")
-        factor = amount / Decimal(100)
-        weight_g = amount if target_basis == "per_100_g" else None
+        else:
+            factor = amount / Decimal(100)
+        weight_g = amount if amount_unit == "g" else None
 
     def value(field_name: str) -> Decimal | None:
         return _canonical_fact_value(canonical, field_name, target_basis)
@@ -439,6 +448,8 @@ def _serialize_food(
         name=food.name,
         brand=food.brand,
         barcode=food.barcode,
+        source_name=food.source_name,
+        external_id=food.external_id,
         energy_kcal_per_100g=cast(Decimal, food.energy_kcal_per_100g),
         protein_g_per_100g=cast(Decimal, food.protein_g_per_100g),
         fat_g_per_100g=cast(Decimal, food.fat_g_per_100g),

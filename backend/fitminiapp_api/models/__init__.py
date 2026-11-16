@@ -29,6 +29,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_nutrition_proposal import CoachNutritionProposal
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.coach_workflow_templates import (
     CoachCommunicationDraft,
@@ -80,11 +81,24 @@ from fitminiapp_api.models.notification import (
     NotificationSetting,
     WebPushSubscription,
 )
-from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition import (
+    EnergyCalibration,
+    NutritionScheduleBinding,
+    NutritionTarget,
+    NutritionTargetDateOverride,
+    NutritionTargetDaySnapshot,
+    NutritionTargetScheduleRule,
+)
+from fitminiapp_api.models.nutrition_import import (
+    NutritionImportDraft,
+    NutritionImportUploadAttempt,
+)
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
+    NutritionCatalogIdentifier,
     NutritionLabelDraft,
 )
+from fitminiapp_api.models.nutrition_notes import NutritionMealNote, NutritionNotesConsent
 from fitminiapp_api.models.nutrition_plan import (
     NutritionPlan,
     NutritionPlanItem,
@@ -172,6 +186,7 @@ __all__ = [
     "CoachClient",
     "CoachClientInvite",
     "CoachCommunicationDraft",
+    "CoachNutritionProposal",
     "CoachPackage",
     "CoachPackageLedgerEntry",
     "CoachPayment",
@@ -224,13 +239,22 @@ __all__ = [
     "NotificationDelivery",
     "NotificationSetting",
     "NutritionCatalogContribution",
+    "NutritionCatalogIdentifier",
+    "NutritionImportDraft",
+    "NutritionImportUploadAttempt",
     "NutritionLabelDraft",
+    "NutritionMealNote",
     "NutritionMealTemplate",
     "NutritionMealTemplateItem",
+    "NutritionNotesConsent",
     "NutritionPlan",
     "NutritionPlanItem",
     "NutritionPlanOperation",
+    "NutritionScheduleBinding",
     "NutritionTarget",
+    "NutritionTargetDateOverride",
+    "NutritionTargetDaySnapshot",
+    "NutritionTargetScheduleRule",
     "OAuthTransaction",
     "Payment",
     "PhotoMealDraft",

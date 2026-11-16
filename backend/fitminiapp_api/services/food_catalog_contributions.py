@@ -12,6 +12,7 @@ from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.contracts import (
     CANONICAL_DRAFT_SCHEMA_VERSION,
+    NUTRIENT_FIELDS,
     CanonicalDraft,
     CanonicalFact,
     DailyValuePercent,
@@ -205,6 +206,29 @@ def find_shared_food(
     if existing is not None:
         return _remember_catalog_identity(existing, identity)
 
+    if canonical.source_basis == "per_serving" and canonical.serving_size is not None:
+        serving = canonical.serving_size
+        normalized_basis = "per_100_g" if serving.unit == "g" else "per_100_ml"
+        old_identity = normalize_food_catalog_identity(
+            name, brand, normalized_basis, Decimal("100"), serving.unit
+        )
+        old_candidates = (
+            query.filter(
+                Food.food_type == "branded",
+                Food.source_name == "yfc_community",
+                Food.catalog_identity == old_identity,
+            )
+            .with_for_update()
+            .all()
+        )
+        for candidate in old_candidates:
+            try:
+                previous = validate_canonical_draft(candidate.canonical_facts)
+            except ValueError:
+                continue
+            if previous.source_basis == "per_serving" and previous.serving_size == serving:
+                return candidate
+
     # Older community rows predate catalog_identity. Match only their exact
     # normalized name/brand/basis, never a fuzzy candidate.
     candidates = (
@@ -230,15 +254,48 @@ def find_shared_food(
     return None
 
 
+def canonical_fact_values_match(
+    first: CanonicalFact,
+    second: CanonicalFact,
+    *,
+    source_basis: str,
+    serving_size: ServingSize | None,
+) -> bool:
+    if first.unit != second.unit:
+        return False
+    if first.basis_ref == second.basis_ref:
+        return first.value == second.value
+    if source_basis != "per_serving" or serving_size is None:
+        return False
+    normalized = "per_100_g" if serving_size.unit == "g" else "per_100_ml"
+    if first.basis_ref == "per_serving" and second.basis_ref == normalized:
+        return first.value * Decimal(100) / serving_size.amount == second.value
+    if second.basis_ref == "per_serving" and first.basis_ref == normalized:
+        return second.value * Decimal(100) / serving_size.amount == first.value
+    return False
+
+
 def canonical_facts_match(food: Food, canonical: CanonicalDraft) -> bool:
     if food.canonical_facts:
         try:
             stored = validate_canonical_draft(food.canonical_facts)
         except ValueError:
             return False
-        return stored.source_basis == canonical.source_basis and stored.normalized_facts.model_dump(
-            mode="json"
-        ) == canonical.normalized_facts.model_dump(mode="json")
+        if stored.source_basis != canonical.source_basis or (
+            stored.source_basis == "per_serving" and stored.serving_size != canonical.serving_size
+        ):
+            return False
+        for name in NUTRIENT_FIELDS:
+            first = getattr(stored.normalized_facts, name)
+            second = getattr(canonical.normalized_facts, name)
+            if first is None or second is None:
+                if first != second:
+                    return False
+            elif not canonical_fact_values_match(
+                first, second, source_basis=stored.source_basis, serving_size=stored.serving_size
+            ):
+                return False
+        return True
 
     if (food.nutrition_basis_kind or "per_100_g") != canonical.source_basis:
         return False

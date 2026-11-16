@@ -16,6 +16,8 @@ from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
+from fitminiapp_api.services.nutrition import load_nutrition_targets_and_date_overrides
+from fitminiapp_api.services.nutrition_schedule import load_scheduled_nutrition_targets
 from fitminiapp_api.services.period_bounds import (
     PeriodBoundsError,
     ReportBounds,
@@ -237,17 +239,23 @@ def build_nutrition_report(
         )
         .all()
     }
-    targets = (
-        db.query(NutritionTarget)
-        .filter(
-            NutritionTarget.user_id == user.id,
-            NutritionTarget.effective_from <= bounds.end,
-            or_(
-                NutritionTarget.effective_to.is_(None), NutritionTarget.effective_to > bounds.start
-            ),
-        )
-        .order_by(NutritionTarget.effective_from.desc(), NutritionTarget.id.desc())
-        .all()
+    previous_day = bounds.start - timedelta(days=1) if bounds.start > date.min else bounds.start
+    history, snapshots, scheduled_users = load_nutrition_targets_and_date_overrides(
+        db, {user.id}, previous_day, bounds.end
+    )
+    scheduled_targets = load_scheduled_nutrition_targets(
+        db, scheduled_users, previous_day, bounds.end
+    )
+    targets = sorted(
+        (
+            target
+            for target in history
+            if target.target_scope is None
+            and target.effective_from <= bounds.end
+            and (target.effective_to is None or target.effective_to > previous_day)
+        ),
+        key=lambda target: (target.effective_from, target.id),
+        reverse=True,
     )
     hydration_rows = (
         db.query(HydrationEntry.diary_date, func.sum(HydrationEntry.volume_ml).label("total_ml"))
@@ -269,12 +277,23 @@ def build_nutrition_report(
         .order_by(HydrationGoal.effective_from.desc(), HydrationGoal.id.desc())
         .all()
     )
-    effective_change_dates = {
-        target.effective_from
-        for target in targets
-        if bounds.start <= target.effective_from <= bounds.end
-        and (target.effective_to is None or target.effective_to > target.effective_from)
-    }
+
+    def target_for_day(day: date) -> NutritionTarget | None:
+        key = (user.id, day)
+        if key in snapshots:
+            return snapshots[key]
+        if key in scheduled_targets:
+            return scheduled_targets[key]
+        return _effective_target(targets, day)
+
+    previous_target = target_for_day(previous_day) if previous_day < bounds.start else None
+    effective_changes: dict[date, NutritionTarget | None] = {}
+    for offset in range((bounds.end - bounds.start).days + 1):
+        day = bounds.start + timedelta(days=offset)
+        target = target_for_day(day)
+        if (target.id if target else None) != (previous_target.id if previous_target else None):
+            effective_changes[day] = target
+        previous_target = target
 
     daily: list[dict] = []
     logged_points: list[dict] = []
@@ -293,7 +312,7 @@ def build_nutrition_report(
                 fiber_g=Decimal(0),
                 has_entries=False,
             )
-        target = _effective_target(targets, diary_date)
+        target = target_for_day(diary_date)
         hydration_goal = _effective_hydration_goal(hydration_goals, diary_date)
         hydration_target_ml = (
             hydration_goal.target_ml
@@ -353,7 +372,7 @@ def build_nutrition_report(
                 if comparison_actual["protein_g"] is not None and target
                 else None
             ),
-            "target_changed": diary_date in effective_change_dates,
+            "target_changed": diary_date in effective_changes,
             "hydration_ml": hydration_ml,
             "hydration_target_ml": hydration_target_ml,
             "hydration_progress_percent": (
@@ -404,15 +423,15 @@ def build_nutrition_report(
     }
     target_changes = [
         {
-            "effective_from": target.effective_from,
+            "effective_from": changed_day,
             "source": target.source,
             "calories": target.calories,
             "protein_g": target.protein_g,
             "fat_g": target.fat_g,
             "carbs_g": target.carbs_g,
         }
-        for target in sorted(targets, key=lambda item: (item.effective_from, item.id))
-        if target.effective_from in effective_change_dates
+        for changed_day, target in effective_changes.items()
+        if target is not None
     ]
     hydration_visible = bool(hydration_by_date or hydration_goals)
     hydration_daily_values = [

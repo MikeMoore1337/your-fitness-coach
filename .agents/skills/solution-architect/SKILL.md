@@ -9,64 +9,34 @@ description: >
 
 # solution-architect
 
-Проектируй минимальную архитектуру, которая выдерживает реальные требования.
+Design the smallest architecture that satisfies actual requirements.
 
-## Сначала
+## First identify
 
-Определи:
+Requirements/constraints, existing stack, expected load, consistency needs, failure modes, security boundaries, privacy/data lifecycle, critical observability, deployment environment, team skills and maintenance cost.
 
-- требования и ограничения;
-- текущий стек;
-- expected load;
-- consistency requirements;
-- failure modes;
-- security boundaries;
-- privacy/data lifecycle boundaries;
-- observability requirements for critical flows;
-- deployment environment;
-- skills команды и стоимость поддержки.
+## Then define
 
-## Затем
+- Components and responsibilities.
+- Data flows, APIs and contract boundaries.
+- Storage model and transaction boundaries.
+- Background processing.
+- Caching only when justified.
+- Idempotency for repeatable requests.
+- Retry/backoff only for safely repeatable operations.
+- Timeouts/circuit breakers for external integrations when needed.
+- Versioning, backward compatibility and migrations.
+- Failure isolation, correlation/observability points and retention/deletion boundaries.
+- Deployment topology.
 
-Опиши:
+## Avoid unnecessary architecture
 
-- компоненты и их ответственность;
-- data flow;
-- API/contract boundaries;
-- модель хранения;
-- транзакционные границы;
-- фоновые процессы;
-- кэширование только при необходимости;
-- идемпотентность там, где возможны повторные запросы;
-- retry/backoff только для безопасно повторяемых операций;
-- timeout/circuit-breaking на внешних интеграциях при необходимости;
-- versioning и backward compatibility;
-- миграции;
-- failure isolation;
-- observability/correlation points for critical paths;
-- data retention/deletion boundaries where sensitive data is involved;
-- deployment topology.
-
-## Запрещённые привычки
-
-Не вводи микросервисы, message broker, Kubernetes, CQRS/Event Sourcing, Redis или сложный DDD автоматически.
-
-Каждый крупный инфраструктурный компонент должен иметь конкретную причину.
-
-Предпочитай modular monolith, если требования не требуют распределённой системы.
+Do not automatically introduce microservices, brokers, Kubernetes, CQRS/Event Sourcing, Redis or complex DDD. Every major infrastructure component needs a concrete justification. Prefer a modular monolith until actual requirements demand distribution.
 
 ## ADR
 
-Для спорных архитектурных решений фиксируй:
+For contested architecture decisions record context, decision, alternatives and consequences. Do not write an ADR for obvious local decisions.
 
-- контекст;
-- решение;
-- альтернативы;
-- последствия.
+## Project adaptation
 
-Не создавай ADR для очевидных локальных решений.
-## Адаптация к проекту
-
-Сначала зафиксируй фактическую текущую архитектуру и ограничения репозитория. Предпочитай
-эволюционное улучшение существующей системы. Для cross-cutting change перечисли все реально
-затронутые surfaces: приложения/сервисы, данные, contracts, tests, deployment и documentation.
+Establish the actual architecture and constraints before suggesting changes. Prefer evolutionary improvement. For cross-cutting work list all affected apps/services, data, contracts, tests, deployment and documentation.

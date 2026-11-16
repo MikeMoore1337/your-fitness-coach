@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>YFC · Варианты выбора продуктов</title>
+  <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+  <div class="app">
+    <aside><strong>YOUR FITNESS COACH</strong><span>Сегодня</span><span>План</span><span class="nav-active">Питание</span><span>Прогресс</span></aside>
+    <main class="diary">
+      <p class="eyebrow">ДНЕВНИК ПИТАНИЯ</p><h1>Питание</h1>
+      <div class="day">Сегодня <span>5 ноября</span></div>
+      <section><div><h2>Завтрак</h2><p>Добавьте продукты в этот приём пищи</p></div><button id="open" class="secondary">Добавить</button></section>
+      <section><div><h2>Обед</h2><p>Пока нет записей</p></div><button class="secondary" disabled>Добавить</button></section>
+      <section><div><h2>Ужин</h2><p>Пока нет записей</p></div><button class="secondary" disabled>Добавить</button></section>
+    </main>
+  </div>
+  <div id="overlay" class="overlay">
+    <section class="panel" role="dialog" aria-modal="true" aria-labelledby="title">
+      <header class="header"><div><p class="eyebrow">ДОБАВИТЬ В ЗАВТРАК</p><h2 id="title">Выберите продукты</h2></div><button id="close" class="close" aria-label="Закрыть добавление">Закрыть</button></header>
+      <div id="single" hidden></div>
+      <div id="multi" class="workspace">
+        <div class="search-area">
+          <label for="search">Найти продукт</label>
+          <div class="search-wrap"><input id="search" type="search" placeholder="Название или бренд" autocomplete="off"><button id="clear" aria-label="Очистить поиск">Очистить</button></div>
+          <p class="hint">Нажмите «Выбрать», чтобы собрать продукты. Название откроет обычное добавление.</p>
+        </div>
+        <div id="tabs" class="tabs" role="tablist" aria-label="Продукты и подборка" hidden><button id="tab-search" role="tab" aria-controls="search-pane" aria-selected="true">Поиск</button><button id="tab-picked" role="tab" aria-controls="picked-pane" aria-selected="false">Выбрано <span class="count">0</span></button></div>
+        <div class="columns">
+          <div id="search-pane" class="scroll search-pane"><div id="tray"></div><div class="list-heading"><strong id="list-title">Недавние продукты</strong><span>Название · бренд · источник</span></div><div id="results"></div><div class="other"><button class="secondary" id="quick">Быстрое добавление</button><span>По фото и другие способы доступны в текущем поиске</span></div></div>
+          <div id="picked-pane" class="scroll picked-pane" hidden></div>
+        </div>
+        <footer class="footer"><div id="footer-error" role="alert"></div><div class="totals"><div><strong>Итого</strong><span id="total-count">Нет выбранных продуктов</span></div><div id="total-values" class="numbers"></div></div><button id="confirm" class="primary" disabled>Добавить в дневник</button></footer>
+      </div>
+    </section>
+  </div>
+  <div id="toast" role="status" hidden>Демонстрация: продукты не сохраняются.</div>
+  <script src="preview.js"></script>
+</body>
+</html>

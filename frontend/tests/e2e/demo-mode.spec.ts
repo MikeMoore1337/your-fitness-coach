@@ -487,6 +487,7 @@ function hydrationDay(snapshot: DemoSessionSnapshot) {
     diary_date: today(),
     timezone: 'Europe/Moscow',
     total_ml: 1350 + entries.reduce((sum, item) => sum + Number(item.volume_ml ?? 0), 0),
+    demo_generation: 0,
     goal: {
       id: 90001,
       enabled: true,
@@ -508,7 +509,7 @@ function hydrationDay(snapshot: DemoSessionSnapshot) {
     ],
     last_logged_at: '2026-09-15T09:00:00Z',
     reminder_suppression_key: null,
-    action_url: '/api/v1/nutrition/hydration/entries',
+    action_url: '/api/v1/nutrition/hydration/entries/v2',
     original_estimated_minutes: 0,
     adapted_estimated_minutes: 0,
     time_budget_minutes: null,
@@ -1053,7 +1054,7 @@ function transport(snapshot: DemoSessionSnapshot, path: string, method: string, 
     if (!breakfast?.entries[0]) throw new Error('Demo nutrition fixture did not create an entry');
     return breakfast.entries[0];
   }
-  if (path === '/api/v1/nutrition/hydration/entries' && method === 'POST') {
+  if (path === '/api/v1/nutrition/hydration/entries/v2' && method === 'POST') {
     const values = (body ?? {}) as { volume_ml?: number; beverage_type?: string };
     const entry = {
       id: 90200,
@@ -1129,6 +1130,33 @@ async function installDemoTransport(page: Page) {
       return;
     }
     await route.fulfill({ status: 404, json: { detail: 'Неизвестный demo endpoint' } });
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`#1436 demo status is read-only in ${theme}`, async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const card = page.locator('.nutrition-completeness');
+    const toggle = card.getByRole('button', { name: /Изменить статус/ });
+    await toggle.click();
+    await expect(
+      card.getByRole('button', { name: 'Заполнен частично', exact: true }),
+    ).toBeDisabled();
+    await expect(card.locator('.demo-capability-notice')).toHaveCSS(
+      'border-inline-start-width',
+      '1px',
+    );
+    for (const width of [320, 360, 393, 430, 1280]) {
+      await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+      await card.scrollIntoViewIfNeeded();
+      await card.screenshot({ path: testInfo.outputPath(`${width}-readonly.png`) });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+    }
   });
 }
 
@@ -1302,6 +1330,149 @@ test('the public trainer entry opens the existing isolated trainer cabinet', asy
   expect(directMutationRequests).toEqual([]);
 });
 
+test('demo water retry survives reload without copying the demo token to shared storage', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  const saved = new Map<string, Record<string, unknown>>();
+  const keys: string[] = [];
+  await page.route('**/api/v1/demo/sessions/current/transport', async (route) => {
+    const payload = route.request().postDataJSON() as {
+      path: string;
+      method: string;
+      body: Record<string, unknown>;
+    };
+    if (payload.path.startsWith('/api/v1/nutrition/hydration?') && payload.method === 'GET') {
+      const date =
+        new URL(payload.path, 'http://localhost').searchParams.get('diary_date') ?? today();
+      return route.fulfill({
+        json: {
+          ...hydrationDay(demoFixture('nutrition')),
+          diary_date: date,
+          entries: Array.from(saved.values()),
+          total_ml: 1350 + saved.size * 250,
+        },
+      });
+    }
+    if (payload.path === '/api/v1/nutrition/hydration/entries/v2' && payload.method === 'POST') {
+      const key = payload.body._hydration_retry_key;
+      if (typeof key !== 'string') throw new Error('Missing demo retry key');
+      expect(payload.body._hydration_generation).toBe(0);
+      keys.push(key);
+      if (!saved.has(key))
+        saved.set(key, {
+          id: 90200 + saved.size,
+          volume_ml: payload.body.volume_ml,
+          beverage_type: payload.body.beverage_type,
+          diary_date: payload.body.diary_date,
+          source: payload.body.source,
+          occurred_at: '2026-09-15T10:00:00Z',
+          timezone: 'Europe/Moscow',
+          created_at: '2026-09-15T10:00:00Z',
+          updated_at: '2026-09-15T10:00:00Z',
+        });
+      if (keys.length === 1) return route.abort('connectionreset');
+      return route.fulfill({ json: saved.get(key) });
+    }
+    return route.fallback();
+  });
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  const glass = hydration.getByRole('button', { name: /Стакан, добавить 250 мл/ });
+  await glass.click();
+  await expect(hydration.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const sessions = JSON.parse(sessionStorage.getItem('fit_demo_sessions_v1') ?? '{}') as {
+        nutrition?: string;
+      };
+      const value = Object.entries(localStorage).filter(([key]) =>
+        key.startsWith('fit_hydration_pending_v2_'),
+      );
+      return Boolean(sessions.nutrition && JSON.stringify(value).includes(sessions.nutrition));
+    }),
+  ).toBe(false);
+  await page.reload();
+  await expect(hydration.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  await glass.click();
+  await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+  expect(keys[1]).toBe(keys[0]);
+  expect(saved.size).toBe(1);
+  await glass.click();
+  await expect.poll(() => saved.size).toBe(2);
+  expect(keys[2]).not.toBe(keys[0]);
+});
+
+test('tabs sharing a demo session retry the same water entry', async ({ page, context }) => {
+  const other = await context.newPage();
+  const saved = new Map<string, Record<string, unknown>>();
+  const keys: string[] = [];
+  for (const current of [page, other]) {
+    await installDemoTransport(current);
+    await current.route('**/api/v1/demo/sessions/current/transport', async (route) => {
+      const payload = route.request().postDataJSON() as {
+        path: string;
+        method: string;
+        body: Record<string, unknown>;
+      };
+      if (payload.path.startsWith('/api/v1/nutrition/hydration?') && payload.method === 'GET') {
+        const date =
+          new URL(payload.path, 'http://localhost').searchParams.get('diary_date') ?? today();
+        return route.fulfill({
+          json: {
+            ...hydrationDay(demoFixture('nutrition')),
+            diary_date: date,
+            entries: Array.from(saved.values()),
+            total_ml: 1350 + saved.size * 250,
+          },
+        });
+      }
+      if (payload.path === '/api/v1/nutrition/hydration/entries/v2' && payload.method === 'POST') {
+        const key = payload.body._hydration_retry_key;
+        if (typeof key !== 'string') throw new Error('Missing demo retry key');
+        keys.push(key);
+        if (!saved.has(key))
+          saved.set(key, {
+            id: 90200 + saved.size,
+            volume_ml: payload.body.volume_ml,
+            beverage_type: payload.body.beverage_type,
+            diary_date: payload.body.diary_date,
+            source: payload.body.source,
+            occurred_at: '2026-09-15T10:00:00Z',
+            timezone: 'Europe/Moscow',
+            created_at: '2026-09-15T10:00:00Z',
+            updated_at: '2026-09-15T10:00:00Z',
+          });
+        if (keys.length === 1) return route.abort('connectionreset');
+        return route.fulfill({ json: saved.get(key) });
+      }
+      return route.fallback();
+    });
+    await current.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    await expect(current.getByRole('region', { name: 'Гидратация' })).toBeVisible();
+  }
+  const token = (current: typeof page) =>
+    current.evaluate(
+      () =>
+        (
+          JSON.parse(sessionStorage.getItem('fit_demo_sessions_v1') ?? '{}') as {
+            nutrition?: string;
+          }
+        ).nutrition,
+    );
+  expect(await token(page)).toBe(await token(other));
+  const glass = (current: typeof page) =>
+    current
+      .getByRole('region', { name: 'Гидратация' })
+      .getByRole('button', { name: /Стакан, добавить 250 мл/ });
+  await glass(page).click();
+  await expect(page.getByRole('button', { name: 'Повторить без дубля' })).toBeVisible();
+  await glass(other).click();
+  await expect(other.getByText('Добавлено 250 мл')).toBeVisible();
+  expect(keys[1]).toBe(keys[0]);
+  expect(saved.size).toBe(1);
+});
+
 test('nutrition and coach scenarios render shared production surfaces with local mutations', async ({
   browser,
 }) => {
@@ -1315,14 +1486,19 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   await expect(nutritionPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
-  await expect(nutritionPage.getByRole('button', { name: 'Быстрый ввод' })).toBeVisible();
-  await nutritionPage.getByRole('button', { name: 'Быстрый ввод' }).click();
+  await nutritionPage.getByTestId('nutrition-add-product').click();
+  await nutritionPage.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод' }).click();
   await expect(nutritionPage.getByRole('dialog')).toBeVisible();
   await nutritionPage.getByRole('spinbutton', { name: 'Калории' }).fill('420');
   await nutritionPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
-  await expect(
-    nutritionPage.getByText('Овсяная каша с бананом и греческим йогуртом'),
-  ).toBeVisible();
+  // Existing meal details stay collapsed by default, including in the demo.
+  const breakfast = nutritionPage.getByRole('region', { name: 'Завтрак' });
+  const breakfastToggle = breakfast.getByRole('button', { name: 'Завтрак', exact: true });
+  await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeAttached();
+  if ((await breakfastToggle.getAttribute('aria-expanded')) === 'false') {
+    await breakfastToggle.click();
+  }
+  await expect(breakfast.getByText('Овсяная каша с бананом и греческим йогуртом')).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Продолжить' }).click();
   await expect(nutritionPage).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
   await expect(nutritionPage.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();

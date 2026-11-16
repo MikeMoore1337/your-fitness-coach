@@ -9,10 +9,9 @@ description: >
 
 # document-import-engineer
 
-Импорт - это недоверенный data ingestion pipeline. Файл не становится каноническими данными сразу
-после upload.
+Import is an **untrusted ingestion pipeline**. Uploading a file must never immediately create canonical data.
 
-## Обязательный pipeline
+## Mandatory pipeline
 
 ```text
 upload
@@ -26,273 +25,90 @@ upload
 -> transactional canonical write
 ```
 
-Parse и matching не должны создавать program, exercise, alias или другую canonical entity.
-При любой ошибке до confirm canonical data остаётся неизменной.
+Parsing and matching must not create programs, exercises, aliases or other canonical entities. Any failure before confirmation must leave canonical data unchanged.
 
-## Сначала
+## Before implementation
 
-Перед реализацией:
+Inspect domain schemas, versioning, ownership, permissions, existing upload/storage/parsers, locale/units/design, runtime/deployment/temporary storage constraints, canonical template and supported variants. Do not add unsupported format parsers or promise arbitrary import "from any app".
 
-- изучи текущие domain schemas, versioning, ownership и permissions;
-- найди существующие upload/storage/parsing dependencies;
-- проверь locale/unit conventions и design system;
-- проверь ограничения runtime/deployment и temporary storage;
-- определи canonical template и поддерживаемые variants;
-- не добавляй format/parser, если он не нужен текущему task;
-- не обещай произвольный импорт файлов «из любого приложения».
+## Allowlisted formats
 
-## Format allowlist
+Support only explicitly approved extensions and structures. Verify extension, untrusted MIME/type, actual signature/container, parser output and expected schema. Never use filename for storage path/identity; generate an internal random ID.
 
-Поддерживай только явно разрешённые extensions и content structures.
+Define per-format maximum size, expanded archive size/compression ratio, sheet/row/column/cell/string counts, paragraph/table limits, parse timeout/memory budget, supported encoding/delimiters, formulas/relationships/objects policy, retention and cleanup.
 
-Проверяй сочетание:
+## XLSX/DOCX security
 
-- extension;
-- MIME/content type как недоверенный signal;
-- file signature/container structure;
-- parser result;
-- expected schema.
+These are ZIP containers. Before and during extraction protect against decompression bombs, excessive entries, oversized content, archive path traversal, nested archives, external relationships, embedded objects, macros, malicious XML/entity expansion and unexpectedly large shared strings/styles.
 
-Filename не используется как storage path или identity. Генерируй internal random id/name.
+Never execute macros, formulas, links, OLE objects or embedded code. Formula cells must either be unsupported or use only bounded cached values under documented rules, with visible warnings; never calculate them server-side through an office application. DOCX text import, if introduced, must match predefined patterns; LLM-only silent structure creation is forbidden.
 
-Для каждого формата зафиксируй:
+## CSV/TXT
 
-- maximum file size;
-- archive expanded size и compression ratio;
-- sheet/row/column/cell/string counts;
-- paragraph/table limits;
-- parse timeout и memory budget;
-- supported encodings/delimiters;
-- allowed formulas/relationships/objects policy;
-- retention и cleanup.
-
-## XLSX и DOCX
-
-XLSX/DOCX являются ZIP containers. До распаковки и во время чтения защищайся от:
-
-- ZIP bomb/decompression bomb;
-- excessive entry count;
-- oversized uncompressed content;
-- path traversal в archive entries;
-- nested archives;
-- external relationships;
-- embedded files/objects;
-- macros/active content;
-- malformed XML/entity expansion;
-- unexpectedly large shared strings/styles.
-
-Не исполняй macros, formulas, links, OLE objects или embedded code.
-
-Formula cells:
-
-- либо явно unsupported;
-- либо разрешены только bounded cached values по документированной policy;
-- никогда не вычисляются сервером через office application;
-- warning видим пользователю.
-
-DOCX text import, если появится, поддерживает только заранее определённые patterns. Не используй
-LLM-only silent structure creation.
-
-## CSV и TXT
-
-- Encoding/delimiter detection ограничено известным набором и размером sample.
-- Поддержи BOM и документированную fallback policy.
-- Ограничь field/line count и длину.
-- Не считай CSV безопасным только потому, что это text.
-- Значения, начинающиеся с formula markers, не должны незаметно попасть в будущий spreadsheet export
-  как active formulas.
-- Не исполняй template expressions, shell-like content или URLs.
-- Ambiguous delimiter/encoding приводит к понятному выбору/ошибке, а не к повреждённым данным.
+Bound encoding/delimiter detection by supported candidates and sample size; handle BOM and documented fallback. Limit field/line counts and lengths. CSV is not inherently safe: prevent formula-marker values from silently becoming active formulas on subsequent spreadsheet export. Never execute template expressions, shell-like content or URLs. Ambiguous encodings/delimiters require explicit choice or a clear error.
 
 ## Temporary storage
 
-- Храни upload вне public web root.
-- Используй private permissions и unguessable identifiers.
-- Не сохраняй исходный filename как путь.
-- Удаляй temporary file после parse/cancel/expiry/error по контролируемому lifecycle.
-- Не передавай confidential file во внешний scanner/LLM без отдельного privacy decision.
-- Не логируй raw content, full rows, notes или documents.
-- Background cleanup идемпотентен и наблюдаем.
+Store uploads outside public web root with private permissions and unguessable identifiers; never use original filenames as paths. Delete temporary files after parse/cancel/expiry/error under a controlled lifecycle. Do not send confidential files to external scanners/LLMs without separate privacy approval, or log raw rows, notes or documents. Cleanup must be idempotent and observable.
 
-## Neutral draft model
+## Neutral draft
 
-Draft должен быть versioned и отделён от canonical domain model.
+Use a versioned draft separate from the canonical model containing import ID/owner/status/schema version, source format, parsed rows/entities, source sheet/row/cell/paragraph provenance, normalized values, warnings/errors, unresolved matches, parser/template version and creation/expiry times. Never expose raw parser objects as API/storage contracts.
 
-Храни минимум:
+Revalidate drafts safely across deployments. When versions are incompatible, require re-upload rather than guessing at migration.
 
-- import id/owner/status/schema version;
-- source format;
-- parsed entities/rows;
-- source sheet/row/cell/paragraph provenance;
-- normalized values;
-- warnings/errors;
-- unresolved candidates;
-- parser/template version;
-- created/expiry timestamps.
+## Template and schema
 
-Не используй raw parser objects в API или persistence contract.
+The canonical template must be versioned, contain required/optional columns, include only synthetic examples, use stable machine field identifiers, document aliases, open in target spreadsheet apps and pass round-trip tests. Localize aliases but keep canonical IDs stable. Define policies for duplicate/unknown columns. Do not infer column meaning from fuzzy similarity without a preview.
 
-Draft можно безопасно revalidate после deploy/version change. Если version несовместима, потребуй re-upload,
-а не угадывай migration.
+## Normalization and validation
 
-## Template и schema
+Separate syntactic parse, normalization, field validation, cross-row/domain validation, matching and canonical transaction.
 
-Canonical template:
-
-- имеет version;
-- содержит обязательные/optional columns;
-- даёт пример без production/user data;
-- использует stable machine semantics;
-- описывает aliases;
-- корректно открывается в целевых spreadsheet apps;
-- проходит round-trip test.
-
-Column aliases локализованы, но canonical field ids стабильны. Duplicate/unknown columns имеют явную policy.
-Не определяй смысл колонки только fuzzy-сходством без preview.
-
-## Normalize и validation
-
-Разделяй:
-
-1. syntactic parsing;
-2. normalization;
-3. field validation;
-4. cross-row/domain validation;
-5. matching;
-6. canonical transaction.
-
-Для numeric/range/unit fields:
-
-- locale decimal separators;
-- whitespace/non-breaking spaces;
-- bounded values;
-- integer/decimal semantics;
-- range/list grammar;
-- units;
-- empty vs zero;
-- duplicate rows;
-- supersets/group references;
-- cross-row consistency.
-
-Ошибки должны ссылаться на source row/cell и объяснять исправление.
+Handle locale decimal separators, whitespace/nonbreaking spaces, numeric ranges/types, units, empty vs zero, duplicates, supersets/group references and consistency. Errors must identify source row/cell and how to correct them.
 
 ## Entity matching
 
-Используй предсказуемую последовательность:
+Use this predictable order:
 
-1. stable id, если template позволяет и ownership valid;
-2. normalized exact visible title;
-3. approved global/user alias;
-4. token/fuzzy candidate search;
-5. domain hints, например equipment/muscle;
-6. confidence + candidates;
-7. manual resolution.
+1. Stable ID when supported and ownership valid.
+2. Normalized exact visible name.
+3. Approved global/user alias.
+4. Token/fuzzy candidate search.
+5. Domain hints (for example equipment/muscle).
+6. Confidence category and candidates.
+7. Manual resolution.
 
-Правила:
-
-- auto-match только для одного unique high-confidence candidate;
-- ambiguity никогда не скрывается;
-- fuzzy score сам по себе не создаёт entity;
-- пользователь явно выбирает existing или создаёт разрешённую personal custom entity;
-- confirmed personal alias имеет user scope;
-- один пользователь не меняет global catalogue;
-- global aliases требуют отдельной moderation policy;
-- bilingual labels/aliases ведут к одной canonical id;
-- cross-user/private entities не участвуют в candidates.
-
-Не выдавай percentage confidence пользователю, если threshold не калиброван и число создаёт ложную
-точность. Достаточно категорий и причины.
+Only one uniquely high-confidence candidate may auto-match; ambiguity must remain visible. Fuzzy scores cannot create entities. Users select existing entities or create allowed personal entities explicitly. Confirmed personal aliases are user-scoped; a user cannot change the global catalog. Global aliases need separate moderation. Bilingual labels share one canonical ID; cross-user/private entries must not appear as candidates. Avoid uncalibrated confidence percentages; explain categories instead.
 
 ## Preview UX
 
-Preview обязателен и показывает:
+A mandatory preview shows parse status, resulting structure, warnings/errors, matched/unmatched/ambiguous rows, source locations, normalized data, domain validity and what will/will not be created.
 
-- parse status;
-- структуру будущего результата;
-- warnings/errors;
-- matched/unmatched/ambiguous rows;
-- source location;
-- normalized values;
-- domain validation;
-- что будет создано и что не будет создано.
+Allow cancel, resolution changes and re-upload. Disable confirm for blocking errors. Test mobile/TMA, keyboard, screen readers, long names and large but valid imports. Do not build an unnecessary raw spreadsheet editor in-browser.
 
-Пользователь может cancel, исправить resolution и re-upload. Confirm недоступен при blocking errors.
+## Confirmation and canonical writes
 
-Проверяй mobile/TMA, keyboard, screen reader, длинные названия и большие, но допустимые imports.
-Не превращай preview в редактирование raw spreadsheet внутри браузера без необходимости.
+Recheck authorization/ownership and expiry; revalidate critical rules on the server. Use one explicit transaction without partial writes; protect confirm against duplicate submit/replay. Preserve audit/provenance without confidential raw contents. Create an editable draft domain entity instead of auto-assigning/activating/starting unless explicitly requested. On concurrent catalog changes, return to resolution instead of silently picking another match.
 
-## Confirm и canonical write
+## Permissions and privacy
 
-- Повторно проверь auth/ownership и draft expiry.
-- Revalidate critical domain rules server-side.
-- Используй одну явную transaction boundary.
-- Не допускай partial canonical writes.
-- Защити confirm от duplicate submit/replay.
-- Сохрани import provenance/audit без raw confidential content.
-- Создавай editable draft domain entity, а не автоматически assign/activate/start, если task не требует.
-- При conflict/concurrent catalogue change верни resolution flow, а не молча выбери другой match.
+Self-import creates user-owned records. Trainer/coach imports recheck current capability and relationship **at confirm**, not only upload. Revoked access blocks confirm/download. Admin access does not imply access to private source files. Source and preview IDs must not be predictable/cross-user accessible. Define separate retention/export/deletion for files, drafts and canonical records.
 
-## Permissions и privacy
+## LLM and OCR boundary
 
-- Self import создаёт данные владельца.
-- Coach/trainer import проверяет current relationship/capability на confirm, не только upload.
-- Revoked access блокирует confirm/download.
-- Admin capability не означает автоматический доступ к private source files.
-- Source file и preview не доступны другому пользователю по predictable id.
-- Retention/export/delete policy зафиксирована отдельно для source file, draft и canonical result.
+Default to **no** LLM-only parsing, OCR, image/PDF extraction or arbitrary competitor migrations. An LLM may propose only untrusted candidates while deterministic parsing, visible uncertainty and mandatory human review remain. PDF/images/OCR require a separate owner decision, threat model, quality policy and task.
 
-## LLM/OCR boundary
+## Testing
 
-По умолчанию не используй:
+Cover template round trips, minimal/full valid data, localized aliases/units, ambiguity/no match, personal custom entries, malformed archives/XML/CSV, ZIP bombs/traversal/external relationships/macros/formulas/objects, limits, encoding/delimiters, duplicates/replay/concurrent confirms, no partial writes, self/coach allow/deny/revoked, cleanup/expiry, private logging and mobile/TMA/accessibility preview.
 
-- LLM-only parsing;
-- OCR;
-- image/PDF extraction;
-- arbitrary competitor migrations.
+Use `references/SAFE_IMPORT_CHECKLIST.md` for the full threat/test review.
 
-LLM может когда-либо предложить candidates только как недоверенный advisory layer, но deterministic parser,
-visible uncertainty и mandatory review остаются. Для PDF/images/OCR нужен отдельный owner decision, threat
-model, quality policy и task.
+## Skill collaboration
 
-## Tests
+`$security-engineer`: upload/parser threats; `$privacy-engineer`: retention/sharing; `$backend-engineer`/`$data-engineer`: draft/transactions; `$frontend-engineer`/`$product-designer`: preview UX; `$localization-engineer`: aliases/units; `$fitness-domain-reviewer`: exercise/program semantics; `$qa-engineer`: adversarial regression.
 
-Минимальная матрица:
+## Final report
 
-- template round-trip;
-- valid minimal/full file;
-- aliases/locales/units;
-- ambiguity и no match;
-- personal custom entity;
-- malformed container/XML/CSV;
-- ZIP bomb/path traversal/external relation/macro/formula/object;
-- file/archive/row/cell/string/time limits;
-- encoding/delimiter;
-- duplicate/replay/concurrent confirm;
-- no partial writes;
-- self/coach allow/deny/revoked;
-- temp cleanup/expiry;
-- logs without raw content;
-- mobile/TMA/a11y preview.
-
-Используй `references/SAFE_IMPORT_CHECKLIST.md` для полного threat/test review.
-
-## Совместная работа с другими skills
-
-- `$security-engineer` - upload/parser threat model;
-- `$privacy-engineer` - source retention и third-party sharing;
-- `$backend-engineer`/`$data-engineer` - draft/transaction/persistence;
-- `$frontend-engineer`/`$product-designer` - preview/resolution UX;
-- `$localization-engineer` - aliases, units и template localization;
-- `$fitness-domain-reviewer` - program/exercise/set semantics;
-- `$qa-engineer` - adversarial and regression suite.
-
-## Финальный отчёт
-
-Укажи:
-
-- поддерживаемые formats/template version;
-- limits и active-content policy;
-- neutral draft/matching/confirm contracts;
-- permissions и retention;
-- security/adversarial tests, реально выполненные;
-- unsupported formats и known ambiguities.
+Include supported formats/template versions, limits and active-content policy, neutral draft/matching/confirm contracts, permissions/retention, **actually executed** adversarial/security tests, unsupported formats and known ambiguities.

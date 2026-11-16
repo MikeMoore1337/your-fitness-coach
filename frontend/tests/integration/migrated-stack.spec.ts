@@ -649,7 +649,8 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
   await expect(page).toHaveURL(/\/app\?section=nutrition$/);
   await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+  await page.getByTestId('nutrition-add-product').click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Быстрый ввод' }).click();
   const itemName = `Migrated PostgreSQL browser item ${Date.now()}`;
   await page.getByRole('textbox', { name: 'Название или контекст (необязательно)' }).fill(itemName);
   await page.getByRole('spinbutton', { name: 'Калории' }).fill('321');
@@ -702,6 +703,285 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
   expect(apiRequests).toContain('GET /api/v1/me');
   expect(apiRequests).toContain('POST /api/v1/nutrition/diary/entries');
 });
+
+test('#952 real browser saves a dated goal on migrated PostgreSQL', async ({ page }) => {
+  const userId = Date.now() * 10 + 952;
+  const login = await page.request.post('/api/v1/auth/dev-login', {
+    data: { telegram_user_id: userId, full_name: 'Синтетическая проверка питания' },
+  });
+  expect(login.status()).toBe(200);
+  const token = (await login.json()).access_token as string;
+  const headers = { Authorization: `Bearer ${token}` };
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(new Date());
+  const base = { calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 180 };
+  const created = await page.request.post('/api/v1/nutrition/targets/manual', {
+    headers,
+    data: base,
+  });
+  expect(created.status()).toBe(200);
+  await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+  await page.goto(`/app?section=nutrition&date=${date}`);
+  await page.getByRole('button', { name: 'Изменить на эту дату' }).click();
+  await page.getByLabel('Тип дня').selectOption('recovery');
+  await page.getByLabel('Калории, ккал').fill('2250');
+  await page.getByLabel('Углеводы, г').fill('240');
+  await page.getByRole('button', { name: 'Проверить изменения' }).click();
+  await expect(page.getByRole('heading', { name: 'Цель на выбранную дату' })).toBeVisible();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      new URL(response.url()).pathname === '/api/v1/nutrition/targets/dates',
+  );
+  await page.getByRole('button', { name: 'Применить к этой дате' }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByText('Изменено вручную')).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Изменено вручную')).toBeVisible();
+  const resolved = await page.request.get(
+    `/api/v1/nutrition/targets/for-date?target_date=${date}`,
+    { headers },
+  );
+  expect(await resolved.json()).toMatchObject({
+    origin: 'date',
+    day_type: 'recovery',
+    target: { calories: 2250 },
+  });
+  const report = await page.request.get(
+    `/api/v1/workouts/progress/nutrition-report?period=custom&date_from=${date}&date_to=${date}`,
+    { headers },
+  );
+  expect((await report.json()).daily[0].target_calories).toBe(2250);
+  const completed = await page.request.put('/api/v1/nutrition/diary/status', {
+    headers,
+    data: { diary_date: date, status: 'fasted' },
+  });
+  expect(completed.status()).toBe(200);
+  const denied = await page.request.post('/api/v1/nutrition/targets/dates', {
+    headers: { ...headers, 'Idempotency-Key': 'completed-date-952' },
+    data: { ...base, effective_from: date },
+  });
+  expect(denied.status()).toBe(409);
+});
+
+testWithoutServiceWorker(
+  '#952 Calendar and Coach OS resolve the same future goal without future diary access',
+  async ({ page, browser }, info) => {
+    test.setTimeout(90_000);
+    const athleteId = Date.now() * 10 + info.workerIndex * 2;
+    const athleteLogin = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: athleteId, full_name: 'Тестовый спортсмен' },
+    });
+    const coachLogin = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: athleteId + 1, full_name: 'Тестовый тренер', is_coach: true },
+    });
+    expect(athleteLogin.status()).toBe(200);
+    expect(coachLogin.status()).toBe(200);
+    const athleteToken = (await athleteLogin.json()).access_token as string;
+    const coachToken = (await coachLogin.json()).access_token as string;
+    const athleteHeaders = { Authorization: `Bearer ${athleteToken}` };
+    const coachHeaders = { Authorization: `Bearer ${coachToken}` };
+    const me = await page.request.get('/api/v1/me', { headers: athleteHeaders });
+    expect(me.status()).toBe(200);
+    const clientId = (await me.json()).id as number;
+    const invite = await page.request.post('/api/v1/coach/invite-links', { headers: coachHeaders });
+    expect(invite.status()).toBe(201);
+    const code = (await invite.json()).code as string;
+    const accepted = await page.request.post('/api/v1/me/coach-invites/link/confirm', {
+      headers: athleteHeaders,
+      data: { token: code },
+    });
+    expect(accepted.status()).toBe(204);
+    const access = await page.request.get('/api/v1/me/trainer/nutrition-access', {
+      headers: athleteHeaders,
+    });
+    expect(access.status()).toBe(200);
+    const relationshipId = (await access.json()).relationship_id as number;
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(
+      new Date(),
+    );
+    const date = new Date(`${today}T12:00:00Z`);
+    const todayWeekday = (date.getUTCDay() + 6) % 7;
+    // On Sunday the week strip has no future day, so advance only the browser calendar to Monday.
+    if (todayWeekday === 6) date.setUTCDate(date.getUTCDate() + 1);
+    const calendarToday = date.toISOString().slice(0, 10);
+    date.setUTCDate(date.getUTCDate() + 1);
+    const future = date.toISOString().slice(0, 10);
+    const futureWeekday = (date.getUTCDay() + 6) % 7;
+    const exercises = await page.request.get('/api/v1/programs/exercises', {
+      headers: athleteHeaders,
+    });
+    expect(exercises.status()).toBe(200);
+    const exercise = (await exercises.json())[0];
+    expect(exercise).toBeTruthy();
+    const template = await page.request.post('/api/v1/programs/templates', {
+      headers: athleteHeaders,
+      data: {
+        title: 'Тестовая программа',
+        goal: 'strength',
+        level: 'beginner',
+        assign_after_create: false,
+        week_cycle: { length_weeks: 1, repeat: true },
+        days: [
+          {
+            title: 'Тестовый день',
+            exercises: [
+              {
+                exercise_id: exercise.id,
+                prescribed_sets: 2,
+                prescribed_reps: '8',
+                rest_seconds: 90,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(template.status()).toBe(200);
+    const assigned = await page.request.post(
+      `/api/v1/programs/templates/${(await template.json()).template.id}/assign-to-me`,
+      {
+        headers: athleteHeaders,
+        data: { start_date: today, duration_weeks: 8, schedule_weekdays: [todayWeekday] },
+      },
+    );
+    expect(assigned.status()).toBe(200);
+    const programId = (await assigned.json()).user_program_id as number;
+    const target = { calories: 2200, protein_g: 150, fat_g: 70, carbs_g: 242 };
+    const rule = await page.request.post('/api/v1/nutrition/targets/schedule', {
+      headers: { ...athleteHeaders, 'Idempotency-Key': `qa952-future-${athleteId}` },
+      data: {
+        ...target,
+        program_id: programId,
+        revision_number: 1,
+        effective_from: future,
+        scope: 'recovery',
+        day_type: 'recovery',
+        week_type: null,
+      },
+    });
+    expect(rule.status()).toBe(200);
+    const forbidden = await page.request.get(`/api/v1/nutrition/diary?diary_date=${future}`, {
+      headers: athleteHeaders,
+    });
+    expect(forbidden.status()).toBe(422);
+    const forbiddenWrite = await page.request.post('/api/v1/nutrition/diary/entries', {
+      headers: { ...athleteHeaders, 'Idempotency-Key': `qa952-future-write-${athleteId}` },
+      data: {
+        diary_date: future,
+        meal_type: 'lunch',
+        amount: '1',
+        amount_unit: 'serving',
+        quick_add: { name: 'Тест', energy_kcal: '500' },
+      },
+    });
+    expect(forbiddenWrite.status()).toBe(422);
+    const resolved = await page.request.get(
+      `/api/v1/nutrition/targets/for-date?target_date=${future}`,
+      { headers: athleteHeaders },
+    );
+    expect(resolved.status()).toBe(200);
+    const canonical = await resolved.json();
+    expect(canonical).toMatchObject({ date: future, origin: 'schedule', target });
+    const trainerDay = await page.request.get(
+      `/api/v1/coach-nutrition-proposals/clients/${clientId}/day?target_date=${future}`,
+      { headers: coachHeaders },
+    );
+    expect(trainerDay.status()).toBe(200);
+    const trainer = await trainerDay.json();
+    expect(trainer).toMatchObject({
+      target_id: canonical.target.id,
+      program: { program_id: programId },
+      binding: { revision_number: 1 },
+      day: { plan_date: future },
+    });
+    expect(Number(trainer.day.targets.energy_kcal)).toBe(2200);
+    expect(Number(trainer.day.targets.protein_g)).toBe(150);
+    expect(Number(trainer.day.targets.fat_g)).toBe(70);
+    expect(Number(trainer.day.targets.carbs_g)).toBe(242);
+
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.addInitScript(() =>
+      localStorage.setItem('app-theme', sessionStorage.getItem('qa_theme') ?? 'light'),
+    );
+    await page.addInitScript(
+      (token) => sessionStorage.setItem('fit_access_token', token),
+      athleteToken,
+    );
+    if (todayWeekday === 6)
+      await page.clock.setFixedTime(new Date(`${calendarToday}T12:00:00+03:00`));
+    await page.goto('/app?section=today');
+    const week = page.getByRole('navigation', { name: 'Эта неделя' });
+    const futureButton = week.locator('button.week-strip__day').nth(futureWeekday);
+    await futureButton.focus();
+    await expect(futureButton).toBeFocused();
+    await futureButton.press('Enter');
+    await expect(futureButton).toHaveAttribute('aria-pressed', 'true');
+    const summary = page.getByRole('region', { name: /Цель на/ });
+    await expect(summary).toContainText('2200 ккал');
+    for (const value of ['150 г', '70 г', '242 г', 'По программе'])
+      await expect(summary).toContainText(value);
+    await expect(summary).not.toContainText('Осталось');
+    await expect(summary.getByRole('link', { name: /дневник/i })).toHaveCount(0);
+    expect(requests.some((url) => url.includes(`/nutrition/diary?diary_date=${future}`))).toBe(
+      false,
+    );
+    await page.screenshot({ path: info.outputPath('future-target-desktop-light.png') });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => sessionStorage.setItem('qa_theme', 'dark'));
+    await page.reload();
+    await week.locator('button.week-strip__day').nth(futureWeekday).click();
+    await expect(summary).toContainText('2200 ккал');
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(requests.some((url) => url.includes(`/nutrition/diary?diary_date=${future}`))).toBe(
+      false,
+    );
+    await summary.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('future-target-mobile-dark.png') });
+
+    const coachContext = await browser.newContext({ serviceWorkers: 'block' });
+    const coach = await coachContext.newPage();
+    await coach.addInitScript(
+      (token) => sessionStorage.setItem('fit_access_token', token),
+      coachToken,
+    );
+    if (todayWeekday === 6)
+      await coach.clock.setFixedTime(new Date(`${calendarToday}T12:00:00+03:00`));
+    await coach.goto(`/coach?tab=clients&client_id=${clientId}`);
+    const switchCoach = coach.getByRole('button', { name: 'Тренер', exact: true });
+    if (await switchCoach.isVisible()) await switchCoach.click();
+    await coach.locator('#coach-client-nutrition > summary').click();
+    await coach.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    await expect(coach.locator('.coach-nutrition-assigned')).toContainText('2200 ккал');
+    await expect(coach.locator('.coach-nutrition-assigned')).toContainText(
+      new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+        date,
+      ),
+    );
+    const revoked = await page.request.put('/api/v1/me/trainer/nutrition-access', {
+      headers: athleteHeaders,
+      data: { relationship_id: relationshipId, nutrition_access: false },
+    });
+    expect(revoked.status()).toBe(200);
+    const denied = await page.request.get(
+      `/api/v1/coach-nutrition-proposals/clients/${clientId}/day?target_date=${future}`,
+      { headers: coachHeaders },
+    );
+    expect(denied.status()).toBe(404);
+    await coach.reload();
+    await coach.locator('#coach-client-nutrition > summary').click();
+    await coach.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    await expect(coach.getByText('Доступ к питанию закрыт')).toBeVisible();
+    await expect(coach.locator('.coach-nutrition-assigned')).toHaveCount(0);
+    await coachContext.close();
+  },
+);
 
 const importColumns = [
   'program_title',
@@ -1094,3 +1374,372 @@ test('#1335 real PostgreSQL generator rechecks an explicit suggestion before con
     (await persisted.json()).filter((item: { id: number }) => item.id === saved.template.id),
   ).toHaveLength(1);
 });
+
+testWithoutServiceWorker(
+  'PostgreSQL nutrition preview matches confirmation and refreshed report',
+  async ({ page }, info) => {
+    info.setTimeout(60_000);
+    await page.setViewportSize({ width: 320, height: 720 });
+    const userId = Date.now() * 10 + info.workerIndex;
+    const login = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: userId, full_name: 'Синтетическая проверка питания' },
+    });
+    expect(login.status()).toBe(200);
+    const token = (await login.json()).access_token as string;
+    const headers = { Authorization: `Bearer ${token}` };
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(
+      new Date(),
+    );
+    const target = await page.request.post('/api/v1/nutrition/targets/manual', {
+      headers,
+      data: { calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 190 },
+    });
+    expect(target.status()).toBe(200);
+    const food = await page.request.post('/api/v1/nutrition/foods', {
+      headers,
+      data: {
+        name: 'Тестовый продукт для проверки',
+        energy_kcal_per_100g: '120',
+        protein_g_per_100g: '12',
+        fat_g_per_100g: '4',
+        carbs_g_per_100g: '8',
+        fiber_g_per_100g: null,
+      },
+    });
+    expect(food.status()).toBe(201);
+    const foodId = (await food.json()).id as number;
+    for (const item of [
+      { name: 'Тестовая овсяная каша', energy: '150', protein: '5', fat: '3', carbs: '25' },
+      { name: 'Тестовое яблоко', energy: '52', protein: '0.3', fat: '0.2', carbs: '14' },
+    ]) {
+      const created = await page.request.post('/api/v1/nutrition/foods', {
+        headers,
+        data: {
+          name: item.name,
+          energy_kcal_per_100g: item.energy,
+          protein_g_per_100g: item.protein,
+          fat_g_per_100g: item.fat,
+          carbs_g_per_100g: item.carbs,
+          fiber_g_per_100g: null,
+        },
+      });
+      expect(created.status()).toBe(201);
+      const favorite = await page.request.put(
+        `/api/v1/nutrition/foods/${(await created.json()).id}/favorite`,
+        { headers },
+      );
+      expect(favorite.status()).toBe(200);
+    }
+    const entry = await page.request.post('/api/v1/nutrition/diary/entries', {
+      headers,
+      data: {
+        food_id: foodId,
+        diary_date: today,
+        meal_type: 'breakfast',
+        amount: '100',
+        amount_unit: 'g',
+      },
+    });
+    expect(entry.status()).toBe(201);
+    await page.addInitScript((value) => sessionStorage.setItem('fit_access_token', value), token);
+    await page.goto('/app?section=progress&progress_view=nutrition&progress_period=days_7');
+    const report = page.locator('#nutrition-period-report');
+    await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
+    const dayLink = report.locator(`a[href*="date=${today}"]`).first();
+    await expect(dayLink).toBeVisible();
+    await dayLink.click();
+    await expect(page.getByRole('link', { name: 'К отчёту по питанию' })).toBeVisible();
+    const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+    await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
+    await expect(
+      suggestions.getByText('Тестовый продукт для проверки', { exact: true }),
+    ).toBeVisible();
+    await expect(suggestions.locator('.nutrition-suggestion-card:visible')).toHaveCount(2);
+    const showAll = suggestions.getByRole('button', {
+      name: /Показать все 3 варианта|Свернуть/,
+    });
+    const secondReview = suggestions
+      .locator('.nutrition-suggestion-card:visible')
+      .nth(1)
+      .getByRole('button', { name: 'Проверить вариант' });
+    const checkGap = async () => {
+      const previous = await secondReview.boundingBox();
+      const toggle = await showAll.boundingBox();
+      expect(previous).not.toBeNull();
+      expect(toggle).not.toBeNull();
+      expect(toggle!.y - previous!.y - previous!.height).toBeGreaterThanOrEqual(11);
+    };
+    await checkGap();
+    await showAll.click();
+    await expect(suggestions.locator('.nutrition-suggestion-card:visible')).toHaveCount(3);
+    await checkGap();
+    const thirdReview = suggestions
+      .locator('.nutrition-suggestion-card:visible')
+      .nth(2)
+      .getByRole('button', { name: 'Проверить вариант' });
+    await thirdReview.click();
+    await expect(suggestions.locator('.nutrition-suggestion-review')).toBeVisible();
+    await suggestions.getByRole('button', { name: 'Вернуться к вариантам' }).click();
+    await suggestions.getByRole('button', { name: 'Показать все 3 варианта' }).click();
+    await suggestions.getByRole('button', { name: 'Свернуть' }).click();
+    const targetCard = suggestions
+      .locator('.nutrition-suggestion-card')
+      .filter({ hasText: 'Тестовый продукт для проверки' });
+    let commitCount = 0;
+    let commitBody: Record<string, unknown> | undefined;
+    let commitKey = '';
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/v1/nutrition/diary/suggestions/commit') {
+        commitCount += 1;
+        commitBody = request.postDataJSON() as Record<string, unknown>;
+        commitKey = request.headers()['idempotency-key'] ?? '';
+      }
+    });
+    await targetCard.getByRole('button', { name: 'Проверить вариант' }).click();
+    const review = suggestions.locator('.nutrition-suggestion-review');
+    const nextPreview = page.waitForResponse((response) => {
+      if (new URL(response.url()).pathname !== '/api/v1/nutrition/diary/suggestions/preview')
+        return false;
+      const payload = response.request().postDataJSON() as { items: { amount: string }[] };
+      return payload.items[0]?.amount === '150';
+    });
+    await review.getByLabel('Количество').fill('150');
+    const previewResponse = await nextPreview;
+    expect(previewResponse.status()).toBe(200);
+    const preview = await previewResponse.json();
+    expect(Number(preview.before.energy_kcal)).toBe(120);
+    expect(Number(preview.addition.energy_kcal)).toBe(180);
+    expect(Number(preview.after.energy_kcal)).toBe(300);
+    expect(preview.after.fiber_g).toBeNull();
+    await expect(review.getByRole('row', { name: /Ккал/ })).toContainText('300');
+    await expect(review.getByText(/Прогноз дня после добавления:/)).toContainText('300 ккал');
+    for (const name of ['Показатель', 'Было', 'Вариант', 'Станет']) {
+      const lines = await review.getByRole('columnheader', { name }).evaluate((header) => {
+        const range = document.createRange();
+        range.selectNodeContents(header);
+        return range.getClientRects().length;
+      });
+      expect(lines, name).toBe(1);
+    }
+    await review.getByText('Предпочтения и ограничения', { exact: true }).click();
+    const limitPreview = page.waitForResponse((response) => {
+      if (new URL(response.url()).pathname !== '/api/v1/nutrition/diary/suggestions/preview')
+        return false;
+      return response.request().postDataJSON().constraints?.max_fat_g === '8';
+    });
+    await review.getByLabel('Жиры, г').fill('8');
+    expect((await (await limitPreview).json()).constraint_status).toBe('violated');
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    await review.getByLabel('Жиры, г').fill('10');
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled();
+
+    const excludedInput = review.getByLabel('Найти исключаемый продукт');
+    expect((await excludedInput.boundingBox())!.width).toBeGreaterThanOrEqual(120);
+    await excludedInput.fill('Тестовый');
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    await expect(
+      page.locator('datalist option[value="Тестовый продукт для проверки"]'),
+    ).toHaveCount(1);
+    await excludedInput.fill('Тестовый продукт для проверки');
+    await review.getByRole('button', { name: 'Добавить исключаемый продукт' }).click();
+    await expect(review.getByText('Выбранный вариант содержит исключённый продукт.')).toBeVisible();
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeDisabled();
+    await review
+      .getByRole('button', { name: 'Убрать Тестовый продукт для проверки из исключений' })
+      .click();
+
+    const preferredInput = review.getByLabel('Найти предпочитаемый продукт');
+    await preferredInput.fill('Тестовый');
+    await expect(
+      page.locator('datalist option[value="Тестовый продукт для проверки"]'),
+    ).toHaveCount(1);
+    await preferredInput.fill('Тестовый продукт для проверки');
+    await review.getByRole('button', { name: 'Добавить предпочитаемый продукт' }).click();
+    await expect(
+      review.getByText('В варианте есть указанный предпочитаемый продукт.'),
+    ).toBeVisible();
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled();
+    const preferredAdd = review.getByRole('button', { name: 'Добавить предпочитаемый продукт' });
+    const excludedAdd = review.getByRole('button', { name: 'Добавить исключаемый продукт' });
+    await preferredAdd.hover();
+    const background = (button: Element) => getComputedStyle(button).backgroundColor;
+    expect(await preferredAdd.evaluate(background)).toBe(await excludedAdd.evaluate(background));
+    const removePreferred = review.getByRole('button', {
+      name: 'Убрать Тестовый продукт для проверки из предпочтений',
+    });
+    const buttonSize = await removePreferred.evaluate((button) => ({
+      width: button.clientWidth,
+      scrollWidth: button.scrollWidth,
+      height: button.getBoundingClientRect().height,
+    }));
+    expect(buttonSize.scrollWidth).toBeLessThanOrEqual(buttonSize.width);
+    expect(buttonSize.height).toBeLessThanOrEqual(56);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      320,
+    );
+    const confirmButton = review.getByRole('button', { name: 'Добавить выбранное' });
+    await confirmButton.scrollIntoViewIfNeeded();
+    const actionVisibility = await confirmButton.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      return { height: rect.height, receivesPointer: hit != null && button.contains(hit) };
+    });
+    expect(actionVisibility.height).toBeGreaterThanOrEqual(44);
+    expect(actionVisibility.receivesPointer).toBe(true);
+    expect(commitCount).toBe(0);
+    const confirmed = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/v1/nutrition/diary/suggestions/commit',
+    );
+    await review.getByRole('button', { name: 'Добавить выбранное' }).click();
+    expect((await confirmed).status()).toBe(201);
+    await expect(targetCard.getByRole('button', { name: 'Проверить вариант' })).toBeVisible();
+    expect(commitCount).toBe(1);
+    expect(commitKey).toBeTruthy();
+    expect(commitBody?.constraints).toEqual({
+      max_fat_g: '10',
+      preferred_food_ids: [foodId],
+      excluded_food_ids: [],
+    });
+    const retry = await page.request.post('/api/v1/nutrition/diary/suggestions/commit', {
+      headers: { ...headers, 'Idempotency-Key': commitKey },
+      data: commitBody,
+    });
+    expect(retry.status()).toBe(201);
+    expect((await retry.json()).replayed).toBe(true);
+    const diary = await page.request.get(`/api/v1/nutrition/diary?diary_date=${today}`, {
+      headers,
+    });
+    const diaryData = await diary.json();
+    expect(Number(diaryData.totals.energy_kcal)).toBe(300);
+    expect(diaryData.totals.fiber_g).toBeNull();
+    const updatedReport = await page.request.get(
+      '/api/v1/workouts/progress/nutrition-report?period=days_7',
+      { headers },
+    );
+    const reportData = await updatedReport.json();
+    const todayPoint = reportData.daily.find(
+      (item: { diary_date: string }) => item.diary_date === today,
+    );
+    expect(todayPoint.calories).toBe(300);
+    expect(todayPoint.fiber_g).toBeNull();
+    expect(reportData.summary.calories.sample_days).toBe(0);
+
+    await targetCard.getByRole('button', { name: 'Проверить вариант' }).click();
+    await review.getByText('Предпочтения и ограничения', { exact: true }).click();
+    await expect(review.getByLabel('Жиры, г')).toHaveValue('');
+    await expect(review.getByRole('button', { name: /Убрать .* из предпочтений/ })).toHaveCount(0);
+    await review.getByRole('button', { name: 'Вернуться к вариантам' }).click();
+
+    const planner = page.getByTestId('meal-planner');
+    await planner.locator('summary').click();
+    const planSuggestions = planner.getByRole('region', { name: 'Варианты для плана' });
+    const targetPlanCard = planSuggestions
+      .locator('.nutrition-suggestion-card')
+      .filter({ hasText: 'Тестовый продукт для проверки' });
+    await expect(targetPlanCard).toBeVisible();
+    await expect(planSuggestions.locator('.nutrition-suggestion-card:visible')).toHaveCount(3);
+    await targetPlanCard.getByRole('button', { name: 'Проверить вариант' }).click();
+    const planReview = planSuggestions.locator('.nutrition-suggestion-review');
+    const planPreviewResponse = page.waitForResponse((response) => {
+      if (new URL(response.url()).pathname !== '/api/v1/nutrition/plans/suggestions/preview')
+        return false;
+      const payload = response.request().postDataJSON() as { items: { amount: string }[] };
+      return payload.items[0]?.amount === '50';
+    });
+    await planReview.getByLabel('Количество').fill('50');
+    const planPreview = await (await planPreviewResponse).json();
+    expect(Number(planPreview.before.energy_kcal)).toBe(0);
+    expect(Number(planPreview.after.energy_kcal)).toBe(60);
+    expect(Number(planPreview.diary.energy_kcal)).toBe(300);
+    expect(Number(planPreview.projected_after.energy_kcal)).toBe(360);
+    await expect(planReview.getByText(/Записано в дневнике:/)).toContainText('300 ккал');
+    await expect(planReview.getByText(/Прогноз дня после добавления:/)).toContainText('360 ккал');
+    await planReview.getByText('Предпочтения и ограничения', { exact: true }).click();
+    await planReview.getByLabel('Ккал', { exact: true }).fill('350');
+    await expect(
+      planReview.getByText('После добавления будет превышен заданный предел калорий.'),
+    ).toBeVisible();
+    await expect(planReview.getByRole('button', { name: 'Добавить в план' })).toBeDisabled();
+    await planReview.getByLabel('Ккал', { exact: true }).fill('360');
+    await expect(planReview.getByRole('button', { name: 'Добавить в план' })).toBeEnabled();
+    const planExcluded = planReview.getByLabel('Найти исключаемый продукт');
+    await planExcluded.fill('Тестовый');
+    await expect(
+      page.locator('datalist option[value="Тестовый продукт для проверки"]'),
+    ).toHaveCount(1);
+    await planExcluded.fill('Тестовый продукт для проверки');
+    await planReview.getByRole('button', { name: 'Добавить исключаемый продукт' }).click();
+    await expect(
+      planReview.getByText('Выбранный вариант содержит исключённый продукт.'),
+    ).toBeVisible();
+    await expect(planReview.getByRole('button', { name: 'Добавить в план' })).toBeDisabled();
+    await planReview
+      .getByRole('button', { name: 'Убрать Тестовый продукт для проверки из исключений' })
+      .click();
+    await expect(planReview.getByRole('button', { name: 'Добавить в план' })).toBeEnabled();
+    const planConfirmation = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === '/api/v1/nutrition/plans/fill',
+    );
+    await planReview.getByRole('button', { name: 'Добавить в план' }).click();
+    expect((await planConfirmation).status()).toBe(201);
+    const planDay = await page.request.get(`/api/v1/nutrition/plans/day?plan_date=${today}`, {
+      headers,
+    });
+    expect(Number((await planDay.json()).planned.energy_kcal)).toBe(60);
+    const unchangedDiary = await page.request.get(`/api/v1/nutrition/diary?diary_date=${today}`, {
+      headers,
+    });
+    expect(Number((await unchangedDiary.json()).totals.energy_kcal)).toBe(300);
+    await page.getByRole('link', { name: 'К отчёту по питанию' }).click();
+    await expect(
+      page.locator('#nutrition-period-report').getByRole('heading', { name: 'Отчёт по питанию' }),
+    ).toBeVisible();
+    await report.getByText('Дни периода: 7').click();
+    const todayRow = report
+      .locator('tr')
+      .filter({ has: page.locator(`time[datetime="${today}"]`) });
+    await expect(todayRow.getByText('300 ккал', { exact: true })).toBeVisible();
+    await expect(todayRow.getByText('Клетчатка: — г')).toBeVisible();
+    await report.locator(`a[href*="date=${today}"]`).first().click();
+    await suggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
+    await targetCard.getByRole('button', { name: 'Проверить вариант' }).click();
+    await expect(review.getByRole('button', { name: 'Добавить выбранное' })).toBeEnabled();
+    const changedTarget = await page.request.post('/api/v1/nutrition/targets/manual', {
+      headers,
+      data: { calories: 2200, protein_g: 150, fat_g: 80, carbs_g: 220 },
+    });
+    expect(changedTarget.status()).toBe(200);
+    const staleConfirmation = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/v1/nutrition/diary/suggestions/commit',
+    );
+    await review.getByRole('button', { name: 'Добавить выбранное' }).click();
+    expect((await staleConfirmation).status()).toBe(409);
+    await expect(suggestions.getByText(/Данные изменились/)).toBeVisible();
+    const emptyLogin = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: userId + 1, full_name: 'Синтетический пустой дневник' },
+    });
+    expect(emptyLogin.status()).toBe(200);
+    const emptyToken = (await emptyLogin.json()).access_token as string;
+    const emptyPage = await page.context().newPage();
+    await emptyPage.setViewportSize({ width: 320, height: 720 });
+    await emptyPage.addInitScript(
+      (value) => sessionStorage.setItem('fit_access_token', value),
+      emptyToken,
+    );
+    await emptyPage.goto(`/app?section=nutrition&date=${today}`);
+    const emptySuggestions = emptyPage.getByRole('region', { name: 'Варианты из вашей еды' });
+    await emptySuggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
+    await expect(emptySuggestions.getByText('Нет цели КБЖУ на эту дату')).toBeVisible();
+    const emptyTarget = await emptyPage.request.post('/api/v1/nutrition/targets/manual', {
+      headers: { Authorization: `Bearer ${emptyToken}` },
+      data: { calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 190 },
+    });
+    expect(emptyTarget.status()).toBe(200);
+    await emptyPage.reload();
+    await emptySuggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
+    await expect(emptySuggestions.getByText('Пока нет готовых вариантов')).toBeVisible();
+    await emptyPage.close();
+  },
+);

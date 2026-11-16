@@ -3105,9 +3105,18 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   const report = page.locator('#nutrition-period-report');
   await expect(report.getByText('Заполнено 0 из 30 дней')).toBeVisible();
   await expect(report.getByText('Нет заполненных дней за период')).toBeVisible();
-  await expect(report.getByRole('link', { name: 'Открыть дневник питания' })).toHaveAttribute(
-    'href',
-    '/app?section=nutrition',
+  const diaryLink = report.getByRole('link', { name: 'Открыть дневник питания' });
+  await expect(diaryLink).toBeVisible();
+  const href = new URL((await diaryLink.getAttribute('href'))!, 'http://localhost');
+  expect(href.pathname).toBe('/app');
+  expect(href.searchParams.get('section')).toBe('nutrition');
+  expect(href.searchParams.get('date')).toBe(
+    await page.evaluate(() =>
+      new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' }),
+    ),
+  );
+  expect(href.searchParams.get('return_to')).toBe(
+    '/app?section=progress&progress_view=nutrition#nutrition-period-report',
   );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();

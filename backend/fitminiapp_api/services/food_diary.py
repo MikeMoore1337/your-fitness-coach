@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
-from datetime import date
-from decimal import Decimal
+from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, DecimalException, localcontext
 from typing import Literal, cast
 
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
     FoodDiaryRepeatPreview,
 )
+from fitminiapp_api.models.nutrition import NutritionTargetDaySnapshot
 from fitminiapp_api.models.nutrition_plan import NutritionPlanItem
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
@@ -59,7 +60,10 @@ from fitminiapp_api.services.foods import (
     get_visible_food,
 )
 from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
-from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
+from fitminiapp_api.services.nutrition import (
+    capture_nutrition_target_snapshot,
+    get_nutrition_target_for_date,
+)
 from fitminiapp_api.services.progress_weekly_action import (
     record_progress_weekly_action_completion,
 )
@@ -110,6 +114,16 @@ def _ensure_day_accepts_entries(db: Session, user: User, diary_date: date) -> No
         )
 
 
+def ensure_suggestion_day_is_mutable(db: Session, user: User, diary_date: date) -> None:
+    if diary_date < today_for_user(user):
+        status = _stored_day_status(db, user, diary_date)
+        snapshot = db.get(NutritionTargetDaySnapshot, (user.id, diary_date))
+        if snapshot is not None or (status is not None and status.status in {"complete", "fasted"}):
+            raise FoodDiaryConflictError(
+                "Завершённый прошедший день нельзя изменить с помощью рекомендаций."
+            )
+
+
 def _visible_food(db: Session, user: User, food_id: int) -> Food:
     try:
         return get_visible_food(db, user, food_id)
@@ -130,9 +144,12 @@ def _calculate_amount(
     amount_unit: DiaryAmountUnit,
 ) -> FoodNutrition:
     try:
-        return calculate_food_amount(food, amount, amount_unit)
+        calculation = calculate_food_amount(food, amount, amount_unit)
     except FoodError as exc:
         raise FoodDiaryError(str(exc)) from exc
+    if calculation.energy_kcal is None:
+        raise FoodDiaryError("food has no known energy value")
+    return calculation
 
 
 def _recipe_as_food(calculation: RecipeCalculation) -> Food:
@@ -260,6 +277,46 @@ def _set_nutrition_amount(entry: FoodDiaryEntry, calculation: FoodNutrition) -> 
     }
 
 
+def _scale_imported_nutrition(entry: FoodDiaryEntry, amount: Decimal) -> dict:
+    snapshot = entry.nutrition_snapshot
+    if not isinstance(snapshot, dict):
+        raise FoodDiaryError("imported nutrition snapshot is unavailable")
+    try:
+        original_amount = Decimal(snapshot["source_row"]["quantity"])
+        facts = snapshot["original_total"]["facts"]
+        if original_amount <= 0:
+            raise ValueError("invalid source amount")
+        fields = {
+            "energy_kcal": ("energy_kcal", "kcal"),
+            "protein_g": ("protein_g", "g"),
+            "fat_g": ("fat_g", "g"),
+            "carbs_g": ("carbohydrate_g", "g"),
+            "fiber_g": ("fiber_g", "g"),
+        }
+        result: dict[str, str | None] = {}
+        with localcontext() as context:
+            context.prec = 50
+            for target, (source, unit) in fields.items():
+                fact = facts.get(source)
+                if not fact or fact.get("evidence") != "read" or fact.get("unit") != unit:
+                    result[target] = None
+                    continue
+                original = Decimal(fact["value"])
+                value = (
+                    original
+                    if amount == original_amount
+                    else (original * amount / original_amount).quantize(
+                        Decimal("0.00000001"), rounding=ROUND_HALF_UP
+                    )
+                )
+                result[target] = str(value)
+        if result["energy_kcal"] is None:
+            raise ValueError("missing source energy")
+        return result
+    except (KeyError, TypeError, ValueError, DecimalException) as exc:
+        raise FoodDiaryError("imported nutrition snapshot is unavailable") from exc
+
+
 def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
     return FoodDiaryEntryResponse(
         id=entry.id,
@@ -269,7 +326,7 @@ def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
         recipe_id=entry.recipe_id,
         entry_kind=cast(Literal["food", "recipe", "quick_add"], entry.entry_kind),
         nutrition_source=cast(
-            Literal["catalog", "recipe", "manual", "restaurant", "photo"],
+            Literal["catalog", "recipe", "manual", "restaurant", "photo", "fatsecret"],
             diary_entry_source(entry),
         ),
         nutrition_confidence=cast(
@@ -320,7 +377,7 @@ def _repeat_candidate(
     db: Session,
     user: User,
     target_date: date,
-    preferred_meals: list[MealType],
+    filled_meals: list[MealType],
 ) -> FoodDiaryRepeatCandidate | None:
     latest_source_date = (
         db.query(func.max(FoodDiaryEntry.diary_date))
@@ -344,8 +401,9 @@ def _repeat_candidate(
     by_meal: dict[str, list[FoodDiaryEntry]] = {}
     for entry in source_entries:
         by_meal.setdefault(entry.meal_type, []).append(entry)
-    meal_order = [*preferred_meals, *(meal for meal in MEAL_TYPES if meal not in preferred_meals)]
-    source_meal = next((meal for meal in meal_order if by_meal.get(meal)), None)
+    source_meal = next(
+        (meal for meal in MEAL_TYPES if meal not in filled_meals and by_meal.get(meal)), None
+    )
     if source_meal is None:
         return None
     return FoodDiaryRepeatCandidate(
@@ -360,6 +418,8 @@ def create_food_diary_entry(
     user: User,
     payload: FoodDiaryEntryCreate,
     idempotency_key: str | None = None,
+    *,
+    commit: bool = True,
 ) -> FoodDiaryEntryResponse:
     _lock_diary_user(db, user)
     _validate_diary_date(user, payload.diary_date)
@@ -413,15 +473,16 @@ def create_food_diary_entry(
         entry.nutrition_source = quick_add.nutrition_source
         entry.food_name = quick_add.name or "Быстрый ввод"
         entry.food_brand = None
-        entry.weight_g = Decimal("1")
-        entry.energy_kcal_per_100g = ZERO
-        entry.protein_g_per_100g = ZERO
-        entry.fat_g_per_100g = ZERO
-        entry.carbs_g_per_100g = ZERO
+        photo_quick_add = quick_add.nutrition_source == "photo"
+        entry.weight_g = None if photo_quick_add else Decimal("1")
+        entry.energy_kcal_per_100g = None if photo_quick_add else ZERO
+        entry.protein_g_per_100g = None if photo_quick_add else ZERO
+        entry.fat_g_per_100g = None if photo_quick_add else ZERO
+        entry.carbs_g_per_100g = None if photo_quick_add else ZERO
         entry.fiber_g_per_100g = None
         entry.serving_amount = Decimal("1")
         entry.serving_unit = "serving"
-        entry.serving_weight_g = Decimal("1")
+        entry.serving_weight_g = None if photo_quick_add else Decimal("1")
         entry.nutrition_basis_kind = "per_serving"
         entry.nutrition_basis_amount = Decimal("1")
         entry.nutrition_basis_unit = "serving"
@@ -446,9 +507,14 @@ def create_food_diary_entry(
     )
     record_progress_weekly_action_completion(db, user, "nutrition")
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except IntegrityError:
         db.rollback()
+        if not commit:
+            raise
         if key is None:
             raise
         existing = (
@@ -498,15 +564,19 @@ def _batch_request_fingerprint(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     template_id: int | None,
+    request_context: dict[str, object] | None = None,
 ) -> str:
+    body: dict[str, object] = {
+        "operation_kind": operation_kind,
+        "diary_date": diary_date.isoformat(),
+        "meal_type": meal_type,
+        "template_id": template_id,
+        "items": [item.model_dump(mode="json") for item in items],
+    }
+    if request_context is not None:
+        body["request_context"] = request_context
     canonical = json.dumps(
-        {
-            "operation_kind": operation_kind,
-            "diary_date": diary_date.isoformat(),
-            "meal_type": meal_type,
-            "template_id": template_id,
-            "items": [item.model_dump(mode="json") for item in items],
-        },
+        body,
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
@@ -546,6 +616,7 @@ def create_food_diary_batch(
     operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     template_id: int | None = None,
     commit: bool = True,
+    request_context: dict[str, object] | None = None,
 ) -> FoodDiaryBatchResponse:
     _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
@@ -555,12 +626,15 @@ def create_food_diary_batch(
         meal_type,
         items,
         template_id,
+        request_context,
     )
     replay = _existing_batch_operation(db, user, key, fingerprint)
     if replay is not None:
         return replay
 
     _validate_diary_date(user, diary_date)
+    if operation_kind == "suggestion":
+        ensure_suggestion_day_is_mutable(db, user, diary_date)
     _ensure_day_accepts_entries(db, user, diary_date)
     operation = FoodDiaryBatchOperation(
         user_id=user.id,
@@ -611,10 +685,10 @@ def create_food_diary_batch(
                 day_scope=True,
             )
             record_progress_weekly_action_completion(db, user, "nutrition")
+        db.flush()
+        response = _batch_response(db, operation, replayed=False)
         if commit:
             db.commit()
-        else:
-            db.flush()
     except FoodDiaryError:
         db.rollback()
         raise
@@ -624,7 +698,7 @@ def create_food_diary_batch(
         if replay is None:
             raise FoodDiaryConflictError("batch diary request could not be completed")
         return replay
-    return _batch_response(db, operation, replayed=False)
+    return response
 
 
 def update_food_diary_entry(
@@ -671,6 +745,10 @@ def update_food_diary_entry(
         recipe is not None or (food is None and entry.recipe_id is not None)
     ) and amount_unit != "g":
         raise FoodDiaryError("recipe diary entries must use grams")
+    photo_quick_add = entry.entry_kind == "quick_add" and entry.nutrition_source == "photo"
+    imported = entry.nutrition_source == "fatsecret" and food is None and recipe is None
+    if imported and amount_unit != entry.amount_unit:
+        raise FoodDiaryError("imported portion unit cannot be changed")
     if food is not None:
         calculation_food = food
     elif recipe is not None:
@@ -679,9 +757,12 @@ def update_food_diary_entry(
         except RecipeError as exc:
             raise FoodDiaryError(str(exc)) from exc
         calculation_food = _recipe_as_food(recipe_calculation)
-    else:
+    elif not photo_quick_add and not imported:
         calculation_food = _entry_snapshot_as_food(entry)
-    calculation = _calculate_amount(calculation_food, amount, amount_unit)
+    if not photo_quick_add and not imported:
+        calculation = _calculate_amount(calculation_food, amount, amount_unit)
+    if imported:
+        imported_nutrition = _scale_imported_nutrition(entry, amount)
 
     if food is not None:
         _copy_food_snapshot(entry, food)
@@ -694,8 +775,16 @@ def update_food_diary_entry(
         entry.logged_at = payload.logged_at
     entry.amount = amount
     entry.amount_unit = amount_unit
-    entry.weight_g = calculation.weight_g
-    _set_nutrition_amount(entry, calculation)
+    if photo_quick_add:
+        entry.weight_g = None
+        entry.serving_weight_g = None
+    elif imported:
+        entry.weight_g = amount if amount_unit == "g" else None
+        entry.nutrition_amount = imported_nutrition
+    else:
+        entry.weight_g = calculation.weight_g
+        _set_nutrition_amount(entry, calculation)
+    entry.updated_at = max(now_msk_naive(), entry.updated_at + timedelta(microseconds=1))
     record_lifecycle_milestone(
         db,
         user,
@@ -708,7 +797,9 @@ def update_food_diary_entry(
     return _serialize_entry(entry)
 
 
-def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
+def delete_food_diary_entry(
+    db: Session, user: User, entry_id: int, expected_version: datetime | None = None
+) -> None:
     _lock_diary_user(db, user)
     entry = (
         db.query(FoodDiaryEntry)
@@ -717,6 +808,8 @@ def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
     )
     if entry is None:
         raise FoodDiaryNotFoundError("diary entry not found")
+    if expected_version is not None and entry.updated_at != expected_version:
+        raise FoodDiaryConflictError("diary entry was changed")
     status = _stored_day_status(db, user, entry.diary_date)
     db.query(NutritionPlanItem).filter(NutritionPlanItem.diary_entry_id == entry.id).update(
         {NutritionPlanItem.diary_entry_id: None}, synchronize_session=False
@@ -741,9 +834,12 @@ def get_food_diary_day(
     db: Session,
     user: User,
     diary_date: date | None,
+    *,
+    allow_future: bool = False,
 ) -> FoodDiaryDayResponse:
     selected_date = diary_date or today_for_user(user)
-    _validate_diary_date(user, selected_date)
+    if not allow_future:
+        _validate_diary_date(user, selected_date)
     entries = (
         db.query(FoodDiaryEntry)
         .filter(
@@ -778,7 +874,7 @@ def get_food_diary_day(
         else ("incomplete" if serialized else "unlogged")
     )
 
-    nutrition_target = get_nutrition_target_for_user(db, user)
+    nutrition_target = get_nutrition_target_for_date(db, user.id, selected_date)
     targets = None
     remaining = None
     if nutrition_target is not None:
@@ -839,6 +935,8 @@ def set_food_diary_day_status(
         raise FoodDiaryConflictError("a day with food entries cannot be marked as fasted")
     if payload.status == "complete" and not has_entries:
         raise FoodDiaryError("an empty day must be marked as fasted instead of complete")
+    if payload.status in {"complete", "fasted"}:
+        capture_nutrition_target_snapshot(db, user.id, payload.diary_date)
     if payload.status == "unlogged":
         if stored is not None:
             db.delete(stored)
@@ -1049,11 +1147,14 @@ def _clone_entry(
     target_meal_type: MealType,
     operation_id: int,
 ) -> FoodDiaryEntry:
+    created_at = now_msk_naive()
     return FoodDiaryEntry(
         user_id=source.user_id,
         food_id=source.food_id,
         recipe_id=source.recipe_id,
         copy_operation_id=operation_id,
+        created_at=created_at,
+        updated_at=created_at,
         copied_from_entry_id=source.id,
         diary_date=target_date,
         meal_type=target_meal_type,
@@ -1187,6 +1288,7 @@ def _perform_copy(
     source_meal_type: MealType | None,
     target_date: date,
     target_meal_type: MealType | None,
+    require_empty_meal: bool = False,
 ) -> FoodDiaryCopyResponse:
     _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
@@ -1194,6 +1296,18 @@ def _perform_copy(
     replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)
     if replay is not None:
         return replay
+
+    if (
+        require_empty_meal
+        and db.query(FoodDiaryEntry.id)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date == target_date,
+            FoodDiaryEntry.meal_type == target_meal_type,
+        )
+        .first()
+    ):
+        raise FoodDiaryConflictError("target meal is not empty")
 
     preview = (
         db.query(FoodDiaryRepeatPreview)
@@ -1362,6 +1476,7 @@ def copy_diary_meal(
     user: User,
     payload: FoodDiaryCopyMeal,
     idempotency_key: str,
+    require_empty_meal: bool = False,
 ) -> FoodDiaryCopyResponse:
     return _perform_copy(
         db,
@@ -1374,6 +1489,7 @@ def copy_diary_meal(
         source_meal_type=payload.source_meal_type,
         target_date=payload.target_date,
         target_meal_type=payload.target_meal_type,
+        require_empty_meal=require_empty_meal,
     )
 
 

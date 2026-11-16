@@ -8,75 +8,43 @@ description: >
 
 # localization-engineer
 
-Создавай несколько языковых вариантов одного продукта, а не несколько расходящихся приложений.
+Create localized variants of **one product**, not diverging apps.
 
-## Сначала
+## First inventory
 
-Перед изменением кода инвентаризируй:
+Inspect all user-facing Web/TMA/Admin/Coach/Demo/AI surfaces, hardcoded text and formatters, backend errors/notifications/email/bot templates, public metadata/`<html lang>`/canonicals/sitemap/structured data, domain dictionaries/enums/statuses/exercises/equipment/goals, profiles/pre-auth storage, Telegram/browser locale signals, tests/snapshots/content source and existing i18n tooling.
 
-- все user-facing Web/TMA/Admin/Coach/Demo/AI surfaces;
-- hardcoded strings и locale-specific formatters;
-- backend errors, notifications, email/bot templates;
-- public metadata, `<html lang>`, canonical, sitemap и structured data;
-- domain dictionaries, enums, statuses, exercises, equipment и goals;
-- current profile/preferences/pre-auth storage;
-- Telegram/browser locale signals;
-- tests, snapshots и content source;
-- существующие i18n libraries и generated types.
-
-Классифицируй строки:
-
-```text
-UI resource | domain label | public editorial content | user-generated | technical literal | out of scope
-```
-
-Не меняй бизнес-логику, formulas, permissions или security под видом перевода.
+Classify strings as `UI resource | domain label | public editorial content | user-generated | technical literal | out of scope`. Never modify business logic, formulas, permissions or security under cover of translation.
 
 ## Locale contract
 
-Зафиксируй поддерживаемые locale identifiers и preference contract, например:
+Define supported locale IDs and preferences such as `auto | ru | en`. Separate **stored preference** (user choice), **effective locale** (active language) and **initial signal** (browser/Telegram language at first use).
 
-```text
-auto | ru | en
-```
+Recommended priority:
 
-Отделяй:
+1. Authenticated account preference.
+2. Pre-auth local preference.
+3. Platform signal on first launch.
+4. Browser language list.
+5. Product fallback.
 
-- **stored preference** - что выбрал пользователь;
-- **effective locale** - какой locale используется сейчас;
-- **initial signal** - browser/Telegram language при первом входе.
-
-Рекомендуемый приоритет:
-
-1. authenticated account preference;
-2. pre-auth local preference;
-3. platform signal при первом запуске;
-4. browser languages;
-5. product fallback.
-
-Manual choice всегда имеет приоритет и не должен перезаписываться очередным platform signal.
-
-Сохраняй preference между Web/TMA и после auth handoff без потери другого состояния. Определи
-конфликтную политику для нескольких вкладок/устройств и не создавай бесконечный sync loop.
+Manual choice must override later platform signals. Preserve preference across Web/TMA and authentication handoffs without losing other state. Define conflict behavior across tabs/devices; avoid sync loops.
 
 ## Translation resources
 
-- Используй одну locale infrastructure и type-safe keys, если стек это поддерживает.
-- Делай namespaces по устойчивым продуктовым областям, а не по случайным компонентам.
-- Не используй raw English/Russian sentence как key.
-- Не склеивай предложения из переводимых фрагментов: порядок слов и грамматика различаются.
-- Используй interpolation и locale-aware plural/select rules.
-- Сохраняй placeholders, markup и variables типизированными и проверяемыми.
-- Не рендери недоверенный translation content через unsafe HTML.
-- В development/test missing key должен быть заметен; production fallback должен быть безопасным и
-  наблюдаемым, а не показывать internal enum/code.
-- Удаляй orphan keys только после поиска динамических consumers и tests.
+- Reuse one locale infrastructure and typed keys when supported.
+- Organize namespaces by durable product domains, not arbitrary components.
+- Never use raw English/Russian sentences as resource keys.
+- Do not concatenate translated sentence fragments; grammar/order differs.
+- Use interpolation and locale-aware plural/select semantics.
+- Type-check placeholders, markup and variables.
+- Do not render untrusted translation content through unsafe HTML.
+- Show missing keys in dev/test; production fallback must be safe/observable and never expose internal enums/codes.
+- Remove orphan keys only after checking dynamic consumers and tests.
 
 ## Stable domain data
 
-Business identifiers и enum codes остаются language-neutral.
-
-Правильно:
+Keep machine identifiers and enum codes language-neutral:
 
 ```text
 exercise_id=42
@@ -84,173 +52,54 @@ code="bench_press"
 labels={ru: "Жим лёжа", en: "Bench press"}
 ```
 
-Неправильно:
+Never duplicate an exercise for an English label, use translated text as a foreign key, change API codes on locale switches or automatically translate custom/user-generated names.
 
-- создавать второе упражнение ради английского названия;
-- использовать translated label как foreign key;
-- менять stable API code при переключении языка;
-- автоматически переводить custom/user-generated name.
-
-Для catalog/search:
-
-- разные языковые labels и aliases ведут к одной canonical entity;
-- aliases имеют source/scope/ownership;
-- matching/import не должен менять identity;
-- API явно возвращает stable code/id и requested/fallback labels;
-- exports/imports используют machine-stable fields.
+Localized catalog/search aliases must resolve to the same canonical entity, retain source/scope/ownership and never change identity during matching/import. APIs should return stable ID/code plus requested/fallback labels; exports/imports use machine-stable fields.
 
 ## Formatting
 
-Используй стандартные locale-aware formatter APIs и актуальные CLDR/Intl semantics вместо ручных
-шаблонов.
+Use standard CLDR/Intl locale-aware formatters, not ad hoc templates. Verify plural categories, decimal/group separators, dates, timezones and DST, relative time, units/ranges, percentages, currencies where relevant and week starts/calendar conventions.
 
-Проверяй:
+Store canonical machine values independently of presentation, without translating/rounding DB values for UI. For fitness verify `кг/lb`, `км/mi`, `см/in`, `ккал`, `г`, `уд/мин`, durations and ranges. Unit choice and locale are separate settings.
 
-- cardinal/ordinal plural forms;
-- decimal/group separators;
-- date/time order;
-- timezone и daylight-saving boundaries;
-- relative time;
-- units, ranges и abbreviations;
-- percentages;
-- currency, если применимо;
-- first day of week и calendar assumptions, если они влияют на продукт.
+## Backend and notifications
 
-Храни canonical machine value отдельно от presentation. Не переводить и не округлять данные в БД
-ради UI.
+Return stable machine-readable error codes; localize messages at a defined boundary. Translated messages alone must not form an API contract. Server notifications use the policy-defined user locale at generation time; background jobs must not depend on process-global locale. Store locale/version when replay must be reproducible; avoid logging full private notification text.
 
-Для fitness продукта отдельно проверь `кг/lb`, `км/mi`, `см/in`, `ккал`, `г`, `уд/мин`, duration и
-range formatting. Unit preference и locale - разные настройки.
+## Multilingual public SEO
 
-## Backend, API и notifications
+Decide URL strategy before translating at scale; preserve default URLs. Index each locale only when full content is reviewed. Set appropriate same-locale canonical URLs (unless documented otherwise), reciprocal `hreflang` only for real equivalents, and sitemaps only for canonical/indexable/reviewed URLs. Preserve locale in internal links where practical. Title/description/OG/structured data must match displayed content. Do not index partial/empty/machine draft pages. Treat redirects as URL migration, not string translation.
 
-- Возвращай stable machine-readable error codes и локализуй user-facing message на определённой
-  границе.
-- Не делай translated message единственным API contract.
-- Server-generated notifications используют locale пользователя на момент формирования по
-  зафиксированной policy.
-- Background jobs не должны зависеть от process-global locale.
-- Сохраняй locale/translation version там, где повторный render должен быть воспроизводимым.
-- Не логируй полный private notification content без необходимости.
+Use `$seo-auditor` for technical SEO and `$evidence-content-editor` for public editorial material.
 
-## Public routes и SEO
+## Telegram Mini App and bot
 
-Для multilingual public surface:
+Telegram `language_code` is an initial automatic hint, **not** trusted identity or permanent override. Web/TMA share account preferences/resources. Runtime language changes should preserve forms, workouts and navigation. BackButton, safe areas, theme and platform controls do not need separate localization trees. Localize bot commands/menus/profile only within current bot scopes. Do not create an English news/channel pipeline if the approved channel remains Russian.
 
-- зафиксируй URL strategy до массового перевода;
-- сохраняй стабильность default-language URLs;
-- каждая indexable locale page имеет полный reviewed content;
-- canonical указывает на canonical URL того же locale, если архитектура не задаёт другое обоснованное
-  правило;
-- reciprocal `hreflang` публикуется только для реально существующих эквивалентов;
-- sitemap содержит только canonical/indexable/reviewed locale URLs;
-- internal links по возможности сохраняют locale;
-- title/description/OG/structured data соответствуют visible content;
-- empty, partial или machine-draft page не индексируется;
-- redirects рассматриваются как URL migration, а не как перевод строки.
-
-Используй `$seo-auditor` для technical SEO и `$evidence-content-editor` для публичных материалов.
-
-## Telegram Mini App и бот
-
-- Telegram `language_code` - initial auto signal, не trusted identity и не вечный override.
-- TMA использует тот же account preference и resources, что Web.
-- Runtime language switch не должен терять форму, workout или navigation state без причины.
-- `BackButton`, safe areas, theme и platform controls не требуют отдельного translation tree.
-- Bot commands/menu/profile localization делай только в рамках текущей bot architecture и command
-  scopes.
-- Не создавай English channel/news pipeline, если project scope оставляет канал русскоязычным.
-
-Используй также `$telegram-engineer`.
+Also load `$telegram-engineer` when relevant.
 
 ## User-generated content
 
-Не переводи автоматически:
+Never automatically translate names, notes, trainer comments, messages, custom exercises or uploaded programs. Surrounding UI may be localized, and an explicit user-initiated translation feature could be added only under a separate task.
 
-- имена;
-- заметки;
-- trainer comments;
-- сообщения;
-- custom exercises;
-- uploaded program content.
+## Text review
 
-Можно локализовать surrounding labels и предоставить явный пользовательский перевод как отдельную
-функцию, если он когда-либо появится.
+Judge naturalness, domain terminology, audience clarity, voice, consistency, absence of ambiguous health claims and length/layout effects, not literal word-for-word match. Never claim native-speaker review unless performed and attributed; otherwise disclose the limit.
 
-## Качество текста
+## UI and accessibility
 
-Translation review проверяет не буквальное совпадение, а:
-
-- естественность;
-- терминологию продукта и домена;
-- ясность для целевой аудитории;
-- tone of voice;
-- consistency;
-- отсутствие двусмысленных health/fitness promises;
-- длину и layout impact.
-
-Не заявляй, что проведён native review, если его фактически не было. Зафиксируй, кто и как выполнил
-review, либо честно укажи ограничение.
-
-## UI и accessibility
-
-Проверяй минимум:
-
-- длинные строки и кнопки;
-- narrow mobile/TMA widths;
-- line wrapping и truncation;
-- tables/charts/tooltips;
-- form labels/errors/hints;
-- keyboard/focus;
-- screen-reader names;
-- alt text;
-- light/dark;
-- locale switch accessibility;
-- mixed-language states.
-
-Не заменяй видимый label на tooltip-only перевод.
+Verify long strings/buttons, narrow mobile/TMA, wrapping/truncation, tables/charts/tooltips, form hints/errors, keyboard/focus, screen-reader names, alt text, themes, locale-switch accessibility and mixed-language states. Do not replace visible labels with tooltip-only translations.
 
 ## Tests
 
-Автоматизируй применимые проверки:
+Cover resolver/manual override, pre-auth/auth persistence, fallback/missing keys, interpolation/plurals, dates/numbers/units/timezones, stable domain identities/bilingual search, backend messages, public routing/canonical/hreflang/sitemap, Web/TMA continuity, absent raw enum/keys, critical-flow language consistency, pseudo-localization/controlled long strings and build/type/lint/E2E.
 
-- locale resolver и manual override;
-- pre-auth/auth persistence;
-- fallback/missing key;
-- interpolation/plurals;
-- dates/numbers/units/timezones;
-- stable domain identity и bilingual search;
-- backend errors/notifications;
-- public route/canonical/hreflang/sitemap;
-- Web/TMA continuity;
-- no raw enum/internal key;
-- no mixed-language critical flow;
-- pseudo-localization или controlled long-string mode;
-- build/type/lint и focused e2e.
+Use `references/LOCALIZATION_ARCHITECTURE_CHECKLIST.md` and `references/LOCALIZATION_REGRESSION_MATRIX.md`.
 
-Для полной работы прочитай:
+## Do not
 
-- `references/LOCALIZATION_ARCHITECTURE_CHECKLIST.md`;
-- `references/LOCALIZATION_REGRESSION_MATRIX.md`.
+Create a frontend tree per language, use runtime machine translation as source of truth, translate user content automatically, override manual preferences on every detection, translate DB IDs, index machine drafts, mass-replace text without context/grammar review or invent native reviewer evidence.
 
-## Не делай
+## Final report
 
-- отдельный frontend tree на каждый язык;
-- runtime machine translation как source of truth;
-- автоматический перевод user-generated content;
-- locale detection, которая каждый раз перезаписывает manual choice;
-- translated database identifiers;
-- indexable machine drafts;
-- массовую замену строк без проверки context и grammar;
-- фиктивный native review.
-
-## Финальный отчёт
-
-Укажи:
-
-- locale contract и priority;
-- resources/domain/public content, которые изменены;
-- persistence и Web/TMA continuity;
-- formatting и SEO decisions;
-- review, реально выполненный для текста;
-- tests и известные untranslated/out-of-scope surfaces.
+Record locale contract/precedence, changed resources/domain/public content, storage and Web/TMA continuity, formatting/SEO choices, actual text review, tests and untranslated/out-of-scope surfaces.

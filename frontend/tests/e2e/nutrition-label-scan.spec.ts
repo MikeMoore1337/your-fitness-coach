@@ -386,6 +386,10 @@ for (const current of cases) {
     await expectNoHorizontalOverflow(page);
 
     await page.reload();
+    const reloadedBreakfast = page.getByRole('region', { name: 'Завтрак' });
+    const reloadedToggle = reloadedBreakfast.getByRole('button', { name: 'Завтрак', exact: true });
+    await expect(reloadedToggle).toHaveAttribute('aria-expanded', 'false');
+    await reloadedToggle.click();
     await expect(
       page.locator('.nutrition-entry').filter({ hasText: 'Шоколад с орехами' }),
     ).toBeVisible();

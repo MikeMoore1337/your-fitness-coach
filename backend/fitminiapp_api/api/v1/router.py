@@ -7,12 +7,15 @@ from fitminiapp_api.api.v1 import (
     bot,
     check_ins,
     coach,
+    coach_nutrition_proposals,
     demo,
     hermes,
     hermes_articles,
     me,
     notifications,
     nutrition,
+    nutrition_imports,
+    nutrition_notes,
     program_imports,
     programs,
     public,
@@ -38,6 +41,11 @@ api_router.include_router(
     program_imports.router, prefix="/programs/imports", tags=["program-imports"]
 )
 api_router.include_router(coach.router, prefix="/coach", tags=["coach"])
+api_router.include_router(
+    coach_nutrition_proposals.router,
+    prefix="/coach-nutrition-proposals",
+    tags=["coach-nutrition-proposals"],
+)
 api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(workout_copy.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(
@@ -50,6 +58,12 @@ api_router.include_router(workout_previous_note.router, prefix="/workouts", tags
 api_router.include_router(workout_rest.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(check_ins.router, prefix="/check-ins", tags=["check-ins"])
 api_router.include_router(nutrition.router, prefix="/nutrition", tags=["nutrition"])
+api_router.include_router(
+    nutrition_notes.router, prefix="/nutrition-notes", tags=["nutrition-notes"]
+)
+api_router.include_router(
+    nutrition_imports.router, prefix="/nutrition/imports", tags=["nutrition-imports"]
+)
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(
     report_handoffs.router, prefix="/report-handoffs", tags=["report-handoffs"]

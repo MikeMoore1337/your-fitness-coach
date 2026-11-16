@@ -471,6 +471,7 @@ export function MealTemplateBrowser({
   diaryDate,
   mealType,
   mealEntries,
+  initialTemplateId = null,
   demoSafeMode = false,
   onCompleted,
   onCancel,
@@ -478,6 +479,7 @@ export function MealTemplateBrowser({
   diaryDate: string;
   mealType: MealType;
   mealEntries: FoodDiaryEntry[];
+  initialTemplateId?: number | null;
   demoSafeMode?: boolean;
   onCompleted: (response: FoodDiaryBatchResponse) => void;
   onCancel: () => void;
@@ -487,7 +489,7 @@ export function MealTemplateBrowser({
   const [editing, setEditing] = useState<{ name: string; items: TemplateDraftItem[] } | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
   const [targetMeal, setTargetMeal] = useState<MealType>(mealType);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(initialTemplateId);
   const [operationError, setOperationError] = useState('');
   const insertKeyRef = useRef<{ templateId: number; mealType: MealType; key: string } | null>(null);
   const insertInFlightRef = useRef(false);

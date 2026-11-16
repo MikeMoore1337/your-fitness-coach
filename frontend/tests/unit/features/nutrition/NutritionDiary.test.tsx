@@ -13,7 +13,15 @@ import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 const apiMock = vi.hoisted(() => vi.fn());
 const useAuthMock = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
+vi.mock('../../../../src/shared/api/client', () => ({
+  api: (path: string, ...args: unknown[]) =>
+    path === '/api/v1/nutrition-notes/consent'
+      ? Promise.resolve({ status: 'revoked' })
+      : apiMock(path, ...args),
+  AUTH_ACCOUNT_SWITCH_EVENT: 'fit:auth-account-switch',
+  AUTH_LOGOUT_EVENT: 'fit:auth-logout',
+  AUTH_VERIFIED_LOGIN_EVENT: 'fit:auth-verified-login',
+}));
 vi.mock('../../../../src/app/AuthProvider', () => ({ useAuth: useAuthMock }));
 vi.mock('../../../../src/features/nutrition/HydrationTracker', () => ({
   HydrationTracker: ({ diaryDate }: { diaryDate: string }) => (
@@ -116,7 +124,11 @@ const zeroNutrition = {
   fiber_g: null,
 };
 
-function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: boolean } = {}) {
+function renderDiary({
+  initialFoodQuickAdd = false,
+  readOnlyEntries = false,
+  demoSafeMode = false,
+}: { initialFoodQuickAdd?: boolean; readOnlyEntries?: boolean; demoSafeMode?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -126,6 +138,8 @@ function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: bo
         <NutritionDiary
           initialDate="2026-08-19"
           initialFoodQuickAdd={initialFoodQuickAdd}
+          readOnlyEntries={readOnlyEntries}
+          demoSafeMode={demoSafeMode}
           timeZone="Europe/Moscow"
         />
       </FeedbackProvider>
@@ -148,6 +162,78 @@ describe('NutritionDiary', () => {
   afterEach(() => {
     vi.useRealTimers();
     cleanup();
+  });
+
+  it('uses the same primary style and plus icon for food and water actions', () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary();
+
+    const food = screen.getByTestId('nutrition-add-product');
+    const water = screen.getByRole('button', { name: 'Добавить воду' });
+    expect(food).toHaveClass('ui-button--primary');
+    expect(water).toHaveClass('ui-button--primary');
+    expect(food.querySelector('svg')).toHaveAttribute('data-icon', 'plus');
+    expect(water.querySelector('svg')).toHaveAttribute('data-icon', 'plus');
+  });
+
+  it('explains why copying is unavailable when the day is empty', async () => {
+    apiMock.mockResolvedValue(makeDay([]));
+    renderDiary();
+
+    const button = await screen.findByRole('button', { name: 'Копировать день' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('В этом дне нет записей для копирования.');
+    expect(screen.getAllByText('Пока без записей')).toHaveLength(4);
+  });
+
+  it('shows the existing goal when a macro total is unknown', async () => {
+    const day = makeDay();
+    day.totals = { ...day.totals, protein_g: null };
+    day.remaining!.protein_g = null;
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(within(summary).getByText('Нет данных')).toBeVisible();
+    expect(within(summary).getByText('Цель: 140 г')).toBeVisible();
+    expect(within(summary).queryByRole('progressbar', { name: /Белки/ })).not.toBeInTheDocument();
+  });
+
+  it('preserves a zero goal and zero consumption', async () => {
+    const day = makeDay([]);
+    day.targets!.energy_kcal = '0';
+    day.remaining!.energy_kcal = '0';
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(
+      within(summary).getByRole('progressbar', { name: 'Калории: 0 из 0 ккал' }),
+    ).toBeVisible();
+    expect(within(summary).getByText('Осталось 0 ккал')).toBeVisible();
+  });
+
+  it('preserves the significant excess status', async () => {
+    const day = makeDay();
+    day.totals = { ...day.totals, energy_kcal: '2400' };
+    day.remaining!.energy_kcal = '-400';
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = await screen.findByRole('complementary', { name: 'КБЖУ' });
+    expect(within(summary).getByText('Выше ориентира на 400 ккал')).toBeVisible();
+  });
+
+  it('shows the unavailable copy action and its explanation in read-only demo', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ readOnlyEntries: true });
+
+    const button = await screen.findByRole('button', { name: 'Копировать день' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      /копирование существующих записей доступно после входа/,
+    );
+    expect(screen.getByText(/копирование существующих записей доступно после входа/)).toBeVisible();
   });
 
   it('opens the quick food entry requested by the global action', async () => {
@@ -176,7 +262,7 @@ describe('NutritionDiary', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(
       expect.arrayContaining([
-        'Это всё за сегодня?',
+        'Проверка дневника',
         'Еда',
         'Завтрак',
         'Обед',
@@ -189,11 +275,15 @@ describe('NutritionDiary', () => {
     const sectionOrder = screen
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)
-      .filter((heading) =>
-        ['Это всё за сегодня?', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
-      );
-    expect(sectionOrder).toEqual(['КБЖУ', 'Это всё за сегодня?', 'Еда', 'Напитки']);
+      .filter((heading) => ['Проверка дневника', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''));
+    expect(sectionOrder).toEqual(['КБЖУ', 'Еда', 'Напитки', 'Проверка дневника']);
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
+    expect(screen.getByText('Б 18,5')).not.toBeVisible();
+
+    const breakfastToggle = within(breakfastSection()).getByRole('button', { name: 'Завтрак' });
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(breakfastToggle);
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Б 18,5')).toBeVisible();
 
     expect(screen.queryByRole('navigation', { name: 'Дата дневника' })).not.toBeInTheDocument();
@@ -201,16 +291,23 @@ describe('NutritionDiary', () => {
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2026-08-18'),
     );
+    await waitFor(() =>
+      expect(within(breakfastSection()).getByRole('button', { name: 'Завтрак' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      ),
+    );
   });
 
-  it('offers one deterministic prior-meal repeat as the Nutrition default', async () => {
+  it('repeats one meal in one press, offers the next meal and can undo it', async () => {
+    let logged = false;
     apiMock.mockImplementation((path: string, options?: { method?: string }) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) {
         return Promise.resolve({
-          ...makeDay([]),
+          ...makeDay(logged ? [entry] : []),
           repeat_candidate: {
             source_date: '2026-08-18',
-            source_meal_type: 'breakfast',
+            source_meal_type: logged ? 'lunch' : 'breakfast',
             entry_count: 1,
           },
         });
@@ -227,21 +324,207 @@ describe('NutritionDiary', () => {
           previewed_at: '2026-08-19T08:00:00Z',
         });
       }
+      if (path.endsWith('/copy/meal') && options?.method === 'POST') {
+        logged = true;
+        return Promise.resolve({ entries: [entry], replayed: false });
+      }
+      if (path.endsWith(`/entries/${entry.id}~undo`) && options?.method === 'DELETE') {
+        logged = false;
+        return Promise.resolve();
+      }
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderDiary();
 
     const defaultRepeat = await screen.findByTestId('nutrition-repeat-default');
-    expect(screen.getByText('Повторить вчерашний завтрак')).toBeVisible();
-    expect(defaultRepeat).toHaveClass('ui-button--primary');
-    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--secondary');
+    expect(screen.getByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
+    expect(defaultRepeat).toHaveClass('ui-button--secondary');
+    expect(within(breakfastSection()).getByTestId('nutrition-repeat-default')).toBeVisible();
+    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--primary');
+    const breakfast = within(breakfastSection()).getByRole('button', { name: 'Завтрак' });
+    const lunch = within(screen.getByRole('region', { name: 'Обед' })).getByRole('button', {
+      name: 'Обед',
+    });
+    fireEvent.click(breakfast);
+    fireEvent.click(breakfast);
+    fireEvent.click(lunch);
     fireEvent.click(defaultRepeat);
-    expect(await screen.findByRole('heading', { name: 'Повторить приём пищи' })).toBeVisible();
-    expect(await screen.findByText('Овсяная каша', { selector: 'strong' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled();
+    expect(await screen.findByText('Завтрак добавлен')).toBeVisible();
+    expect(await screen.findByText('Обед за 18.08.2026 — в дневник за 19.08.2026')).toBeVisible();
+    expect(breakfast).toHaveAttribute('aria-expanded', 'false');
+    expect(lunch).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/nutrition/diary/copy/meal',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Require-Empty-Meal': 'true' }),
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Отменить повтор завтрака' }));
+    expect(await screen.findByText('Повтор завтрака отменён')).toBeVisible();
+    expect(
+      await screen.findByText('Завтрак за 18.08.2026 — в дневник за 19.08.2026'),
+    ).toBeVisible();
+    expect(apiMock).toHaveBeenCalledWith(`/api/v1/nutrition/diary/entries/${entry.id}~undo`, {
+      method: 'DELETE',
+      headers: { 'X-Diary-Entry-Version': entry.created_at },
+    });
   });
 
-  it('keeps empty meals compact and lets every meal be expanded or collapsed', async () => {
+  it.each([
+    ['breakfast', 'Завтрак'],
+    ['lunch', 'Обед'],
+    ['dinner', 'Ужин'],
+    ['snacks', 'Перекусы'],
+  ] as const)('offers %s repeat in the collapsed meal with both dates', async (meal, label) => {
+    apiMock.mockResolvedValue({
+      ...makeDay([]),
+      repeat_candidate: { source_date: '2026-08-12', source_meal_type: meal, entry_count: 1 },
+    });
+    renderDiary();
+    const section = await screen.findByRole('region', { name: label });
+    expect(within(section).getByRole('button', { name: label })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(
+      within(section).getByText(`${label} за 12.08.2026 — в дневник за 19.08.2026`),
+    ).toBeVisible();
+    expect(within(section).getByTestId('nutrition-repeat-default')).toBeVisible();
+    expect(screen.getAllByTestId('nutrition-repeat-default')).toHaveLength(1);
+  });
+
+  it('does not offer a repeat for an empty source', async () => {
+    apiMock.mockResolvedValue({
+      ...makeDay([]),
+      repeat_candidate: {
+        source_date: '2026-08-18',
+        source_meal_type: 'breakfast',
+        entry_count: 0,
+      },
+    });
+    renderDiary();
+    await screen.findByRole('region', { name: 'Завтрак' });
+    expect(screen.queryByTestId('nutrition-repeat-default')).not.toBeInTheDocument();
+  });
+
+  it('retries an uncertain quick repeat with the same preview and idempotency key', async () => {
+    let attempts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?'))
+        return Promise.resolve({
+          ...makeDay([]),
+          repeat_candidate: {
+            source_date: '2026-08-18',
+            source_meal_type: 'breakfast',
+            entry_count: 1,
+          },
+        });
+      if (path.endsWith('/copy/meal/preview'))
+        return Promise.resolve({ preview_token: 'preview-token-1234567890' });
+      if (path.endsWith('/copy/meal') && options?.method === 'POST') {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new Error('timeout'))
+          : Promise.resolve({ entries: [entry], replayed: true });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    fireEvent.click(await screen.findByTestId('nutrition-repeat-default'));
+    expect(
+      await screen.findByText('Не удалось проверить, добавлен ли завтрак. Попробуйте ещё раз.'),
+    ).toBeVisible();
+    fireEvent.click(screen.getByTestId('nutrition-repeat-default'));
+    expect(await screen.findByText('Завтрак добавлен')).toBeVisible();
+    const requests = apiMock.mock.calls.filter(([path]) => String(path).endsWith('/copy/meal'));
+    expect(requests).toHaveLength(2);
+    expect(requests[0]?.[1]).toEqual(requests[1]?.[1]);
+    expect(
+      apiMock.mock.calls.filter(([path]) => String(path).endsWith('/copy/meal/preview')),
+    ).toHaveLength(1);
+  });
+
+  it('keeps hydration available when the food diary fails to load', async () => {
+    apiMock.mockRejectedValue(new Error('Не удалось загрузить дневник'));
+    renderDiary();
+    expect(await screen.findByText('Не удалось загрузить дневник')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Гидратация' })).toBeVisible();
+  });
+
+  it('keeps confirmation for Yesterday inside a meal', async () => {
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.endsWith('/copy/meal/preview'))
+        return Promise.resolve({
+          copy_scope: 'meal',
+          source_date: '2026-08-18',
+          source_meal_type: 'breakfast',
+          target_date: '2026-08-19',
+          target_meal_type: 'breakfast',
+          entries: [entry],
+          preview_token: 'preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00Z',
+        });
+      if (path.endsWith('/copy/meal') && options?.method === 'POST')
+        return Promise.resolve({ entries: [entry] });
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    const breakfast = await screen.findByRole('heading', { name: 'Завтрак' });
+    const section = breakfast.closest('section') as HTMLElement;
+    fireEvent.click(within(section).getByRole('button', { name: 'Завтрак' }));
+    fireEvent.click(within(section).getByRole('button', { name: 'Повторить вчера' }));
+    expect(await screen.findByRole('dialog', { name: 'Повторить приём пищи' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Подтвердить' })).toBeEnabled();
+    expect(apiMock.mock.calls.filter(([path]) => String(path).endsWith('/copy/meal'))).toHaveLength(
+      0,
+    );
+  });
+
+  it('keeps the last-meal undo visible and allows retry after a partial failure', async () => {
+    const secondEntry = { ...entry, id: 42, food_name: 'Второй продукт' };
+    let logged = false;
+    let secondAttempts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?'))
+        return Promise.resolve({
+          ...makeDay(logged ? [entry, secondEntry] : []),
+          repeat_candidate: logged
+            ? null
+            : { source_date: '2026-08-18', source_meal_type: 'breakfast', entry_count: 2 },
+        });
+      if (path.endsWith('/copy/meal/preview'))
+        return Promise.resolve({ preview_token: 'preview-token-1234567890' });
+      if (path.endsWith('/copy/meal') && options?.method === 'POST') {
+        logged = true;
+        return Promise.resolve({ entries: [entry, secondEntry] });
+      }
+      if (path.endsWith(`/entries/${entry.id}~undo`)) return Promise.resolve();
+      if (path.endsWith(`/entries/${secondEntry.id}~undo`)) {
+        secondAttempts += 1;
+        if (secondAttempts === 1) return Promise.reject({ status: 409 });
+        logged = false;
+        return Promise.reject({ status: 404 });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    fireEvent.click(await screen.findByTestId('nutrition-repeat-default'));
+    const undo = await screen.findByRole('button', { name: 'Отменить повтор завтрака' });
+    await waitFor(() =>
+      expect(screen.queryByTestId('nutrition-repeat-default')).not.toBeInTheDocument(),
+    );
+    fireEvent.click(undo);
+    expect(
+      await screen.findByText('Не удалось отменить повтор. Проверьте записи завтрака.'),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить отмену завтрака' }));
+    expect(await screen.findByText('Повтор завтрака отменён')).toBeVisible();
+    expect(secondAttempts).toBe(2);
+  });
+
+  it('starts all meals collapsed and preserves manual expand/collapse', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary();
 
@@ -251,11 +534,16 @@ describe('NutritionDiary', () => {
     const breakfastToggle = within(breakfast).getByRole('button', { name: 'Завтрак' });
     const lunchToggle = within(lunch).getByRole('button', { name: 'Обед' });
 
-    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
     expect(lunchToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(breakfast).getByText('Овсяная каша')).not.toBeVisible();
     expect(
       within(lunch).queryByText('Добавьте продукт — недавние будут под рукой.'),
     ).not.toBeVisible();
+
+    fireEvent.click(breakfastToggle);
+    expect(breakfastToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(breakfast).getByText('Овсяная каша')).toBeVisible();
 
     fireEvent.click(lunchToggle);
     expect(lunchToggle).toHaveAttribute('aria-expanded', 'true');
@@ -263,7 +551,46 @@ describe('NutritionDiary', () => {
 
     fireEvent.click(breakfastToggle);
     expect(breakfastToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(within(breakfast).queryByText('Овсяная каша')).not.toBeVisible();
+    expect(within(breakfast).getByText('Овсяная каша')).not.toBeVisible();
+  });
+
+  it('shows each meal’s server totals, preserving unknown values and fractional grams', async () => {
+    const day = makeDay([]);
+    day.meals = [
+      {
+        meal_type: 'breakfast',
+        entries: [entry],
+        totals: { ...nutrition, energy_kcal: '153', protein_g: '17.14', fat_g: '3.56' },
+      },
+      {
+        meal_type: 'lunch',
+        entries: [{ ...entry, id: 42, meal_type: 'lunch', entry_kind: 'quick_add' }],
+        totals: { ...nutrition, energy_kcal: '207', protein_g: null, fat_g: '0', carbs_g: null },
+      },
+      {
+        meal_type: 'dinner',
+        entries: [{ ...entry, id: 44, meal_type: 'dinner' }],
+        totals: { ...nutrition, energy_kcal: '501', protein_g: '24.5' },
+      },
+      {
+        meal_type: 'snacks',
+        entries: [{ ...entry, id: 43, meal_type: 'snacks' }],
+        totals: { ...nutrition, energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0' },
+      },
+    ];
+    apiMock.mockResolvedValue(day);
+    renderDiary();
+
+    const summary = (name: string) =>
+      screen.getByRole('region', { name }).querySelector('.nutrition-meal__header > div > span');
+    await screen.findByRole('region', { name: 'Завтрак' });
+    expect(summary('Завтрак')).toHaveTextContent('153 ккал · Б 17,1 · Ж 3,6 · У 54 г · 1 запись');
+    expect(summary('Обед')).toHaveTextContent('207 ккал · Б — · Ж 0 · У — г · 1 запись');
+    expect(summary('Ужин')).toHaveTextContent('501 ккал · Б 24,5 · Ж 12 · У 54 г · 1 запись');
+    expect(summary('Перекусы')).toHaveTextContent('0 ккал · Б 0 · Ж 0 · У 0 г · 1 запись');
+
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
+    expect(summary('Завтрак')).toHaveTextContent('Б 17,1');
   });
 
   it('uses Russian plural forms in compact meal summaries', async () => {
@@ -298,6 +625,7 @@ describe('NutritionDiary', () => {
     renderDiary();
 
     expect(await screen.findByText('День без приёмов пищи', { selector: 'strong' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Изменить статус/ }));
     expect(screen.getByText(/только если сознательно не ели весь день/i)).toBeVisible();
     expect(screen.queryByText(/пост/i)).not.toBeInTheDocument();
   });
@@ -345,6 +673,9 @@ describe('NutritionDiary', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(await screen.findByText('Овсяная каша')).toBeVisible();
+    expect(
+      breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+    ).toHaveTextContent('420 ккал · Б 18,5 · Ж 12 · У 54 г · 1 запись');
     expect(localStorage.getItem('fit_food_draft_10_2026-08-19_breakfast')).toBeNull();
   });
 
@@ -370,6 +701,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findByText('Овсяная каша');
 
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Изменить Овсяная каша' }));
     const breakfast = breakfastSection();
     const draftAmount = within(breakfast).getByRole('spinbutton', { name: 'Количество' });
@@ -409,7 +741,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
 
-    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.click(screen.getByTestId('nutrition-add-product'));
+    fireEvent.click(await screen.findByRole('button', { name: /Быстрый ввод/ }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
       target: { value: '530' },
     });
@@ -484,7 +817,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
 
-    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.click(screen.getByTestId('nutrition-add-product'));
+    fireEvent.click(await screen.findByRole('button', { name: /Быстрый ввод/ }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
       target: { value: '680' },
     });
@@ -531,7 +865,12 @@ describe('NutritionDiary', () => {
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderDiary();
-    expect(await screen.findByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
+    const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: 'День заполнен' })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
 
@@ -542,6 +881,102 @@ describe('NutritionDiary', () => {
       }),
     );
     expect(await screen.findByText('Подтверждено')).toBeVisible();
+  });
+
+  it('keeps a failed status action available for retry without claiming success', async () => {
+    let attempts = 0;
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        return Promise.resolve(
+          attempts > 1 ? { ...makeDay(), status: 'complete', status_is_explicit: true } : makeDay(),
+        );
+      }
+      if (path === '/api/v1/nutrition/diary/status' && options?.method === 'PUT') {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new Error('Нет соединения'))
+          : Promise.resolve({ ...makeDay(), status: 'complete', status_is_explicit: true });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+    fireEvent.click(toggle);
+    expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/nutrition/diary/status')).toBe(
+      false,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
+    expect(await screen.findByText('Нет соединения')).toBeVisible();
+    expect(screen.getByText('Не подтверждено')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    expect(await screen.findByText('Подтверждено')).toBeVisible();
+    const requests = apiMock.mock.calls.filter(
+      ([path]) => path === '/api/v1/nutrition/diary/status',
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.[1]?.body).toEqual({ diary_date: '2026-08-19', status: 'complete' });
+  });
+
+  it('keeps a pending result on its original date after the day changes', async () => {
+    let finish: (day: FoodDiaryDay) => void = () => {};
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        const date = new URL(path, 'http://localhost').searchParams.get('diary_date');
+        return Promise.resolve({ ...makeDay(), diary_date: date ?? '2026-08-19' });
+      }
+      if (path === '/api/v1/nutrition/diary/status' && options?.method === 'PUT') {
+        return new Promise<FoodDiaryDay>((resolve) => {
+          finish = resolve;
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'Отметить день без приёмов пищи' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'День заполнен' }));
+    fireEvent.click(screen.getByRole('button', { name: /четверг, 20 августа/i }));
+    await waitFor(() => expect(screen.getByText('Гидратация за 2026-08-20')).toBeVisible());
+    await act(async () => finish({ ...makeDay(), status: 'complete', status_is_explicit: true }));
+    expect(screen.getByText('Не подтверждено')).toBeVisible();
+    expect(screen.queryByText('Подтверждено')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['complete', true, 'День заполнен', 'Подтверждено'],
+    ['incomplete', false, 'Заполнен частично', 'Не подтверждено'],
+    ['fasted', true, 'День без приёмов пищи', 'Подтверждено'],
+    ['unlogged', false, 'Не подтверждено', 'Не подтверждено'],
+  ] as const)(
+    'shows %s status with explicitness',
+    async (status, explicit, label, confirmation) => {
+      apiMock.mockResolvedValue({ ...makeDay(), status, status_is_explicit: explicit });
+      renderDiary();
+      const toggle = await screen.findByRole('button', { name: /Изменить статус/ });
+      expect(toggle).toHaveTextContent(label);
+      expect(toggle).toHaveTextContent(confirmation);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    },
+  );
+
+  it('keeps status actions disabled in read-only mode', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ readOnlyEntries: true });
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Отметить день без приёмов пищи' })).toBeDisabled();
+    expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/nutrition/diary/status')).toBe(
+      false,
+    );
+  });
+
+  it('does not permit status changes in demo mode even when entries are editable', async () => {
+    apiMock.mockResolvedValue(makeDay());
+    renderDiary({ demoSafeMode: true });
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByRole('button', { name: 'День заполнен' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Заполнен частично' })).toBeDisabled();
   });
 
   it('tracks an explicit incomplete-day confirmation without diary details', async () => {
@@ -559,7 +994,8 @@ describe('NutritionDiary', () => {
     });
 
     renderDiary();
-    expect(await screen.findByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: /Изменить статус/ }));
+    expect(screen.getByText('Заполнен частично', { selector: 'strong' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Заполнен частично' }));
 
     await waitFor(() =>
@@ -629,10 +1065,19 @@ describe('NutritionDiary', () => {
     let currentEntries = [entry];
     apiMock.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) {
-        return Promise.resolve(makeDay(currentEntries));
+        const day = makeDay(currentEntries);
+        day.meals[0]!.totals = currentEntries[0]?.nutrition ?? zeroNutrition;
+        return Promise.resolve(day);
       }
       if (path.endsWith('/entries/41') && options?.method === 'PATCH') {
-        currentEntries = [{ ...entry, amount: '150.000', weight_g: '150.000' }];
+        currentEntries = [
+          {
+            ...entry,
+            amount: '150.000',
+            weight_g: '150.000',
+            nutrition: { ...nutrition, energy_kcal: '630', protein_g: '27.75' },
+          },
+        ];
         return Promise.resolve(currentEntries[0]);
       }
       if (path.endsWith('/entries/41') && options?.method === 'DELETE') {
@@ -644,6 +1089,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findByText('Овсяная каша');
 
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Изменить Овсяная каша' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Количество' }), {
       target: { value: '150' },
@@ -655,6 +1101,11 @@ describe('NutritionDiary', () => {
         expect.objectContaining({ method: 'PATCH', body: { amount: 150, amount_unit: 'g' } }),
       ),
     );
+    await waitFor(() =>
+      expect(
+        breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+      ).toHaveTextContent('630 ккал · Б 27,8 · Ж 12 · У 54 г · 1 запись'),
+    );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Удалить Овсяная каша' }));
     const confirmDialog = await screen.findByRole('dialog', { name: 'Удалить запись?' });
@@ -665,6 +1116,9 @@ describe('NutritionDiary', () => {
       }),
     );
     await waitFor(() => expect(screen.queryByText('Овсяная каша')).not.toBeInTheDocument());
+    expect(
+      breakfastSection().querySelector('.nutrition-meal__header > div > span'),
+    ).toHaveTextContent('Пока без записей');
   });
 
   it('retries the day and keeps favorites usable when recent products fail', async () => {
@@ -1161,6 +1615,7 @@ describe('NutritionDiary', () => {
     );
     renderDiary();
     await screen.findByText('Овсяная каша');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
     const submit = await screen.findByRole('button', { name: 'Подтвердить' });
@@ -1239,6 +1694,7 @@ describe('NutritionDiary', () => {
 
     renderDiary();
     await screen.findByText('Овсяная каша');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: 'Завтрак' }));
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));

@@ -1,0 +1,148 @@
+{
+  "schema_version": "nutrition-import-v2",
+  "source": {
+    "provider": "fixture_provider",
+    "source": "diary_export",
+    "source_version": null,
+    "adapter_version": "fixture-v2",
+    "source_format": "csv",
+    "transport": "upload",
+    "publication_rights": "unknown"
+  },
+  "completeness": "partial",
+  "rows": [],
+  "original_totals": [],
+  "original_summaries": [
+    {
+      "header_coordinates": {
+        "section": "period_summary",
+        "section_kind": "summary",
+        "row": 2
+      },
+      "header_label": "  Синтетический заголовок  ",
+      "aggregation": {
+        "kind": "unknown",
+        "evidence": "unknown"
+      },
+      "period_start": "2031-02-01",
+      "period_end": "2031-02-28",
+      "period_coordinates": {
+        "section": "metadata",
+        "section_kind": "unknown",
+        "row": 1
+      },
+      "timezone": null,
+      "rows": [
+        {
+          "coordinates": {
+            "section": "period_summary",
+            "section_kind": "summary",
+            "row": 3
+          },
+          "source_label": "  Синтетическая группа A  ",
+          "scope": "meal",
+          "meal_type": null,
+          "values": [
+            {
+              "source_column": 2,
+              "source_header": "  Энергия (пример)  ",
+              "source_value": " 17,2300 ",
+              "nutrient_field": "energy_kcal",
+              "mapping_evidence": "source_label",
+              "fact": {
+                "value": "17.2300",
+                "unit": "kcal",
+                "evidence": "read"
+              }
+            },
+            {
+              "source_column": 3,
+              "source_header": "Жиры (пример)",
+              "source_value": "",
+              "nutrient_field": "fat_g",
+              "mapping_evidence": "source_label",
+              "fact": {
+                "value": null,
+                "unit": "g",
+                "evidence": "absent"
+              }
+            },
+            {
+              "source_column": 4,
+              "source_header": "Углеводы (пример)",
+              "source_value": "0,00",
+              "nutrient_field": "carbohydrate_g",
+              "mapping_evidence": "source_label",
+              "fact": {
+                "value": "0.00",
+                "unit": "g",
+                "evidence": "read"
+              }
+            },
+            {
+              "source_column": 5,
+              "source_header": "Белок (пример)",
+              "source_value": "2,30",
+              "nutrient_field": "protein_g",
+              "mapping_evidence": "source_label",
+              "fact": {
+                "value": "2.30",
+                "unit": "g",
+                "evidence": "read"
+              }
+            },
+            {
+              "source_column": 6,
+              "source_header": "Неизвестная мера (пример)",
+              "source_value": " 0,00 ",
+              "nutrient_field": null,
+              "mapping_evidence": "unknown",
+              "fact": {
+                "value": "0.00",
+                "unit": null,
+                "source_unit": "пример единицы",
+                "evidence": "read"
+              }
+            }
+          ]
+        },
+        {
+          "coordinates": {
+            "section": "period_summary",
+            "section_kind": "summary",
+            "row": 4
+          },
+          "source_label": "Итог (пример)",
+          "scope": "overall",
+          "meal_type": null,
+          "values": [
+            {
+              "source_column": 2,
+              "source_header": "Энергия (пример)",
+              "source_value": "18,00",
+              "nutrient_field": "energy_kcal",
+              "mapping_evidence": "source_label",
+              "fact": {
+                "value": "18.00",
+                "unit": "kcal",
+                "evidence": "read"
+              }
+            }
+          ]
+        }
+      ],
+      "period_label": "  Пример периода  "
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "summary_aggregation_unknown",
+      "severity": "warning",
+      "coordinates": {
+        "section": "period_summary",
+        "section_kind": "summary",
+        "row": 2
+      }
+    }
+  ]
+}

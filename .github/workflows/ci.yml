@@ -185,12 +185,16 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         lane: [checks, unit]
     env:
+      UV_SYSTEM_PYTHON: "0"
+      UV_MANAGED_PYTHON: "1"
       ALLURE_RESULTS_DIR: ${{ matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
       ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
     steps:
@@ -207,24 +211,28 @@ jobs:
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
           echo "CI_CACHE package=npm path=$(npm config get cache)"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
-        if: matrix.lane == 'checks'
         with:
           version: "0.11.32"
           enable-cache: true
           cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: frontend
+      - name: Install container-compatible Python 3.14
+        run: |
+          uv python install 3.14
+          python_path="$(uv python find --managed-python 3.14)"
+          "$python_path" -c 'import ssl; print(ssl.OPENSSL_VERSION)'
+          echo "$(dirname "$python_path")" >> "$GITHUB_PATH"
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Install PR Playwright browser
+      - name: Verify Chromium and system libraries
         if: matrix.lane == 'checks'
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
+          node -e 'const { chromium } = require("@playwright/test"); (async () => { const browser = await chromium.launch(); const page = await browser.newPage(); await page.setContent("<title>Chromium ready</title>"); if (await page.title() !== "Chromium ready") throw new Error("Chromium page failed"); console.log(`Chromium ${browser.version()} launched`); await browser.close(); })().catch(error => { console.error(error); process.exit(1); });'
       - name: Install scheduled Vitest reporter
         if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
@@ -236,6 +244,10 @@ jobs:
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
         run: python scripts/ci_contract.py run-group frontend-checks
       - name: Run shared frontend unit group
         if: matrix.lane == 'unit'
@@ -258,6 +270,11 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
     runs-on: ubuntu-latest
+    # Use the same immutable Playwright runtime proven by mobile regression.
+    # This image already contains Chromium and its system libraries; avoid
+    # running apt on every shard, even if the browser cache is warm.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -276,7 +293,6 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - uses: actions/setup-python@v5
-        if: needs.scope-router.outputs.run_scheduled_report == 'true'
         with:
           python-version: "3.14"
       - name: Report npm cache
@@ -293,15 +309,35 @@ jobs:
       - name: Build frontend for smoke tests
         working-directory: frontend
         run: npx vite build
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
+      # Exercise the actual pre-change JS and the v2 bundle on one origin.
+      # Use an immutable PR base SHA rather than a moving dev ref.
+      - name: Checkout pre-change hydration frontend
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1459
+        uses: actions/checkout@v4
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-      - name: Install Playwright Chromium
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .artifacts/runtime/tests/legacy-hydration-source
+          persist-credentials: false
+      - name: Build pre-change hydration frontend
+        if: github.event_name == 'pull_request' && github.event.pull_request.number == 1459
+        env:
+          LEGACY_FRONTEND: ${{ github.workspace }}/.artifacts/runtime/tests/legacy-hydration-source/frontend
+        run: |
+          ln -s "$GITHUB_WORKSPACE/frontend/node_modules" "$LEGACY_FRONTEND/node_modules"
+          (cd "$LEGACY_FRONTEND" && "$GITHUB_WORKSPACE/frontend/node_modules/.bin/vite" build)
+          test -f "$LEGACY_FRONTEND/dist/index.html"
+          # Browser preload/fetch requests can bypass Playwright's page route.
+          # Serve both hashed asset graphs from the same real preview origin.
+          cp -an "$LEGACY_FRONTEND/dist/assets/." "$GITHUB_WORKSPACE/frontend/dist/assets/"
+      - name: Verify baked Playwright Chromium
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
+          npx playwright --version
+          test -d /ms-playwright
       - name: Run shared frontend E2E group
+        env:
+          YFC_LEGACY_HYDRATION_DIST: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1459 && format('{0}/.artifacts/runtime/tests/legacy-hydration-source/frontend/dist', github.workspace) || '' }}
         run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
       - name: Upload Playwright traces on failure
         if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
@@ -690,12 +726,20 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_migrated_stack == 'true'
     runs-on: ubuntu-latest
+    # Preinstalled Chromium and apt libraries avoid 8-minute Ubuntu font mirror stalls.
+    # Service containers use Docker DNS when the job itself runs in a container.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
     timeout-minutes: 20
     env:
+      # setup-python's Ubuntu 26.04 toolcache links to OpenSSL 3.3, unavailable
+      # in this pinned Ubuntu 24.04 image. Use uv's portable Python instead.
+      UV_SYSTEM_PYTHON: "0"
+      UV_MANAGED_PYTHON: "1"
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
-      postgres:
+      db:
         image: postgres:16-alpine
         env:
           POSTGRES_DB: fitminiapp_test
@@ -720,9 +764,6 @@ jobs:
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
           echo "CI_CACHE package=npm path=$(npm config get cache)"
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
         with:
           version: "0.11.32"
@@ -730,14 +771,14 @@ jobs:
           cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: migrated-stack
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install container-compatible Python 3.14
+        run: |
+          uv python install 3.14
+          "$(uv python find --managed-python 3.14)" -c 'import ssl; print(ssl.OPENSSL_VERSION)'
       - name: Sync stack dependencies
         run: |
           uv sync --locked --no-default-groups --extra backend --group dev
+          .venv/bin/python -c 'import ssl, psycopg; print(ssl.OPENSSL_VERSION, psycopg.__version__)'
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
           npm --prefix frontend ci
       - name: Sync scheduled Pytest Allure adapter
@@ -747,9 +788,12 @@ jobs:
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
-      - name: Install Playwright Chromium
+      - name: Verify baked Playwright Chromium
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: |
+          test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
+          npx playwright --version
+          test -d /ms-playwright
       - name: Build frontend preview
         working-directory: frontend
         run: npm run build
@@ -761,8 +805,8 @@ jobs:
           APP_DEBUG: "false"
           ACCESS_TOKEN_EXPIRE_MINUTES: "60"
           REFRESH_TOKEN_EXPIRE_DAYS: "30"
-          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
-          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
+          DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@db:5432/fitminiapp_test
+          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@db:5432/fitminiapp_test
           ENABLE_DEV_AUTH: "true"
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token

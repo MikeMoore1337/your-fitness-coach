@@ -18,7 +18,7 @@ UPSTREAM_TAG = "v2026.8.31"
 UPSTREAM_COMMIT = "29112bef099274229cadff79cdff7bf7b99c4b77"
 UPSTREAM_REPOSITORY = "https://github.com/NousResearch/hermes-agent.git"
 BASE_IMAGE = "python:3.13-alpine"
-BASE_DIGEST = "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee"
+BASE_DIGEST = "sha256:d76f585fb0d5107dd47143da5e61554fd9cae656a30f3470f815cb8475769b6a"
 TRIVY_IMAGE = (
     "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"
 )

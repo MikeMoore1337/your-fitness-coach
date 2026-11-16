@@ -7,33 +7,20 @@ description: >
 
 # flaky-analysis
 
-Retry - сигнал, а не исправление.
+A retry is a signal, not a fix.
 
-## Ищи
+## Investigate
 
-- async race;
-- action/request observer ordering;
-- animation/hydration race;
-- unstable selectors;
-- shared mutable state;
-- order dependency;
-- parallel worker collision;
-- clock/timezone dependency;
-- external network dependency;
-- stale auth/session;
-- nondeterministic seed;
-- cleanup leak;
-- resource contention;
-- environment-specific viewport/browser behavior.
+Async races, observer/action ordering, animation/hydration races, unstable selectors, shared mutable state, order dependencies, parallel worker collisions, clock/timezone dependencies, external networks, stale authentication/session, nondeterministic seeds, cleanup leaks, resource contention and environment-specific browser/viewport behavior.
 
 ## Method
 
-1. установи конкретный symptom;
-2. сравни first failure и retry/pass;
-3. проверь isolation и parallelism;
-4. найди nondeterministic boundary;
-5. устрани причину condition-based synchronization/isolation/data fix;
-6. сохрани сильный assertion;
-7. повтори targeted run достаточное число раз согласно project policy.
+1. Establish the exact symptom.
+2. Compare first failure against retry/pass.
+3. Inspect isolation and parallelism.
+4. Identify the nondeterministic boundary.
+5. Remove its cause through condition-based synchronization, isolation or corrected test data.
+6. Preserve strong assertions.
+7. Repeat targeted runs sufficiently according to project policy.
 
-Не повышай timeout и retries как основной fix без доказанной причины.
+Do not treat increased timeouts/retries as the primary fix without evidence of the root cause.

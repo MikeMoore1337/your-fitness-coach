@@ -8,113 +8,43 @@ description: >
 
 # mobile-engineer
 
-В v6 этот skill намеренно узкий.
+This v6 skill intentionally has a narrow scope.
 
-## Не владеет
+## Outside this skill
 
-- общей visual composition - `$product-designer`;
-- обычной responsive CSS implementation - `$frontend-engineer`;
-- Telegram Bot/Mini App API contracts - `$telegram-engineer`;
-- general UI audit - `$ui-audit`.
+- General visual composition: `$product-designer`.
+- Ordinary responsive CSS: `$frontend-engineer`.
+- Telegram Bot/Mini App APIs: `$telegram-engineer`.
+- General UI audits: `$ui-audit`.
 
-## Trigger
+## Triggers
 
-Используй при изменении/риске:
+Use for changes/risks involving mobile keyboards, input mode/focus recovery, safe areas, `visualViewport`, dynamic/stable heights, foreground/background, reload/resume, minimize/restore, offline/reconnect, touch-only behavior, stuck hover, gestures/pointers, device memory/main-thread performance or Mobile Web/TMA runtime differences.
 
-- mobile keyboard;
-- input mode/focus restoration;
-- safe areas;
-- `visualViewport`;
-- dynamic/stable viewport height;
-- foreground/background;
-- reload/resume;
-- minimize/restore;
-- offline/reconnect;
-- touch-only behavior;
-- stuck hover;
-- gesture/pointer specifics;
-- device memory/main-thread cost;
-- Mobile Web/TMA runtime differences.
+## YFC context
 
-## Контекст YFC
-
-Учитывай:
-
-- телефон во время тренировки;
-- одна рука;
-- короткие паузы;
-- повторные taps;
-- пот/движение;
-- interruptions;
-- плохую сеть;
-- keyboard;
-- смену orientation/viewport;
-- foreground return.
+Account for phone use during workouts: one-handed interaction, short pauses, repeated taps, sweat/movement, interruptions, unreliable connections, keyboard, orientation/viewport changes and return to foreground.
 
 ## Forms
 
-Проверяй:
+Verify `type`, `inputMode`, `enterKeyHint`, autocomplete, numeric keyboards, focus, visible errors, CTA while keyboard is open, recoverable drafts and avoidance of layout jumps.
 
-- `type`;
-- `inputMode`;
-- `enterKeyHint`;
-- autocomplete;
-- numeric keyboard;
-- focus;
-- error visibility;
-- CTA при открытой keyboard;
-- сохранение recoverable draft;
-- отсутствие layout jump.
+## Safe areas and viewport
 
-## Safe areas / viewport
+Fixed/sticky UI must not cover content or focused fields, conflict with bottom navigation or hide under system/Telegram chrome. Changing viewport, theme or background must not unnecessarily reset route/dialog/form state.
 
-Fixed/sticky UI не должен:
+## Lifecycle and network
 
-- перекрывать content;
-- перекрывать focused field;
-- конфликтовать с bottom navigation;
-- уходить под system/Telegram chrome.
-
-Смена viewport/theme/background не должна необоснованно сбрасывать route/dialog/form state.
-
-## Lifecycle / network
-
-Для critical flow проверяй по scope:
-
-- reload;
-- resume;
-- background/foreground;
-- offline/reconnect;
-- stale server state;
-- repeated submit;
-- local draft recovery.
+For critical flows, test relevant reload, resume, background/foreground, offline/reconnect, stale server state, repeated submit and local draft recovery.
 
 ## TMA
 
-Для Telegram-specific API/initData/BackButton/deep link используй `$telegram-engineer`.
-
-Этот skill проверяет только smartphone runtime parity и physical interaction.
+Use `$telegram-engineer` for Telegram APIs, initData, BackButton and deep links. This skill covers smartphone runtime parity and physical interaction only.
 
 ## Performance
 
-Desktop localhost не является доказательством mobile quality.
-
-Измеряй при необходимости:
-
-- main-thread blocking;
-- memory growth;
-- animation jank;
-- keyboard/sheet jank;
-- resume cost;
-- media loading;
-- duplicate bundles.
+Desktop localhost cannot prove mobile quality. Measure main-thread blocking, memory, animation/keyboard/sheet stutter, resume cost, media loading and duplicate bundles when relevant.
 
 ## Verification
 
-Выбирай representative viewports по task, обычно:
-
-- 360;
-- 390;
-- 430;
-
-и применимые keyboard/touch/lifecycle states.
+Choose representative task-specific viewports, usually widths 360, 390 and 430, plus applicable keyboard/touch/lifecycle states.

@@ -1775,12 +1775,11 @@ body:has(.app-shell--design-v2) {
 
 .nutrition-diary--design-v2 .nutrition-diary__intro {
   align-items: flex-start;
-  padding-bottom: var(--v2-space-4);
-  border-bottom: 1px solid var(--v2-border);
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__intro .eyebrow,
-.nutrition-diary--design-v2 .nutrition-day-summary__head .eyebrow {
+.nutrition-diary--design-v2 .nutrition-day-summary__head .eyebrow,
+.nutrition-diary--design-v2 .nutrition-food-card__header .eyebrow {
   color: var(--v2-accent-text);
   font-size: 0.68rem;
   letter-spacing: 0.12em;
@@ -1789,9 +1788,10 @@ body:has(.app-shell--design-v2) {
 .nutrition-diary--design-v2 .nutrition-diary__intro h1 {
   margin-top: var(--v2-space-1);
   color: var(--v2-text-primary);
-  font-size: clamp(2.7rem, 5vw, 4rem);
+  font-size: clamp(2.25rem, 5vw, 2.75rem);
   letter-spacing: -0.055em;
   line-height: 0.95;
+  text-transform: uppercase;
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__intro p {
@@ -1800,21 +1800,15 @@ body:has(.app-shell--design-v2) {
   font-size: 0.9rem;
 }
 
-.nutrition-diary--design-v2 .nutrition-diary__primary-action {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: var(--v2-space-2);
-  min-height: 44px;
-  min-width: 0;
-  white-space: nowrap;
-}
-
 .nutrition-diary--design-v2 .nutrition-completeness {
   border-color: var(--v2-border);
   border-radius: var(--v2-control-radius);
-  background: var(--v2-surface-secondary);
+  background: var(--v2-surface);
+}
+
+.nutrition-diary--design-v2 .nutrition-completeness .nutrition-completeness__toggle:focus-visible {
+  outline: 1px solid var(--v2-focus);
+  outline-offset: 2px;
 }
 
 .nutrition-diary--design-v2 .nutrition-entry__title > div > span,
@@ -1851,6 +1845,7 @@ body:has(.app-shell--design-v2) {
 
 .nutrition-diary--design-v2 .nutrition-meal__header h2 {
   color: var(--v2-text-primary);
+  font-family: var(--font-body);
   font-size: 1.05rem;
   font-weight: 700;
 }
@@ -1898,6 +1893,51 @@ body:has(.app-shell--design-v2) {
   display: none;
 }
 
+.nutrition-notes-controls,
+.nutrition-personal-notes {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4) 0;
+  border-top: 1px solid var(--v2-border);
+}
+
+.nutrition-notes-controls p,
+.nutrition-personal-notes p {
+  margin: 0;
+  color: var(--v2-text-secondary);
+}
+
+.nutrition-personal-notes fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.nutrition-personal-notes__choices,
+.nutrition-personal-notes__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  margin-top: var(--v2-space-2);
+}
+
+.nutrition-personal-notes__choices button {
+  flex: 1 1 4rem;
+  min-height: 44px;
+}
+
+.nutrition-personal-notes textarea {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-top: var(--v2-space-2);
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+}
+
 .nutrition-diary--design-v2 .nutrition-meal__content .nutrition-meal__secondary-actions {
   justify-content: flex-end;
   margin-top: calc(-1 * var(--v2-space-2));
@@ -1924,7 +1964,7 @@ body:has(.app-shell--design-v2) {
   padding: var(--v2-space-5);
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
-  background: var(--v2-surface-secondary);
+  background: var(--v2-surface);
 }
 
 .nutrition-diary--design-v2 .nutrition-day-summary__head h2 {
@@ -3605,7 +3645,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .nutrition-diary--design-v2 .nutrition-diary__intro h1 {
-    font-size: clamp(2.55rem, 13vw, 3.25rem);
+    font-size: clamp(2.25rem, 10vw, 2.5rem);
   }
 
   .nutrition-diary--design-v2 .nutrition-day-summary {

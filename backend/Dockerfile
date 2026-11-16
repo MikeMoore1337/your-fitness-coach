@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Python 3.14.10 (security maintenance), immutable multi-platform image digest.
-FROM python:3.14-slim@sha256:930e1abba7c4e8f96ed93e8012c35d174d7732752731bbd5e8e757d7ec6f3966
+FROM python:3.14-slim@sha256:af8a5aa14780025dbfbcfbc81bd8a91ebd87711dd5b0f48ed71090949dd7cb1d
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -25,10 +25,12 @@ RUN apt-get update \
         fonts-dejavu-core \
         libbrotli1=1.1.0-2+deb13u1 \
         libexpat1 \
+        libseccomp2 \
         libgl1 \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-rus \
+        zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge "1.1.0-2+deb13u1" \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libexpat1)" ge "2.9.0-1~deb13u1" \
     && rm -rf /var/lib/apt/lists/*

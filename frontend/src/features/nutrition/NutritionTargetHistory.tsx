@@ -30,14 +30,24 @@ function macroDiff(previous: NutritionTarget, current: NutritionTarget): string[
   ];
 }
 
-export function NutritionTargetHistory({ targetTelegramId }: { targetTelegramId?: number | null }) {
+export function NutritionTargetHistory({
+  targetTelegramId,
+  clientId,
+}: {
+  targetTelegramId?: number | null;
+  clientId?: number;
+}) {
   const history = useQuery({
-    queryKey: queryKeys.nutrition.targetHistory(targetTelegramId),
+    queryKey: clientId
+      ? ['coach-nutrition-target-history', clientId]
+      : queryKeys.nutrition.targetHistory(targetTelegramId),
     queryFn: () =>
       api<NutritionTargetHistory>(
-        `/api/v1/nutrition/targets/history${
-          targetTelegramId ? `?target_telegram_user_id=${targetTelegramId}` : ''
-        }`,
+        clientId
+          ? `/api/v1/coach-nutrition-proposals/clients/${clientId}/target-history`
+          : `/api/v1/nutrition/targets/history${
+              targetTelegramId ? `?target_telegram_user_id=${targetTelegramId}` : ''
+            }`,
       ),
   });
   const items = history.data?.items ?? [];

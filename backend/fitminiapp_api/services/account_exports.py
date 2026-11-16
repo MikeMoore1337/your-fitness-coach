@@ -50,7 +50,7 @@ def _csv_cell(value: object) -> object:
         return ""
     encoded = jsonable_encoder(value)
     if isinstance(encoded, str):
-        if encoded.startswith(("=", "+", "-", "@", "\t", "\r")):
+        if encoded.startswith(("\t", "\r")) or encoded.lstrip().startswith(("=", "+", "-", "@")):
             return f"'{encoded}"
         return encoded
     if isinstance(encoded, (int, float, bool)):
@@ -328,6 +328,20 @@ def build_account_export_archive(db: Session, user: User) -> tuple[bytes, str]:
                 "mood",
                 "note",
                 "source",
+                "created_at",
+                "updated_at",
+            ),
+        ),
+        "nutrition-meal-notes.csv": _csv_bytes(
+            _rows(payload.get("nutrition_meal_notes")),
+            (
+                "local_date",
+                "meal_type",
+                "timezone_at_entry",
+                "hunger_before",
+                "fullness_after",
+                "energy",
+                "note",
                 "created_at",
                 "updated_at",
             ),

@@ -10,20 +10,17 @@ description: >
 
 ## Principles
 
-- один тест - один значимый behavior/risk;
-- arrange/act/assert должен читаться без реконструкции скрытого состояния;
-- параметризуй одинаковую логику, но не превращай кейсы в нечитаемую таблицу;
-- fixture должна описывать состояние/ресурс, а не скрывать основное действие теста;
-- scope fixture выбирай по isolation cost, а не ради скорости любой ценой;
-- monkeypatch/mock применяй на boundary, который действительно не является целью теста;
-- exception test должен проверять тип и значимый contract ошибки;
-- regression test воспроизводит исходный defect и падает без исправления.
+- One test should cover one meaningful behavior or risk.
+- Arrange/act/assert should be understandable without reconstructing hidden state.
+- Parametrize repeated logic without building unreadable test-case tables.
+- Fixtures describe state/resources; they must not hide the test's primary action.
+- Select fixture scope based on isolation cost, not speed at any cost.
+- Use monkeypatch/mocks at a boundary that is genuinely outside test scope.
+- Exception tests assert the exception type and meaningful error contract.
+- Regression tests reproduce the original defect and fail without the fix.
 
 ## Integration
 
-Для БД подключай `$database-validation`.
-Для API - `$api-testing`.
-Для данных - `$test-data-management`.
-Для flaky symptom - `$flaky-analysis`.
+For databases use `$database-validation`; for APIs use `$api-testing`; for test data use `$test-data-management`; for flaky behavior use `$flaky-analysis`.
 
-Используй существующие YFC pytest wrappers/config и не создавай альтернативный test runner.
+Reuse existing YFC pytest wrappers/configuration; do not introduce another test runner.

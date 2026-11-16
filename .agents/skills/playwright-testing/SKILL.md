@@ -8,84 +8,66 @@ description: >
 
 # playwright-testing
 
-Пиши Playwright-тесты, которые доказывают пользовательское поведение и дают понятный failure evidence.
+Write Playwright tests that actually prove user behavior and produce actionable failure evidence.
 
 ## Baseline
 
-- предпочитай semantic locators: role/label/name;
-- CSS/test id используй, когда semantic contract недостаточен или проверяется geometry/style;
-- используй web-first assertions и auto-wait;
-- не используй фиксированные sleeps;
-- каждый тест должен быть изолирован и не зависеть от порядка;
-- shared setup оформляй через fixtures/helpers, а не module-level mutable state;
-- URL/config/auth должны переиспользовать существующую project infrastructure;
-- не добавляй новый fixture layer, если существующий YFC harness решает задачу.
+- Prefer semantic locators using role, label and accessible name.
+- Use CSS/test IDs only when semantic contracts are insufficient or geometry/style is under test.
+- Use web-first assertions and automatic waiting; avoid fixed sleeps.
+- Keep tests independent of ordering and isolated.
+- Put shared setup in fixtures/helpers, not module-level mutable state.
+- Reuse existing project URLs, configuration, authentication and test infrastructure.
+- Do not add a competing fixture layer when the YFC harness already covers the need.
 
 ## Test intent
 
-Перед кодом сформулируй:
+Before coding, state:
 
-- Given: какое состояние гарантированно создано;
-- When: какое пользовательское действие выполняется;
-- Then: какой наблюдаемый результат обязан быть доказан.
+- Given: the state guaranteed to exist.
+- When: the user action performed.
+- Then: the observable result the test must prove.
 
-Если сценарий обещает persistence/backend side effect, одного визуального изменения недостаточно.
-Добавь доказательство request/response, persisted state или reload/re-entry по подходящему уровню.
+If the scenario promises persistence or a backend side effect, a visual change alone is insufficient. Verify request/response, persisted state, reload or re-entry at the appropriate level.
 
-## Locators
+## Locator order
 
-Приоритет:
+1. `getByRole` with accessible name.
+2. `getByLabel`.
+3. Stable project-owned test ID.
+4. Scoped text locator.
+5. CSS for structure, geometry or a visual contract.
+6. XPath only when alternatives are impractical.
 
-1. `getByRole` с accessible name;
-2. `getByLabel`;
-3. устойчивый project-owned test id;
-4. scoped text locator;
-5. CSS только для структуры/geometry/visual contract;
-6. XPath - только при обоснованной невозможности остальных вариантов.
-
-Не превращай accessible copy в нестабильный глобальный substring selector.
+Never turn accessible copy into a fragile global substring selector.
 
 ## Assertions and waiting
 
-- assertion должен проверять обещанное состояние, а не существование handle;
-- после navigation/action жди нужный outcome, а не произвольную паузу;
-- для запросов arm observer/interception до action;
-- отсутствие элемента доказывай только после доказанного состояния, в котором он обязан исчезнуть;
-- коллекцию сначала докажи непустой, если дальнейшие assertions проходят циклом по элементам.
+- Assert the promised state, not merely existence of an element handle.
+- After navigation/actions, wait for the required outcome rather than a fixed delay.
+- Arm request observers/interception **before** triggering the action.
+- Assert absence only after proving the UI reached a state in which the element must disappear.
+- Prove collections are nonempty before relying on assertions inside a loop.
 
 ## Network and mocking
 
-- не mock собственный YFC слой только ради зелёного E2E, если цель теста - проверить сквозной contract;
-- third-party dependencies можно стабилизировать через controlled mocks;
-- optimistic UI mutation для критичного write-flow должна иметь call/persistence proof;
-- учитывай offline/reconnect только когда это часть task/risk.
+- Do not mock YFC's own layer merely to turn an end-to-end contract test green.
+- Stabilize third-party dependencies with controlled mocks when appropriate.
+- For critical optimistic writes, prove the call and persistence.
+- Cover offline/reconnect only when relevant to the task or risk.
 
-## Auth
+## Authentication
 
-Используй существующий auth fixture/storageState/setup project.
-Не храни literal credentials в spec.
-Protected-route тест обязан доказать, что проверяет нужную authenticated surface, а не fallback/login page.
+Reuse project auth fixtures, `storageState` and setup. Never hardcode literal credentials in test specs. A protected-route test must prove it reached the intended authenticated surface, not a login/fallback page.
 
 ## Mobile/TMA
 
-Соблюдай YFC Mobile/TMA acceptance matrix.
-Отдельно фиксируй automated viewport evidence и real Telegram evidence.
-Проверяй keyboard, safe areas, touch, sticky layers, viewport resize, reload/resume, если применимо.
+Follow the YFC Mobile/TMA acceptance matrix. Report automated viewport evidence separately from real Telegram device evidence. Check keyboard, safe areas, touch, sticky layers, viewport resizing and reload/resume where relevant.
 
-## Visual/geometry
+## Visual and geometry checks
 
-Screenshot baseline полезен только для стабильного contract.
-Для touch targets, overlap, clipping, centering и safe-area допустимы explicit geometry assertions.
-Перед non-null geometry assertions убедись, что locator действительно должен быть rendered/visible.
+Screenshot baselines are valuable only for stable contracts. Explicit geometry assertions may verify touch targets, overlap, clipping, centering and safe areas. Confirm the locator should be rendered/visible before making non-null geometry assertions.
 
 ## Failure evidence
 
-При падении предпочитай существующие:
-
-- trace;
-- screenshot;
-- video;
-- Playwright report;
-- request/console evidence.
-
-Не чинить selector до выяснения, product defect это или test defect.
+Prefer existing traces, screenshots, videos, Playwright reports and request/console evidence. Determine whether a failure is a product defect or a test defect before editing selectors.
