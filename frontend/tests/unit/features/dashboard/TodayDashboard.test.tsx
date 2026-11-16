@@ -583,16 +583,20 @@ describe('TodayDashboard', () => {
     expect(future).toHaveTextContent('По программе');
     expect(future).not.toHaveTextContent('1450');
     expect(future).not.toHaveTextContent('Осталось');
+    expect(future).not.toHaveTextContent('День отмечен как постный');
     expect(future.querySelector('a')).toBeNull();
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2030-01-11');
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/hydration?diary_date=2030-01-11');
     fireEvent.click(days[5]!);
-    expect(screen.queryByText('2200 ккал')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Цель на/ })).not.toBeInTheDocument();
     resolveEmpty({ date: '2030-01-12', origin: 'none', target: null });
-    expect(await screen.findByText('Цель на этот день не задана')).toBeVisible();
+    const empty = await screen.findByText('Цель на этот день не задана');
+    expect(empty).toBeVisible();
+    expect(empty.closest('section')).not.toHaveTextContent('0 ккал');
+    expect(empty.closest('section')?.querySelector('a')).toBeNull();
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2030-01-12');
     fireEvent.click(days[4]!);
-    expect(screen.queryByText('2200 ккал')).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /Цель на/ })).not.toBeInTheDocument();
     resolveRefresh({
       date: '2030-01-11',
       origin: 'date',
