@@ -1167,12 +1167,16 @@ jobs:
         run: |
           set -Eeuo pipefail
           published_repository="${PUBLISHED_REF%:*}"
-          published_digest="$(docker buildx imagetools inspect "$PUBLISHED_REF" --format '{{.Manifest.Digest}}')"
+          # Resolve the digest from a freshly pulled registry image, not a
+          # formatter field which can vary across Buildx/registry versions.
+          docker pull "$PUBLISHED_REF"
+          published_digest="$(docker image inspect "$PUBLISHED_REF" --format '{{json .RepoDigests}}' | PUBLISHED_REPOSITORY="$published_repository" python -c 'import json, os, sys; prefix = os.environ["PUBLISHED_REPOSITORY"] + "@"; matches = {ref[len(prefix):] for ref in json.load(sys.stdin) if ref.startswith(prefix)}; sys.exit("missing or ambiguous published digest") if len(matches) != 1 else print(next(iter(matches)))')"
           [[ "$published_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           immutable_ref="$published_repository@$published_digest"
-          published_image_id="$(docker buildx imagetools inspect "$immutable_ref" --raw | python -c 'import json, sys; print(json.load(sys.stdin)["config"]["digest"])')"
-          test "$published_image_id" = "$EXPECTED_IMAGE_ID"
           docker pull "$immutable_ref"
+          published_image_id="$(docker image inspect "$immutable_ref" --format '{{.Id}}')"
+          [[ "$published_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$published_image_id" = "$EXPECTED_IMAGE_ID"
           oci_revision="$(docker image inspect "$immutable_ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
           architecture="$(docker image inspect "$immutable_ref" --format '{{.Os}}/{{.Architecture}}')"
           test "$architecture" = "linux/amd64"
