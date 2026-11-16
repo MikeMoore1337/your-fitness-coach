@@ -132,6 +132,18 @@ test('FatSecret catalog, recurring template and history remain consistent across
   );
   expect(search.ok()).toBeTruthy();
   expect(JSON.stringify(await search.json())).toContain(product);
+  const otherEntry = await page.request.post(`${base}/api/v1/nutrition/diary/entries`, {
+    headers: headers(otherToken),
+    data: {
+      food_id: catalog.rows[0].food_id,
+      diary_date: '2024-02-28',
+      meal_type: 'lunch',
+      amount: '100',
+      amount_unit: 'g',
+    },
+  });
+  expect(otherEntry.status()).toBe(201);
+  expect(Number((await otherEntry.json()).nutrition.energy_kcal)).toBe(65);
   await page.getByRole('button', { name: 'Посмотреть предложения' }).click();
   await expect(page.getByText('2 из 2 дней')).toBeVisible();
   await page.getByRole('button', { name: 'Проверить состав' }).click();
@@ -203,6 +215,7 @@ test('FatSecret catalog, recurring template and history remain consistent across
   ).toMatchObject({ status: 'incomplete', calories: 65 });
   expect(reportData.summary.logged_days).toBe(0);
   expect(entries(await diary(otherToken, '2024-02-29'))).toHaveLength(0);
+  expect(entries(await diary(otherToken, '2024-02-28'))).toHaveLength(1);
   expect(
     (
       await page.request.get(`${base}/api/v1/nutrition/imports/${draft.id}`, {
