@@ -534,6 +534,101 @@ describe('TodayDashboard', () => {
     expect(nutrition).not.toHaveTextContent('Записей за день пока нет');
   });
 
+  it('uses the dated target for future days without requesting a future diary or retaining the previous target', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-10T12:00:00Z'));
+    useAvailableData({ diaryDay: loggedDiary });
+    const fallback = apiMock.getMockImplementation()!;
+    let resolveEmpty!: (value: unknown) => void;
+    const emptyTarget = new Promise((resolve) => {
+      resolveEmpty = resolve;
+    });
+    let resolveRefresh!: (value: unknown) => void;
+    const refreshedTarget = new Promise((resolve) => {
+      resolveRefresh = resolve;
+    });
+    let firstDayRequests = 0;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) => {
+      if (path.endsWith('/targets/for-date?target_date=2030-01-11')) {
+        firstDayRequests += 1;
+        if (firstDayRequests > 1) return refreshedTarget;
+        return Promise.resolve({
+          date: '2030-01-11',
+          origin: 'schedule',
+          target: { calories: 2200, protein_g: 150, fat_g: 70, carbs_g: 242 },
+        });
+      }
+      if (path.endsWith('/targets/for-date?target_date=2030-01-12')) return emptyTarget;
+      return fallback(path, ...args);
+    });
+    renderDashboard();
+    expect(await screen.findByRole('region', { name: 'Питание на сегодня' })).toHaveTextContent(
+      '1450 / 2100 ккал',
+    );
+    const week = await screen.findByRole('navigation', { name: 'Эта неделя' });
+    const days = week.querySelectorAll<HTMLButtonElement>('button.week-strip__day');
+    fireEvent.click(days[2]!);
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2030-01-09'),
+    );
+    expect(await screen.findByRole('region', { name: /Питание за/ })).toHaveTextContent(
+      '1450 / 2100 ккал',
+    );
+    fireEvent.click(days[4]!);
+    const future = await screen.findByRole('region', { name: /Цель на/ });
+    expect(future).toHaveTextContent('2200 ккал');
+    expect(future).toHaveTextContent('150 г');
+    expect(future).toHaveTextContent('70 г');
+    expect(future).toHaveTextContent('242 г');
+    expect(future).toHaveTextContent('По программе');
+    expect(future).not.toHaveTextContent('1450');
+    expect(future).not.toHaveTextContent('Осталось');
+    expect(future.querySelector('a')).toBeNull();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2030-01-11');
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/hydration?diary_date=2030-01-11');
+    fireEvent.click(days[5]!);
+    expect(screen.queryByText('2200 ккал')).not.toBeInTheDocument();
+    resolveEmpty({ date: '2030-01-12', origin: 'none', target: null });
+    expect(await screen.findByText('Цель на этот день не задана')).toBeVisible();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/diary?diary_date=2030-01-12');
+    fireEvent.click(days[4]!);
+    expect(screen.queryByText('2200 ккал')).not.toBeInTheDocument();
+    resolveRefresh({
+      date: '2030-01-11',
+      origin: 'date',
+      target: { calories: 2400, protein_g: 160, fat_g: 75, carbs_g: 250 },
+    });
+    expect(await screen.findByRole('region', { name: /Цель на/ })).toHaveTextContent('2400 ккал');
+  });
+
+  it('reports a future target error and retries the resolver', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-10T12:00:00Z'));
+    useAvailableData();
+    const fallback = apiMock.getMockImplementation()!;
+    let attempts = 0;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) => {
+      if (path.endsWith('/targets/for-date?target_date=2030-01-11')) {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve({
+              date: '2030-01-11',
+              origin: 'base',
+              target: { calories: 2000, protein_g: 150, fat_g: 70, carbs_g: 180 },
+            });
+      }
+      return fallback(path, ...args);
+    });
+    renderDashboard();
+    const week = await screen.findByRole('navigation', { name: 'Эта неделя' });
+    fireEvent.click(week.querySelectorAll<HTMLButtonElement>('button.week-strip__day')[4]!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Цель питания временно недоступна');
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    expect(await screen.findByRole('region', { name: /Цель на/ })).toHaveTextContent('2000 ккал');
+    expect(attempts).toBe(2);
+  });
+
   it('does not turn missing targets or macro values into zeros', async () => {
     useAvailableData({ diaryDay: diaryWithoutTargets });
     renderDashboard();

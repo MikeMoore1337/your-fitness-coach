@@ -286,16 +286,28 @@ export function formatNutritionDateLabel(value: string, today: string): string {
   return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function useNutritionDay(date: string) {
+function useNutritionDay(date: string, today: string) {
+  const future = date > today;
   const diary = useQuery({
     queryKey: ['nutrition', 'diary', date],
     queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${date}`),
+    enabled: !future,
   });
   const hydration = useQuery({
     queryKey: queryKeys.nutrition.hydrationDate(date),
     queryFn: () => api<HydrationDay>(`/api/v1/nutrition/hydration?diary_date=${date}`),
+    enabled: !future,
   });
-  return { diary, hydration };
+  const target = useQuery({
+    queryKey: ['nutrition', 'targets', 'resolved', date],
+    staleTime: 0,
+    queryFn: () =>
+      api<ApiSchemas['NutritionResolvedTargetResponse']>(
+        `/api/v1/nutrition/targets/for-date?target_date=${date}`,
+      ),
+    enabled: future,
+  });
+  return { diary, hydration, target };
 }
 
 function hasNutritionConfirmation(
@@ -357,7 +369,68 @@ function NutritionSummary({
   nutrition: ReturnType<typeof useNutritionDay>;
   showAction?: boolean;
 }) {
-  const { diary, hydration } = nutrition;
+  const { diary, hydration, target } = nutrition;
+
+  if (date > today) {
+    if (target.isFetching) {
+      return (
+        <section className="today-panel today-summary-card">
+          <div aria-label="Загружаем питание" className="today-summary-skeleton" role="status">
+            <Skeleton height="48px" width="100%" />
+          </div>
+        </section>
+      );
+    }
+    if (target.error || !target.data) {
+      return (
+        <section className="today-panel today-inline-state" role="alert">
+          <strong>Цель питания временно недоступна</strong>
+          <button className="today-text-link" type="button" onClick={() => void target.refetch()}>
+            Повторить
+          </button>
+        </section>
+      );
+    }
+    const title = `Цель на ${formatNutritionDateLabel(date, today)}`;
+    const values = target.data.target;
+    const source = {
+      schedule: 'По программе',
+      date: 'Изменено вручную',
+      base: 'Базовая цель',
+      none: null,
+    }[target.data.origin];
+    return (
+      <section className="today-nutrition" aria-label={title}>
+        <h2>
+          <Icon name="nav-nutrition" size={16} /> {title}
+        </h2>
+        <div className="today-nutrition__content">
+          <div className="today-nutrition__food-group">
+            <div className="today-nutrition__values">
+              {values ? (
+                <>
+                  <p>
+                    <strong>{formatAmount(values.calories)}</strong> ккал
+                  </p>
+                  {source && <p>{source}</p>}
+                  <dl className="today-nutrition__macros" aria-label="Белки, жиры и углеводы">
+                    {nutritionMacroRows.map(({ key, label }) => (
+                      <div key={key}>
+                        <dt>{label}</dt>
+                        <dd>{formatAmount(values[key])} г</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              ) : (
+                <p>Цель на этот день не задана</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (diary.isLoading) {
     return (
@@ -1042,7 +1115,7 @@ export function TodayDashboard({
           }),
         };
   const progress = useProgressSummary();
-  const nutrition = useNutritionDay(selectedDate);
+  const nutrition = useNutritionDay(selectedDate, today);
   const nutritionConfirmed =
     selectedDate === today &&
     hasNutritionConfirmation(nutrition.diary.data, nutrition.hydration.data);

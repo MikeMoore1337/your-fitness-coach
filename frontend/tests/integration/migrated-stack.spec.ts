@@ -763,6 +763,226 @@ test('#952 real browser saves a dated goal on migrated PostgreSQL', async ({ pag
   expect(denied.status()).toBe(409);
 });
 
+testWithoutServiceWorker(
+  '#952 Calendar and Coach OS resolve the same future goal without future diary access',
+  async ({ page, browser }, info) => {
+    test.setTimeout(90_000);
+    const athleteId = Date.now() * 10 + info.workerIndex * 2;
+    const athleteLogin = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: athleteId, full_name: 'Тестовый спортсмен' },
+    });
+    const coachLogin = await page.request.post('/api/v1/auth/dev-login', {
+      data: { telegram_user_id: athleteId + 1, full_name: 'Тестовый тренер', is_coach: true },
+    });
+    expect(athleteLogin.status()).toBe(200);
+    expect(coachLogin.status()).toBe(200);
+    const athleteToken = (await athleteLogin.json()).access_token as string;
+    const coachToken = (await coachLogin.json()).access_token as string;
+    const athleteHeaders = { Authorization: `Bearer ${athleteToken}` };
+    const coachHeaders = { Authorization: `Bearer ${coachToken}` };
+    const me = await page.request.get('/api/v1/me', { headers: athleteHeaders });
+    expect(me.status()).toBe(200);
+    const clientId = (await me.json()).id as number;
+    const invite = await page.request.post('/api/v1/coach/invite-links', { headers: coachHeaders });
+    expect(invite.status()).toBe(201);
+    const code = (await invite.json()).code as string;
+    const accepted = await page.request.post('/api/v1/me/coach-invites/link/confirm', {
+      headers: athleteHeaders,
+      data: { token: code },
+    });
+    expect(accepted.status()).toBe(204);
+    const access = await page.request.get('/api/v1/me/trainer/nutrition-access', {
+      headers: athleteHeaders,
+    });
+    expect(access.status()).toBe(200);
+    const relationshipId = (await access.json()).relationship_id as number;
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Moscow' }).format(
+      new Date(),
+    );
+    const date = new Date(`${today}T12:00:00Z`);
+    const todayWeekday = (date.getUTCDay() + 6) % 7;
+    // On Sunday the week strip has no future day, so advance only the browser calendar to Monday.
+    if (todayWeekday === 6) date.setUTCDate(date.getUTCDate() + 1);
+    const calendarToday = date.toISOString().slice(0, 10);
+    date.setUTCDate(date.getUTCDate() + 1);
+    const future = date.toISOString().slice(0, 10);
+    const futureWeekday = (date.getUTCDay() + 6) % 7;
+    const exercises = await page.request.get('/api/v1/programs/exercises', {
+      headers: athleteHeaders,
+    });
+    expect(exercises.status()).toBe(200);
+    const exercise = (await exercises.json())[0];
+    expect(exercise).toBeTruthy();
+    const template = await page.request.post('/api/v1/programs/templates', {
+      headers: athleteHeaders,
+      data: {
+        title: 'Тестовая программа',
+        goal: 'strength',
+        level: 'beginner',
+        assign_after_create: false,
+        week_cycle: { length_weeks: 1, repeat: true },
+        days: [
+          {
+            title: 'Тестовый день',
+            exercises: [
+              {
+                exercise_id: exercise.id,
+                prescribed_sets: 2,
+                prescribed_reps: '8',
+                rest_seconds: 90,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(template.status()).toBe(200);
+    const assigned = await page.request.post(
+      `/api/v1/programs/templates/${(await template.json()).template.id}/assign-to-me`,
+      {
+        headers: athleteHeaders,
+        data: { start_date: today, duration_weeks: 8, schedule_weekdays: [todayWeekday] },
+      },
+    );
+    expect(assigned.status()).toBe(200);
+    const programId = (await assigned.json()).user_program_id as number;
+    const target = { calories: 2200, protein_g: 150, fat_g: 70, carbs_g: 242 };
+    const rule = await page.request.post('/api/v1/nutrition/targets/schedule', {
+      headers: { ...athleteHeaders, 'Idempotency-Key': `qa952-future-${athleteId}` },
+      data: {
+        ...target,
+        program_id: programId,
+        revision_number: 1,
+        effective_from: future,
+        scope: 'recovery',
+        day_type: 'recovery',
+        week_type: null,
+      },
+    });
+    expect(rule.status()).toBe(200);
+    const forbidden = await page.request.get(`/api/v1/nutrition/diary?diary_date=${future}`, {
+      headers: athleteHeaders,
+    });
+    expect(forbidden.status()).toBe(422);
+    const forbiddenWrite = await page.request.post('/api/v1/nutrition/diary/entries', {
+      headers: { ...athleteHeaders, 'Idempotency-Key': `qa952-future-write-${athleteId}` },
+      data: {
+        diary_date: future,
+        meal_type: 'lunch',
+        amount: '1',
+        amount_unit: 'serving',
+        quick_add: { name: 'Тест', energy_kcal: '500' },
+      },
+    });
+    expect(forbiddenWrite.status()).toBe(422);
+    const resolved = await page.request.get(
+      `/api/v1/nutrition/targets/for-date?target_date=${future}`,
+      { headers: athleteHeaders },
+    );
+    expect(resolved.status()).toBe(200);
+    const canonical = await resolved.json();
+    expect(canonical).toMatchObject({ date: future, origin: 'schedule', target });
+    const trainerDay = await page.request.get(
+      `/api/v1/coach-nutrition-proposals/clients/${clientId}/day?target_date=${future}`,
+      { headers: coachHeaders },
+    );
+    expect(trainerDay.status()).toBe(200);
+    const trainer = await trainerDay.json();
+    expect(trainer).toMatchObject({
+      target_id: canonical.target.id,
+      program: { program_id: programId },
+      binding: { revision_number: 1 },
+      day: { plan_date: future },
+    });
+    expect(Number(trainer.day.targets.energy_kcal)).toBe(2200);
+    expect(Number(trainer.day.targets.protein_g)).toBe(150);
+    expect(Number(trainer.day.targets.fat_g)).toBe(70);
+    expect(Number(trainer.day.targets.carbs_g)).toBe(242);
+
+    const requests: string[] = [];
+    page.on('request', (request) => requests.push(request.url()));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.addInitScript(() =>
+      localStorage.setItem('app-theme', sessionStorage.getItem('qa_theme') ?? 'light'),
+    );
+    await page.addInitScript(
+      (token) => sessionStorage.setItem('fit_access_token', token),
+      athleteToken,
+    );
+    if (todayWeekday === 6)
+      await page.clock.setFixedTime(new Date(`${calendarToday}T12:00:00+03:00`));
+    await page.goto('/app?section=today');
+    const week = page.getByRole('navigation', { name: 'Эта неделя' });
+    const futureButton = week.locator('button.week-strip__day').nth(futureWeekday);
+    await futureButton.focus();
+    await expect(futureButton).toBeFocused();
+    await futureButton.press('Enter');
+    await expect(futureButton).toHaveAttribute('aria-pressed', 'true');
+    const summary = page.getByRole('region', { name: /Цель на/ });
+    await expect(summary).toContainText('2200 ккал');
+    for (const value of ['150 г', '70 г', '242 г', 'По программе'])
+      await expect(summary).toContainText(value);
+    await expect(summary).not.toContainText('Осталось');
+    await expect(summary.getByRole('link', { name: /дневник/i })).toHaveCount(0);
+    expect(requests.some((url) => url.includes(`/nutrition/diary?diary_date=${future}`))).toBe(
+      false,
+    );
+    await page.screenshot({ path: info.outputPath('future-target-desktop-light.png') });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => sessionStorage.setItem('qa_theme', 'dark'));
+    await page.reload();
+    await week.locator('button.week-strip__day').nth(futureWeekday).click();
+    await expect(summary).toContainText('2200 ккал');
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(requests.some((url) => url.includes(`/nutrition/diary?diary_date=${future}`))).toBe(
+      false,
+    );
+    await summary.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('future-target-mobile-dark.png') });
+
+    const coachContext = await browser.newContext({ serviceWorkers: 'block' });
+    const coach = await coachContext.newPage();
+    await coach.addInitScript(
+      (token) => sessionStorage.setItem('fit_access_token', token),
+      coachToken,
+    );
+    if (todayWeekday === 6)
+      await coach.clock.setFixedTime(new Date(`${calendarToday}T12:00:00+03:00`));
+    await coach.goto(`/coach?tab=clients&client_id=${clientId}`);
+    const switchCoach = coach.getByRole('button', { name: 'Тренер', exact: true });
+    if (await switchCoach.isVisible()) await switchCoach.click();
+    await coach.locator('#coach-client-nutrition > summary').click();
+    await coach.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    await expect(coach.locator('.coach-nutrition-assigned')).toContainText('2200 ккал');
+    await expect(coach.locator('.coach-nutrition-assigned')).toContainText(
+      new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+        date,
+      ),
+    );
+    const revoked = await page.request.put('/api/v1/me/trainer/nutrition-access', {
+      headers: athleteHeaders,
+      data: { relationship_id: relationshipId, nutrition_access: false },
+    });
+    expect(revoked.status()).toBe(200);
+    const denied = await page.request.get(
+      `/api/v1/coach-nutrition-proposals/clients/${clientId}/day?target_date=${future}`,
+      { headers: coachHeaders },
+    );
+    expect(denied.status()).toBe(404);
+    await coach.reload();
+    await coach.locator('#coach-client-nutrition > summary').click();
+    await coach.getByRole('button', { name: 'Открыть питание клиента' }).click();
+    await expect(coach.getByText('Доступ к питанию закрыт')).toBeVisible();
+    await expect(coach.locator('.coach-nutrition-assigned')).toHaveCount(0);
+    await coachContext.close();
+  },
+);
+
 const importColumns = [
   'program_title',
   'goal',
