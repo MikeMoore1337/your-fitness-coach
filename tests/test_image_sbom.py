@@ -106,7 +106,7 @@ def test_secret_shaped_sbom_content_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Executes the Linux Actions bash step")
-@pytest.mark.parametrize("failure", [None, "image_id", "revision", "digest", "pull"])
+@pytest.mark.parametrize("failure", [None, "image_id", "revision", "digest", "pull", "pull_tag", "ambiguous_digest"])
 def test_published_sbom_binds_registry_digest_to_scanned_image(tmp_path: Path, failure: str | None):
     root = Path(__file__).resolve().parents[1]
     workflow = yaml.safe_load((root / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
@@ -131,20 +131,31 @@ import sys
 args = sys.argv[1:]
 failure = os.environ['FAILURE']
 digest = 'sha256:' + 'd' * 64
-if args[:3] == ['buildx', 'imagetools', 'inspect']:
-    if args[-1] == '--raw':
-        print(json.dumps({'config': {'digest': 'sha256:' + ('e' if failure == 'image_id' else 'b') * 64}}))
-    else:
-        print('invalid' if failure == 'digest' else digest)
-elif args[0] == 'pull':
-    assert args[1] == 'ghcr.io/example/yfc@' + digest
-    sys.exit(1 if failure == 'pull' else 0)
+tag = 'ghcr.io/example/yfc:' + 'c' * 40
+immutable = 'ghcr.io/example/yfc@' + digest
+if args[0] == 'pull':
+    assert args[1] in (tag, immutable)
+    if (failure == 'pull_tag' and args[1] == tag) or (failure == 'pull' and args[1] == immutable):
+        sys.exit(1)
 elif args[:2] == ['image', 'inspect']:
-    assert args[2] == 'ghcr.io/example/yfc@' + digest
-    if args[-1] == '{{.Os}}/{{.Architecture}}':
-        print('linux/amd64')
+    if args[2] == tag:
+        assert args[-1] == '{{json .RepoDigests}}'
+        if failure == 'digest':
+            print(json.dumps(['ghcr.io/example/yfc@invalid']))
+        elif failure == 'ambiguous_digest':
+            print(json.dumps([immutable, 'ghcr.io/example/yfc@sha256:' + 'f' * 64]))
+        else:
+            print(json.dumps([immutable]))
+    elif args[2] == immutable:
+        if args[-1] == '{{.Id}}':
+            print('sha256:' + ('e' if failure == 'image_id' else 'b') * 64)
+        elif args[-1] == '{{.Os}}/{{.Architecture}}':
+            print('linux/amd64')
+        else:
+            assert args[-1] == '{{index .Config.Labels "org.opencontainers.image.revision"}}'
+            print(('e' if failure == 'revision' else 'c') * 40)
     else:
-        print(('e' if failure == 'revision' else 'c') * 40)
+        raise AssertionError(args)
 else:
     raise AssertionError(args)
 """,
