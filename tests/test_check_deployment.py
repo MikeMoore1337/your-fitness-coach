@@ -117,7 +117,6 @@ def test_production_smoke_requires_safe_environment_and_auth_flags(
     assert "Environment reported by API: prod" in capsys.readouterr().out
 
 
-
 @pytest.mark.parametrize("leaked_status", [200, 302, 404, 500])
 def test_production_smoke_requires_private_nutrition_diary(
     leaked_status: int,
@@ -151,9 +150,7 @@ def test_production_smoke_requires_private_nutrition_diary(
                 final_url=response.final_url,
                 headers=response.headers,
             )
-        return source(
-            base_url, path, timeout=timeout, method=method, body=body, headers=headers
-        )
+        return source(base_url, path, timeout=timeout, method=method, body=body, headers=headers)
 
     with pytest.raises(RuntimeError, match="nutrition diary privacy boundary returned"):
         check_deployment.check_deployment(
