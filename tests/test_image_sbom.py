@@ -106,7 +106,9 @@ def test_secret_shaped_sbom_content_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Executes the Linux Actions bash step")
-@pytest.mark.parametrize("failure", [None, "image_id", "revision", "digest", "pull", "pull_tag", "ambiguous_digest"])
+@pytest.mark.parametrize(
+    "failure", [None, "image_id", "revision", "digest", "pull", "pull_tag", "ambiguous_digest"]
+)
 def test_published_sbom_binds_registry_digest_to_scanned_image(tmp_path: Path, failure: str | None):
     root = Path(__file__).resolve().parents[1]
     workflow = yaml.safe_load((root / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
