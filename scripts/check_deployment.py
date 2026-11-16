@@ -141,6 +141,21 @@ def check_deployment(
             f"authenticated boundary returned {auth_boundary.status}, expected anonymous 401"
         )
 
+    # Release V13 privacy smoke: both V12 and V13 must reject anonymous
+    # access to personal nutrition diary data before or after rollout.
+    if expected_environment == "prod":
+        diary_privacy = reader(
+            base_url,
+            "/api/v1/nutrition/diary?diary_date=2024-02-29",
+            timeout=timeout,
+        )
+        _expect_same_origin(base_url, diary_privacy, "nutrition diary privacy boundary")
+        if diary_privacy.status != 401:
+            raise RuntimeError(
+                "nutrition diary privacy boundary returned "
+                f"{diary_privacy.status}, expected anonymous 401"
+            )
+
     if check_refresh_boundary:
         auth_refresh = reader(
             base_url,
