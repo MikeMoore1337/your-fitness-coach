@@ -15,6 +15,7 @@ from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food_diary import FoodDiaryDayStatus, FoodDiaryEntry
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.nutrition_import_engine import HistoryConfirmRequest
+from fitminiapp_api.services.energy_calibration import _load_inputs
 from fitminiapp_api.services.nutrition_import_drafts import (
     create_nutrition_import_draft,
     nutrition_import_preview,
@@ -360,6 +361,30 @@ def test_confirm_history_keeps_source_snapshot_and_replays(client, rows):
         assert stored.nutrition_snapshot["source"] == "fatsecret"
         assert stored.nutrition_snapshot["source_record_fingerprint"] == stored.request_fingerprint
         assert stored.nutrition_amount["energy_kcal"] == "12.30000001"
+
+
+def test_imported_history_enters_adaptive_inputs_only_after_explicit_completion(client, rows):
+    owner = _auth(client, 984_718)
+    _auth(client, 984_719)
+    owner_id, other_id = _user_id(984_718), _user_id(984_719)
+    day = date(2024, 2, 29)
+    with get_session_context() as db:
+        draft_id = _history_draft(db, db.get(User, owner_id), rows, "adaptive-history-upload").id
+        db.commit()
+    root, payload, _ = _history_confirmation(client, owner, draft_id)
+    assert client.post(f"{root}/confirm", headers=owner, json=payload).status_code == 200
+    with get_session_context() as db:
+        assert _load_inputs(db, db.get(User, owner_id), day, day)[0] == {}
+        assert _load_inputs(db, db.get(User, other_id), day, day)[0] == {}
+    complete = client.put(
+        "/api/v1/nutrition/diary/status",
+        headers=owner,
+        json={"diary_date": day.isoformat(), "status": "complete"},
+    )
+    assert complete.status_code == 200
+    with get_session_context() as db:
+        assert _load_inputs(db, db.get(User, owner_id), day, day)[0] == {day: 12.30000001}
+        assert _load_inputs(db, db.get(User, other_id), day, day)[0] == {}
 
 
 def test_confirm_rechecks_conflicts_after_preview(client, rows):
