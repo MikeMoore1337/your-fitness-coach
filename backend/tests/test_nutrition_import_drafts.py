@@ -109,6 +109,38 @@ def test_stale_revision_expiry_tampering_and_skips_fail_closed(client):
         assert db.get(NutritionImportDraft, draft.id) is None
 
 
+def test_cleanup_is_bounded_and_preserves_unexpired_drafts_and_diary(client):
+    _auth(client, 982_090)
+    _auth(client, 982_091)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    with get_session_context() as db:
+        owners = [db.get(User, _user_id(982_090)), db.get(User, _user_id(982_091))]
+        before = (db.query(Food).count(), db.query(FoodDiaryEntry).count())
+        ids = []
+        for index in range(4):
+            draft = _create(db, owners[index % 2], key=f"bounded-cleanup-{index}")
+            draft.expires_at = now - timedelta(minutes=4 - index)
+            db.flush()
+            ids.append(draft.id)
+        live = _create(db, owners[0], key="bounded-cleanup-live")
+        live_id = live.id
+        db.flush()
+        assert expire_nutrition_import_drafts(db, now=now, limit=2) == 2
+        db.flush()
+        assert [db.get(NutritionImportDraft, item) is None for item in ids] == [
+            True,
+            True,
+            False,
+            False,
+        ]
+        assert db.get(NutritionImportDraft, live_id) is not None
+        assert expire_nutrition_import_drafts(db, now=now, limit=2) == 2
+        db.flush()
+        assert expire_nutrition_import_drafts(db, now=now, limit=2) == 0
+        assert db.get(NutritionImportDraft, live_id) is not None
+        assert (db.query(Food).count(), db.query(FoodDiaryEntry).count()) == before
+
+
 def test_concurrent_same_key_creates_one_draft_in_postgresql(client):
     if engine.dialect.name != "postgresql":
         pytest.skip("requires PostgreSQL row locking")
