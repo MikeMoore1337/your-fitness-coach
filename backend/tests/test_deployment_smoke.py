@@ -112,6 +112,7 @@ def test_deployment_smoke_separates_compatible_preflight_from_release_contract()
         == "prod"
     )
     assert "/app/report?period=days_30" in requested_paths
+    assert "/api/v1/nutrition/diary?diary_date=2024-02-29" in requested_paths
 
     requested_paths.clear()
     assert check_deployment(BASE_URL, timeout=3, expected_environment="prod", read=read) == "prod"
