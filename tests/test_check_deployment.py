@@ -41,6 +41,13 @@ def _fake_read(config: dict[str, object]):
             final_url=f"{base_url}/api/v1/me",
             headers={"cache-control": "no-store"},
         ),
+        "/api/v1/nutrition/diary?diary_date=2024-02-29": check_deployment.HttpResponse(
+            status=401,
+            body=b'{"detail":"Not authenticated"}',
+            content_type="application/json",
+            final_url=f"{base_url}/api/v1/nutrition/diary?diary_date=2024-02-29",
+            headers={"cache-control": "no-store"},
+        ),
         "/api/v1/auth/refresh": check_deployment.HttpResponse(
             status=401,
             body=b'{"detail":"Not authenticated"}',
@@ -108,6 +115,50 @@ def test_production_smoke_requires_safe_environment_and_auth_flags(
 
     assert check_deployment.main() == 0
     assert "Environment reported by API: prod" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("leaked_status", [200, 302, 404, 500])
+def test_production_smoke_requires_private_nutrition_diary(
+    leaked_status: int,
+) -> None:
+    source = _fake_read(
+        {
+            "app_env": "prod",
+            "enable_dev_auth": False,
+            "enable_web_auth": True,
+            "enable_email_auth": False,
+        }
+    )
+
+    def intercepted(
+        base_url: str,
+        path: str,
+        *,
+        timeout: float,
+        method: str = "GET",
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> check_deployment.HttpResponse:
+        if path == "/api/v1/nutrition/diary?diary_date=2024-02-29":
+            response = source(
+                base_url, path, timeout=timeout, method=method, body=body, headers=headers
+            )
+            return check_deployment.HttpResponse(
+                status=leaked_status,
+                body=response.body,
+                content_type=response.content_type,
+                final_url=response.final_url,
+                headers=response.headers,
+            )
+        return source(base_url, path, timeout=timeout, method=method, body=body, headers=headers)
+
+    with pytest.raises(RuntimeError, match="nutrition diary privacy boundary returned"):
+        check_deployment.check_deployment(
+            "https://app.example.test",
+            timeout=10.0,
+            expected_environment="prod",
+            read=intercepted,
+        )
 
 
 def test_deployment_check_can_skip_rate_limited_refresh_boundary() -> None:
