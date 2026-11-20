@@ -3,6 +3,7 @@ import { AppLink } from '../shared/navigation/router';
 import { glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
+import { useQuickAddDrag } from './useQuickAddDrag';
 import {
   isQuickAddAnalyticsKind,
   productEventSurface,
@@ -106,6 +107,7 @@ export function QuickAddSheet({
   open: boolean;
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
+  const drag = useQuickAddDrag(panelRef, open, onClose);
   useLayoutEffect(() => {
     if (!open) return;
     const layer = panelRef.current?.parentElement;
@@ -157,7 +159,7 @@ export function QuickAddSheet({
         role="dialog"
         tabIndex={-1}
       >
-        <div aria-hidden="true" className="app-quick-add-panel__grip" />
+        <div aria-hidden="true" className="app-quick-add-panel__grip" {...drag} />
         <header className="app-quick-add-panel__header">
           <div>
             <p className="app-quick-add-panel__eyebrow">Быстрое добавление</p>

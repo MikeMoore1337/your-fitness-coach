@@ -3,6 +3,7 @@ import { addCalendarDays, calendarWeek, formatCalendarDate } from '../dateTime';
 import { AppLink } from '../navigation/router';
 import { ChevronIcon } from './common';
 import { Icon, type IconName } from './Icon';
+import { useWeekSwipe } from './useWeekSwipe';
 
 export type WeekStripStatusKey =
   'completed' | 'in-progress' | 'planned' | 'upcoming' | 'skipped' | 'neutral';
@@ -169,6 +170,7 @@ export function formatWeekRange(days: string[]): string {
 export function WeekStrip(props: WeekStripProps) {
   const headingId = useId();
   const daysRef = useRef<HTMLOListElement>(null);
+  const swipe = useWeekSwipe(daysRef, props.navigation);
   const days = props.rangeStart
     ? Array.from({ length: 7 }, (_, index) => addCalendarDays(props.rangeStart!, index))
     : calendarWeek(props.anchorDate);
@@ -241,7 +243,11 @@ export function WeekStrip(props: WeekStripProps) {
         </div>
       </div>
 
-      <ol className="week-strip__days" ref={daysRef}>
+      <ol
+        className={`week-strip__days${props.navigation ? ' week-strip__days--swipe' : ''}`}
+        ref={daysRef}
+        {...swipe}
+      >
         {days.map((date) => {
           const isToday = date === props.today;
           const isSelected = isPicker && date === props.selectedDate;
