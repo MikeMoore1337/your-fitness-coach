@@ -1738,10 +1738,6 @@ body:has(.app-shell--design-v2) {
   border-bottom: 2px solid var(--v2-lime);
 }
 
-.today-workout-focus {
-  container-type: inline-size;
-}
-
 .today-workout-focus__header > div {
   display: grid;
   min-width: 0;
@@ -3684,26 +3680,21 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-workout-focus__header {
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
   }
 
   .today-workout-focus__header > div {
+    flex: 1 0 max-content;
+    min-width: 0;
+    max-width: 100%;
     justify-items: end;
   }
 
   .today-workout-focus__header > div span,
   .today-workout-focus__header > span {
     display: none;
-  }
-
-  @container (max-width: 15em) {
-    .today-workout-focus__header {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .today-workout-focus__header > div {
-      justify-items: start;
-    }
   }
 
   .active-workout--design-v2 .active-workout-hero {
