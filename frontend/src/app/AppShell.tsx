@@ -279,8 +279,10 @@ export function AppShell({
   const brandTo = demo?.brandTo ?? '/app?section=today';
   const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
   const shellVisible = Boolean(user || demo);
-  const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
-  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
+  const quickAddVisible =
+    shellVisible &&
+    (Boolean(demo) || section !== undefined || (mobileNavigation && path === '/admin'));
+  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation;
   const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
   const inlineQuickAdd = Boolean(quickAddTarget && !demo && section === 'progress');
   useLayoutEffect(() => {
@@ -406,12 +408,11 @@ export function AppShell({
       const labels = Array.from(
         navigation.querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label'),
       );
-      if (labels.length !== 5) return;
-      const navStyle = getComputedStyle(navigation);
+      const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
+      if (!primary || labels.length !== 4) return;
+      const navStyle = getComputedStyle(primary);
       const width =
-        navigation.clientWidth -
-        parseFloat(navStyle.paddingLeft) -
-        parseFloat(navStyle.paddingRight);
+        primary.clientWidth - parseFloat(navStyle.paddingLeft) - parseFloat(navStyle.paddingRight);
       const gap = parseFloat(navStyle.columnGap) || 0;
       const need = Math.max(
         44,
@@ -431,9 +432,9 @@ export function AppShell({
       const horizontal = largeText && (width - gap) / 2 >= need + 25;
       const standardText =
         parseFloat(getComputedStyle(root).fontSize) <= 16 && window.innerWidth >= 320;
-      const availableColumns = window.innerWidth < 320 ? [2, 1] : [5, 3, 2, 1];
+      const availableColumns = window.innerWidth < 320 ? [2, 1] : [4, 2, 1];
       const columns = standardText
-        ? 5
+        ? 4
         : horizontal
           ? 2
           : (availableColumns.find((count) => (width - (count - 1) * gap) / count >= need) ?? 1);
@@ -555,30 +556,34 @@ export function AppShell({
   return (
     <AiCoachWorkspaceProvider>
       <div className="app-shell app-shell--design-v2">
-        {!demo && shellVisible && mobileNavigation && (
-          <header className="app-mobile-header">
+        {shellVisible && mobileNavigation && (
+          <header className={`app-mobile-header${demo ? ' app-mobile-header--demo' : ''}`}>
             <AppLink
               className="app-mobile-header__brand"
               to={resolvedBrandTo}
-              aria-label="Your Fitness Coach — сегодня"
+              aria-label={demo ? 'Your Fitness Coach — демо' : 'Your Fitness Coach — сегодня'}
             >
               <BrandLockup markClassName="app-mobile-header__brand-mark" />
             </AppLink>
             <button
-              id="appProfileButton"
+              id={demo ? 'appMoreButton' : 'appProfileButton'}
               type="button"
               className={`app-mobile-header__profile${moreOpen || secondaryActive ? ' is-active' : ''}`}
               aria-expanded={moreOpen}
               aria-controls="appMorePanel"
-              aria-label="Открыть профиль и настройки"
+              aria-label={demo ? 'Сценарии' : 'Открыть профиль и настройки'}
               onClick={(event) => (moreOpen ? closeMore() : openMore(event.currentTarget))}
             >
-              <AccountAvatar
-                className="app-bottom-nav__avatar"
-                customAvatarVersion={user?.custom_avatar?.updated_at}
-                name={displayName}
-                photoUrl={user?.photo_url}
-              />
+              {demo ? (
+                <AppNavigationIcon name="more" />
+              ) : (
+                <AccountAvatar
+                  className="app-bottom-nav__avatar"
+                  customAvatarVersion={user?.custom_avatar?.updated_at}
+                  name={displayName}
+                  photoUrl={user?.photo_url}
+                />
+              )}
             </button>
           </header>
         )}
@@ -608,7 +613,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps('regular', true)}
+              {...(embeddedQuickAddVisible ? {} : glassProps('regular', true))}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >
@@ -666,7 +671,10 @@ export function AppShell({
                 </div>
               )}
 
-              <div className="app-bottom-nav__primary">
+              <div
+                className="app-bottom-nav__primary"
+                {...(embeddedQuickAddVisible ? glassProps('regular') : {})}
+              >
                 {shellDestinations.map((destination) => {
                   const destinationKey =
                     'section' in destination ? destination.section : destination.key;
@@ -701,7 +709,7 @@ export function AppShell({
                     </AppLink>
                   );
                 })}
-                {demo && (
+                {demo && !mobileNavigation && (
                   <button
                     id="appMoreButton"
                     type="button"
@@ -714,8 +722,8 @@ export function AppShell({
                     <span className="app-bottom-nav__label">Сценарии</span>
                   </button>
                 )}
-                {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
               </div>
+              {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
 
               {!demo && (
                 <div

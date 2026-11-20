@@ -12,7 +12,7 @@ for (const width of [320, 360, 390, 393, 430]) {
       await page.goto('/app?section=today');
       const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
       const items = navigation.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
-      await expect(items).toHaveCount(5);
+      await expect(items).toHaveCount(4);
       await page.evaluate(() => {
         document.documentElement.style.fontSize = '32px';
       });
@@ -41,7 +41,6 @@ for (const width of [320, 360, 390, 393, 430]) {
           expect.objectContaining({ text: 'План', fits: true }),
           expect.objectContaining({ text: 'Питание', fits: true }),
           expect.objectContaining({ text: 'Прогресс', fits: true }),
-          expect.objectContaining({ text: 'Добавить', fits: true }),
         ]);
       for (const item of await items.all()) {
         const box = (await item.boundingBox())!;
@@ -52,7 +51,11 @@ for (const width of [320, 360, 390, 393, 430]) {
         'aria-current',
         'page',
       );
-      await expect(navigation.getByRole('button', { name: 'Быстро добавить' })).toBeVisible();
+      const quickAdd = navigation.getByRole('button', { name: 'Быстро добавить' });
+      await expect(quickAdd).toBeVisible();
+      const addBox = (await quickAdd.boundingBox())!;
+      expect(addBox.width).toBeGreaterThanOrEqual(44);
+      expect(addBox.height).toBeGreaterThanOrEqual(44);
     });
   }
 }
@@ -65,7 +68,7 @@ test('navigation adapts to intermediate text sizes and restores its ordinary lay
   await page.goto('/app?section=today');
   const nav = page.getByRole('navigation', { name: 'Основная навигация' });
   const items = nav.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
-  await expect(items).toHaveCount(5);
+  await expect(items).toHaveCount(4);
   await expect.poll(async () => (await nav.boundingBox())!.height).toBeLessThanOrEqual(76);
   for (const size of [20, 24, 32]) {
     await page.evaluate((value) => {

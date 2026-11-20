@@ -33,10 +33,11 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(page.locator('.app-mobile-header')).toHaveCount(0);
       }
       const nav = page.getByRole('navigation', { name: 'Основная навигация' });
-      await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
-      await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
-      await expect(nav).toHaveCSS('box-shadow', /inset/);
-      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(20px\)/ : 'none');
+      const navMaterial = width < 900 ? nav.locator('.app-bottom-nav__primary') : nav;
+      await expect(navMaterial).toHaveAttribute('data-glass-variant', 'regular');
+      await expect(navMaterial).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
+      await expect(navMaterial).toHaveCSS('box-shadow', /inset/);
+      await expect(navMaterial).toHaveCSS('backdrop-filter', width < 900 ? /blur\(20px\)/ : 'none');
       await expect(nav).toHaveCSS('opacity', '1');
       await expectNoHorizontalOverflow(page);
       // Content containers remain ordinary surfaces; navigation alone carries this material.
@@ -49,7 +50,7 @@ for (const theme of ['light', 'dark'] as const) {
       await add.hover();
       if (width < 900) {
         await expect
-          .poll(() => nav.evaluate((element) => element.style.getPropertyValue('--glass-x')))
+          .poll(() => add.evaluate((element) => element.style.getPropertyValue('--glass-x')))
           .not.toBe('');
         await expect(add).toHaveClass(/app-bottom-nav__quick-add/);
       } else {

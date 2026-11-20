@@ -271,6 +271,25 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   justify-content: space-between;
   gap: 12px;
 }
+.app-quick-add-panel__grip {
+  display: none;
+  width: 36px;
+  height: 4px;
+  flex: 0 0 4px;
+  align-self: center;
+  margin-bottom: 8px;
+  border-radius: 9999px;
+  background: var(--v2-border-strong);
+}
+.app-quick-add-panel__eyebrow {
+  display: none;
+  margin: 0 0 4px;
+  color: var(--v2-accent-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .app-quick-add-panel__header h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -1662,41 +1681,8 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     padding: 6px;
   }
 
-  .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav[data-dock-columns='3'] {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    border-radius: 28px;
-  }
-
-  .app-bottom-nav[data-dock-columns='3']
-    .app-bottom-nav__primary
-    > .app-bottom-nav__btn:nth-child(-n + 3) {
-    grid-column: span 2;
-  }
-
-  .app-bottom-nav[data-dock-columns='3']
-    .app-bottom-nav__primary
-    > .app-bottom-nav__btn:nth-child(n + 4) {
-    grid-column: span 3;
-  }
-
-  .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav[data-dock-columns='2'] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-radius: 28px;
-  }
-
-  .app-bottom-nav[data-dock-columns='2']
-    .app-bottom-nav__primary
-    > .app-bottom-nav__btn:last-child {
-    grid-column: span 2;
-  }
-
-  .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav[data-dock-columns='1'] {
-    grid-template-columns: 1fr;
-    border-radius: 28px;
-  }
-
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
-    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='5'])
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
     .app-bottom-nav__primary
     > .app-bottom-nav__btn {
     min-width: 44px;
@@ -1732,13 +1718,13 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
-    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='5'])
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
     .app-bottom-nav__label {
     overflow: visible;
     text-overflow: clip;
   }
 
-  html:has(.app-bottom-nav[data-dock-columns]:not([data-dock-columns='5']))
+  html:has(.app-bottom-nav[data-dock-columns]:not([data-dock-columns='4']))
     .app-shell--design-v2
     #appContent
     :where(button, a, input, select, textarea, summary) {
@@ -1912,6 +1898,140 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
       .app-bottom-nav__primary
       .app-bottom-nav__label {
       font-size: 0.6875rem;
+    }
+  }
+}
+
+/* Dock and Quick Add share the fixed safe-area container but keep separate glass surfaces. */
+@media (max-width: 899px) {
+  .app-quick-add-panel__grip,
+  .app-quick-add-panel__eyebrow {
+    display: block;
+  }
+
+  .app-quick-add-panel__header h2 {
+    font-size: 1.5rem;
+  }
+
+  body:has(.app-quick-add-layer) .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  body:has(.app-bottom-nav__quick-add) .app-quick-add-layer {
+    padding-bottom: calc(
+      12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
+  }
+
+  body:has(.app-bottom-nav__quick-add) .app-quick-add-panel {
+    max-height: calc(
+      var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    );
+  }
+
+  :root .app-shell--design-v2 .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root .app-bottom-nav:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary {
+    --glass-opacity: var(--glass-nav-opacity);
+    --glass-blur: var(--glass-nav-blur);
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(max(44px, 3.25rem), 1fr));
+    padding: 4px;
+    border: 1px solid var(--glass-edge);
+    border-radius: 9999px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='2'] .app-bottom-nav__primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 24px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='1'] .app-bottom-nav__primary {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 24px;
+  }
+
+  :root .app-shell--design-v2 .app-bottom-nav .app-bottom-nav__quick-add {
+    --glass-opacity: var(--glass-nav-opacity);
+    --glass-blur: var(--glass-nav-blur);
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    display: grid;
+    width: 62px;
+    height: 62px;
+    min-height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--glass-edge);
+    border-radius: 50%;
+  }
+
+  :root .app-bottom-nav__quick-add .app-bottom-nav__icon,
+  :root .app-bottom-nav__quick-add .app-bottom-nav__icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  :root
+    .app-bottom-nav:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__btn {
+    min-width: 44px;
+    min-height: 52px;
+  }
+
+  @media (max-width: 250px) {
+    :root .app-shell--design-v2 .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+      right: var(--yfc-layout-safe-right);
+      left: var(--yfc-layout-safe-left);
+      gap: 2px;
+    }
+
+    :root .app-shell--design-v2 .app-bottom-nav .app-bottom-nav__quick-add {
+      width: 44px;
+      height: 44px;
+    }
+
+    :root .app-bottom-nav:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: 2px;
+      border-radius: 24px;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__btn {
+      min-height: 44px;
+      flex-direction: row;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__icon {
+      display: none;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__label {
+      font-size: 0.625rem;
     }
   }
 }

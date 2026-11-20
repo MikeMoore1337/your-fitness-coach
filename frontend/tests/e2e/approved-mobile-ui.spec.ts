@@ -10,9 +10,9 @@ import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
-for (const width of [320, 360, 393, 430])
+for (const width of [320, 360, 390, 393, 430])
   for (const theme of ['dark', 'light'] as const) {
-    test(`approved B navigation and quick add ${width} ${theme}`, async ({ page }, testInfo) => {
+    test(`dock 4+1 navigation and quick add ${width} ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 844 });
       await page.clock.setFixedTime(new Date('2026-10-09T12:00:00+03:00'));
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
@@ -31,8 +31,8 @@ for (const width of [320, 360, 393, 430])
       const trigger = page.getByRole('button', { name: 'Быстро добавить', exact: true });
       const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
       const tabs = navigation.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
-      await expect(tabs).toHaveCount(5);
-      await expect(tabs).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс', 'Добавить']);
+      await expect(tabs).toHaveCount(4);
+      await expect(tabs).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс']);
       await expect(trigger).toHaveClass(/app-bottom-nav__quick-add/);
       await expect(trigger).not.toHaveClass(/is-active/);
       await expect(trigger).not.toHaveAttribute('aria-current');
@@ -98,11 +98,25 @@ for (const width of [320, 360, 393, 430])
       expect(triggerBox.y + triggerBox.height).toBeLessThanOrEqual(
         navigationBox.y + navigationBox.height,
       );
-      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+      await expect(navigation.locator('.app-bottom-nav__primary')).toHaveCSS(
+        'backdrop-filter',
+        /blur\(20px\)/,
+      );
+      await expect(trigger).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       expect(triggerBox.x).toBeGreaterThanOrEqual(navigationBox.x);
       expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(
         navigationBox.x + navigationBox.width,
       );
+      const capsuleBox = (await navigation.locator('.app-bottom-nav__primary').boundingBox())!;
+      expect(triggerBox.x).toBeGreaterThan(capsuleBox.x + capsuleBox.width);
+      expect(
+        Math.abs(triggerBox.y + triggerBox.height / 2 - capsuleBox.y - capsuleBox.height / 2),
+      ).toBeLessThan(1);
+      expect(Math.abs(triggerBox.width - triggerBox.height)).toBeLessThan(1);
+      const tabRows = await tabs.evaluateAll((elements) =>
+        elements.map((element) => Math.round(element.getBoundingClientRect().y)),
+      );
+      expect(new Set(tabRows).size).toBe(1);
       const choices = navigation.locator('.app-bottom-nav__primary [data-yfc-choice]');
       await expect(choices).toHaveCount(4);
       for (const tab of await choices.all()) {
@@ -130,7 +144,20 @@ for (const width of [320, 360, 393, 430])
       }
       await trigger.click();
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
+      await expect(page.locator('#appBottomNav')).toHaveCSS('opacity', '0');
+      await expect(page.locator('#appBottomNav')).toHaveJSProperty('inert', true);
       await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+      await page.mouse.move(1, 1);
+      await expect
+        .poll(() =>
+          sheet
+            .locator('.app-quick-add-action__icon')
+            .evaluateAll(
+              (elements) =>
+                new Set(elements.map((element) => getComputedStyle(element).color)).size,
+            ),
+        )
+        .toBe(1);
       const icons = await sheet.locator('.app-quick-add-action__icon').evaluateAll((elements) =>
         elements.map((element) => {
           const style = getComputedStyle(element);
@@ -291,7 +318,11 @@ for (const width of [320, 360, 393, 430])
           'aria-current',
           'page',
         );
-        await expect(tabs).toHaveCount(5);
+        await expect(tabs).toHaveCount(4);
+        await trigger.click();
+        await expect(page.getByRole('dialog', { name: 'Что добавить?' })).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(trigger).toBeFocused();
         await expect(page.getByText('Загружаем раздел…', { exact: true })).toHaveCount(0);
         await expect(page.locator('[role="status"][aria-busy="true"]')).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
@@ -317,7 +348,7 @@ for (const width of [320, 360, 393, 430])
       for (const section of ['profile', 'catalog']) {
         await page.goto(`/app?section=${section}`);
         await expect(page.locator(`.app-section--${section}`)).toBeVisible();
-        await expect(tabs).toHaveCount(5);
+        await expect(tabs).toHaveCount(4);
         await expect(trigger).toBeVisible();
         await expectNoHorizontalOverflow(page);
       }

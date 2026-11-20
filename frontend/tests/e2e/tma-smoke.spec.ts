@@ -106,7 +106,7 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
     await expectNoHorizontalOverflow(tmaPage);
   }
   await expectTouchTargets(
-    tmaPage.locator('.app-bottom-nav__primary > a, .app-bottom-nav__primary > button'),
+    tmaPage.locator('.app-bottom-nav__primary > a, .app-bottom-nav__quick-add'),
   );
   await expectTouchTargets(tmaPage.locator('.week-strip__day--interactive'));
   await expectNoOverlap(
