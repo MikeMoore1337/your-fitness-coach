@@ -114,6 +114,63 @@ describe('WeekStrip', () => {
     expect(onPrevious).toHaveBeenCalledOnce();
   });
 
+  it('distinguishes short, fast, vertical and edge gestures and resets on resize', () => {
+    const now = vi.spyOn(performance, 'now');
+    let clock = 0;
+    now.mockImplementation(() => clock);
+    const onPrevious = vi.fn();
+    const onNext = vi.fn();
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя"
+        mode="overview"
+        navigation={{ onPrevious, onNext }}
+        title="Неделя"
+        today="2026-08-20"
+      />,
+    );
+    const rail = container.querySelector<HTMLOListElement>('.week-strip__days')!;
+    Object.defineProperty(rail, 'clientWidth', { value: 320 });
+    pointer(rail, 'pointerdown', 140);
+    clock += 100;
+    pointer(rail, 'pointermove', 160);
+    pointer(rail, 'pointerup', 160);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 200;
+    pointer(rail, 'pointermove', 190);
+    pointer(rail, 'pointerup', 190);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 10;
+    pointer(rail, 'pointermove', 200);
+    clock += 10;
+    pointer(rail, 'pointermove', 190);
+    pointer(rail, 'pointerup', 190);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 10;
+    pointer(rail, 'pointermove', 175);
+    pointer(rail, 'pointerup', 175);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 140);
+    pointer(rail, 'pointermove', 180, 150);
+    pointer(rail, 'pointerup', 250, 220);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 10);
+    pointer(rail, 'pointermove', 150);
+    pointer(rail, 'pointerup', 150);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 140);
+    fireEvent(window, new Event('resize'));
+    pointer(rail, 'pointerup', 140);
+    expect(onNext).not.toHaveBeenCalled();
+    expect(rail.style.transform).toBe('');
+    now.mockRestore();
+  });
+
   it('reveals a selected date inside the narrow rail without scrolling the page', () => {
     const scrollPage = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const measure = vi

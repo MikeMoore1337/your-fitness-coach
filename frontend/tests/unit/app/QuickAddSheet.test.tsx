@@ -21,6 +21,12 @@ it('returns incomplete or interrupted drags and closes once after a valid drag',
   const panel = screen.getByRole('dialog');
   const grip = container.querySelector('.app-quick-add-panel__grip')!;
   Object.defineProperty(panel, 'offsetHeight', { value: 300 });
+  const content = screen.getByRole('navigation', { name: 'Быстрые действия' });
+  pointer(content, 'pointerdown', 100);
+  pointer(content, 'pointermove', 340);
+  pointer(content, 'pointerup', 340);
+  expect(onClose).not.toHaveBeenCalled();
+  expect(panel.style.transform).toBe('');
   pointer(grip, 'pointerdown', 100);
   pointer(grip, 'pointermove', 150);
   pointer(grip, 'pointerup', 150);
