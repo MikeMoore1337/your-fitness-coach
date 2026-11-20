@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>YFC · Прототип V14-06</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+ <symbol id="i-today" viewBox="0 0 24 24"><path d="M8 2v3M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01M16 17h.01"/></symbol>
+ <symbol id="i-plan" viewBox="0 0 24 24"><g transform="scale(.09375)" fill="currentColor" stroke="none"><path d="M248,120h-8V88a16,16,0,0,0-16-16H208V64a16,16,0,0,0-16-16H168a16,16,0,0,0-16,16v56H104V64A16,16,0,0,0,88,48H64A16,16,0,0,0,48,64v8H32A16,16,0,0,0,16,88v32H8a8,8,0,0,0,0,16h8v32a16,16,0,0,0,16,16H48v8a16,16,0,0,0,16,16H88a16,16,0,0,0,16-16V136h48v56a16,16,0,0,0,16,16h24a16,16,0,0,0,16-16v-8h16a16,16,0,0,0,16-16V136h8a8,8,0,0,0,0-16ZM32,168V88H48v80Zm56,24H64V64H88V192Zm104,0H168V64h24V175.82c0,.06,0,.12,0,.18s0,.12,0,.18V192Zm32-24H208V88h16Z"/></g></symbol>
+ <symbol id="i-nutrition" viewBox="0 0 24 24"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></symbol>
+ <symbol id="i-progress" viewBox="0 0 24 24"><path d="M12 16v5M16 14.639V21M20 10.656V21M22 3l-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15M4 18.463V21M8 14.656V21"/></symbol>
+ <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+ <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+ <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+ <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+ <symbol id="i-water" viewBox="0 0 24 24"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></symbol>
+ <symbol id="i-cardio" viewBox="0 0 24 24"><path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></symbol>
+ <symbol id="i-measurement" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0ZM14.5 12.5l2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol>
+ <symbol id="i-wellbeing" viewBox="0 0 24 24"><path d="M13 5h8M13 12h8M13 19h8M3 17l2 2 4-4M3 7l2 2 4-4"/></symbol></svg>
+<div class="prototype-note">ПРОТОТИП · ДЕМО-ДАННЫЕ <span>без сохранения</span></div>
+<header class="top"><div class="brand"><img id="brand-logo" src="assets/yfc-logo-light.svg" alt=""><span>YOUR FITNESS<br>COACH</span></div><div class="top-actions"><button id="theme-toggle" class="text-control" type="button">Тёмная тема</button><button class="profile" type="button" data-go="profile" aria-label="Профиль">АП</button></div></header>
+<main id="main" tabindex="-1"></main>
+<div class="dock-group" id="dock-group"><nav class="dock" aria-label="Основная навигация"><button type="button" data-nav="today"><svg><use href="#i-today"/></svg><span>Сегодня</span></button><button type="button" data-nav="plan"><svg><use href="#i-plan"/></svg><span>План</span></button><button type="button" data-nav="nutrition"><svg><use href="#i-nutrition"/></svg><span>Питание</span></button><button type="button" data-nav="progress"><svg><use href="#i-progress"/></svg><span>Прогресс</span></button></nav><button id="open-add" class="dock-add" type="button" aria-label="Быстро добавить"><svg><use href="#i-plus"/></svg></button></div>
+<dialog id="sheet" aria-labelledby="sheet-title"><div class="sheet-grip" aria-hidden="true"></div><div class="sheet-heading"><div><p class="eyebrow">БЫСТРОЕ ДОБАВЛЕНИЕ</p><h2 id="sheet-title">Что добавить?</h2></div><button id="close-sheet" class="icon-button" type="button" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></div><div id="sheet-content"></div></dialog>
+<script src="app.js"></script>
+</body></html>
