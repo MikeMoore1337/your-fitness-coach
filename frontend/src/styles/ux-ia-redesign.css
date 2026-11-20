@@ -2822,3 +2822,20 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+@container (max-width: 15em) {
+  .app-section--progress .progress-experience--approved .progress-hero__heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-section--progress .progress-experience--approved .progress-hero__help {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .progress-experience--approved .progress-hero__help:has(.contextual-help[open]) {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+}

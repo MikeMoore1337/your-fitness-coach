@@ -1738,6 +1738,10 @@ body:has(.app-shell--design-v2) {
   border-bottom: 2px solid var(--v2-lime);
 }
 
+.today-workout-focus {
+  container-type: inline-size;
+}
+
 .today-workout-focus__header > div {
   display: grid;
   min-width: 0;
@@ -3692,6 +3696,16 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     display: none;
   }
 
+  @container (max-width: 15em) {
+    .today-workout-focus__header {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .today-workout-focus__header > div {
+      justify-items: start;
+    }
+  }
+
   .active-workout--design-v2 .active-workout-hero {
     padding: 0 0 12px;
     gap: 8px;
@@ -3865,6 +3879,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   color: var(--v2-text-primary);
 }
 
+.app-section--progress .progress-experience {
+  container-type: inline-size;
+}
+
 .app-section--progress .progress-experience--bento .progress-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, min(620px, 50%));
@@ -3956,6 +3974,26 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   flex: 0 0 28px;
 }
 
+@container (max-width: 15em) {
+  .app-section--progress .progress-hero__heading {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-section--progress .progress-hero__help,
+  .app-section--progress .progress-hero__help:has(.contextual-help[open]) {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: start;
+    width: 100%;
+  }
+
+  .app-section--progress .progress-hero__help .contextual-help > summary {
+    max-width: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help {
   display: block;
   width: 100%;
@@ -4015,6 +4053,24 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     min-width: max-content;
     padding-inline: var(--v2-space-2);
     white-space: nowrap;
+  }
+}
+
+@container (max-width: 15em) {
+  .app-section--progress .progress-period-controls__tabs {
+    overflow: visible;
+    padding: calc(var(--focus-width) + var(--focus-offset));
+  }
+
+  .app-section--progress .progress-period-controls .ui-tabs {
+    flex-wrap: wrap;
+  }
+
+  .app-section--progress .progress-period-controls .ui-tab {
+    flex: 1 1 40%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
