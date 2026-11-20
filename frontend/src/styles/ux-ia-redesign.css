@@ -273,6 +273,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 .app-quick-add-panel__grip {
   display: none;
+  position: relative;
   width: 36px;
   height: 4px;
   flex: 0 0 4px;
@@ -280,6 +281,12 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   margin-bottom: 8px;
   border-radius: 9999px;
   background: var(--v2-border-strong);
+  touch-action: none;
+}
+.app-quick-add-panel__grip::after {
+  position: absolute;
+  inset: -12px -4px -28px;
+  content: '';
 }
 .app-quick-add-panel__eyebrow {
   display: none;

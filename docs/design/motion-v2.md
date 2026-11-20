@@ -90,7 +90,13 @@ secondary panels не анимируются одновременно ради �
 | Demo cabinet                                           | `Animate context`          | Scenario/revision/reset/handoff; prepared metrics remain factual and immediately readable                                   |
 | Mobile Web/mocked TMA                                  | `Same contract`            | Те же triggers/timings; safe area, keyboard, lifecycle и BackButton не создают replay                                       |
 
-WeekStrip анимирует только selection/status feedback и disclosure glyph. Вся неделя не сдвигается.
+WeekStrip анимирует selection/status feedback и disclosure glyph. В согласованных экземплярах
+с навигацией по неделям разрешены горизонтальное следование за пользовательским жестом и короткий
+прерываемый settle. Свайп переключает не более одной разрешённой недели, не выбирает дату и не
+вызывает мутаций; кнопки, прокрутка скрытых дней, ограничения навигации, доступность и reduced motion
+сохраняются. Для остальных WeekStrip запрет движения всей недели остаётся. Ограниченное исключение
+согласовано владельцем для [#982](https://github.com/MikeMoore1337/your-fitness-coach/issues/982)
+по [пакету прототипов](https://github.com/MikeMoore1337/your-fitness-coach/blob/5e26a4724bb8e7cda5f20f92d6d69bca94baeb78/docs/ux-proposals/issue-982/SPEC.md).
 Route/page carousel, large-list stagger, incompatible chart morph, platform haptics и admin row motion
 не внедрены: для них нет отдельной доказанной пользы в `74A`.
 

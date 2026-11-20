@@ -1,10 +1,50 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { QuickAddSheet } from '../../../src/app/QuickAddSheet';
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+function pointer(target: Element, type: string, y: number) {
+  const event = new MouseEvent(type, { bubbles: true, clientX: 200, clientY: y, button: 0 });
+  Object.defineProperties(event, { pointerId: { value: 1 }, isPrimary: { value: true } });
+  fireEvent(target, event);
+}
+
+it('returns incomplete or interrupted drags and closes once after a valid drag', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  const onClose = vi.fn();
+  const { container } = render(<QuickAddSheet actions={[]} onClose={onClose} open />);
+  const panel = screen.getByRole('dialog');
+  const grip = container.querySelector('.app-quick-add-panel__grip')!;
+  Object.defineProperty(panel, 'offsetHeight', { value: 300 });
+  const content = screen.getByRole('navigation', { name: 'Быстрые действия' });
+  pointer(content, 'pointerdown', 100);
+  pointer(content, 'pointermove', 340);
+  pointer(content, 'pointerup', 340);
+  expect(onClose).not.toHaveBeenCalled();
+  expect(panel.style.transform).toBe('');
+  pointer(grip, 'pointerdown', 100);
+  pointer(grip, 'pointermove', 150);
+  pointer(grip, 'pointerup', 150);
+  expect(onClose).not.toHaveBeenCalled();
+  expect(panel.style.transform).toBe('');
+  pointer(grip, 'pointerdown', 100);
+  pointer(grip, 'pointermove', 340);
+  pointer(grip, 'pointercancel', 340);
+  expect(onClose).not.toHaveBeenCalled();
+  pointer(grip, 'pointerdown', 100);
+  pointer(grip, 'pointermove', 340);
+  fireEvent(window, new Event('resize'));
+  pointer(grip, 'pointerup', 340);
+  expect(onClose).not.toHaveBeenCalled();
+  pointer(grip, 'pointerdown', 100);
+  pointer(grip, 'pointermove', 340);
+  pointer(grip, 'pointerup', 340);
+  expect(onClose).toHaveBeenCalledOnce();
 });
 
 it.each(['another control', 'no active control'])(

@@ -1376,6 +1376,10 @@ body:has(.app-shell--design-v2) {
   min-width: 0;
 }
 
+.week-strip__days--swipe {
+  touch-action: pan-y pinch-zoom;
+}
+
 .week-strip__day {
   display: grid;
   width: 100%;

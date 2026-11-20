@@ -771,7 +771,9 @@ export function HydrationTracker({
     return (
       <section className="hydration-card">
         <ErrorState
-          message={(hydration.error as Error).message}
+          message={
+            hydration.error?.message ?? 'Не удалось загрузить гидратацию. Проверьте соединение.'
+          }
           retry={() => void hydration.refetch()}
         />
       </section>
