@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QuickAddPlacementContext } from '../../../src/app/QuickAddPlacementContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../../src/app/AppShell';
@@ -387,6 +387,32 @@ describe('AppShell', () => {
     expect(add).toHaveFocus();
   });
 
+  it('does not restore dock height after unmount when fonts finish loading', async () => {
+    stubViewport(390);
+    navigation.path = '/app';
+    const original = Object.getOwnPropertyDescriptor(document, 'fonts');
+    let resolveFonts!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      resolveFonts = resolve;
+    });
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    });
+    try {
+      const view = render(<AppShell section="today">Содержимое</AppShell>);
+      expect(document.documentElement.style.getPropertyValue('--app-bottom-nav-height')).not.toBe(
+        '',
+      );
+      view.unmount();
+      await act(async () => resolveFonts());
+      expect(document.documentElement.style.getPropertyValue('--app-bottom-nav-height')).toBe('');
+    } finally {
+      if (original) Object.defineProperty(document, 'fonts', original);
+      else Reflect.deleteProperty(document, 'fonts');
+    }
+  });
+
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {
     stubViewport(390);
     navigation.path = '/app';
@@ -479,6 +505,34 @@ describe('AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
     const dialog = screen.getByRole('dialog', { name: 'Демо-кабинет' });
     expect(within(dialog).getByText('Отдельная сессия')).toBeInTheDocument();
+  });
+
+  it('does not apply personal dock layout to mobile Coach OS or Demo', () => {
+    stubViewport(390);
+    const coach = render(<AppShell>Кабинет тренера</AppShell>);
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
+      'data-dock-columns',
+    );
+    coach.unmount();
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/demo',
+          moreLinks: [],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо
+      </AppShell>,
+    );
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
+      'data-dock-columns',
+    );
   });
 
   it('оставляет в минимальном demo utility только тему и полный выход из демо', () => {
