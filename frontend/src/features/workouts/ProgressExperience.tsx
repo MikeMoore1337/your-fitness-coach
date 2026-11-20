@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1677,6 +1678,7 @@ export function ProgressExperience({
   progressView?: ProgressView;
   timeZone?: string | null;
 } = {}) {
+  const heroRef = useRef<HTMLElement>(null);
   const { navigate, search } = useNavigation();
   const view = progressView ?? parseProgressView(search, window.location.hash);
   const selection = useMemo(() => parseProgressSelection(search), [search]);
@@ -1739,6 +1741,40 @@ export function ProgressExperience({
     : false;
   const isSummaryUpdating = Boolean(summary.data && !summaryMatchesSelection);
 
+  useLayoutEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const period = hero.querySelector<HTMLElement>('.progress-hero__period');
+    if (!period) return;
+    // Container queries here caused multi-second layout stalls in Demo.
+    const sync = () => {
+      const compact = hero.clientWidth <= 15 * parseFloat(getComputedStyle(hero).fontSize);
+      const periodCompact =
+        period.clientWidth <= 15 * parseFloat(getComputedStyle(period).fontSize);
+      if (hero.hasAttribute('data-compact') !== compact) {
+        hero.toggleAttribute('data-compact', compact);
+      }
+      if (hero.hasAttribute('data-period-compact') !== periodCompact) {
+        hero.toggleAttribute('data-period-compact', periodCompact);
+      }
+    };
+    sync();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
+    observer?.observe(hero);
+    observer?.observe(period);
+    const rootObserver = new MutationObserver(sync);
+    rootObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+    window.addEventListener('resize', sync);
+    return () => {
+      observer?.disconnect();
+      rootObserver.disconnect();
+      window.removeEventListener('resize', sync);
+    };
+  }, []);
+
   useEffect(() => {
     if (!focusMeasurements || !summary.data) return;
     const frame = window.requestAnimationFrame(() => {
@@ -1752,7 +1788,7 @@ export function ProgressExperience({
 
   return (
     <div className="progress-experience progress-experience--approved">
-      <header className="progress-hero">
+      <header className="progress-hero" ref={heroRef}>
         <div className="progress-hero__heading">
           <div className="progress-hero__copy">
             <span className="eyebrow">Факты за период</span>

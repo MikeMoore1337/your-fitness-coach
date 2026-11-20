@@ -37,6 +37,12 @@ for (const width of [320, 360, 390, 393, 430]) {
         document.documentElement.style.fontSize = '32px';
       });
       await page.evaluate(() => document.fonts.ready);
+      const rows = await periods.evaluateAll((elements) =>
+        elements.map((element) => Math.round(element.getBoundingClientRect().top)),
+      );
+      expect(rows[0]).toBe(rows[1]);
+      expect(rows[2]).toBe(rows[3]);
+      expect(rows[2]!).toBeGreaterThan(rows[0]!);
       for (const period of await periods.all()) {
         await expectTextInsideControl(period);
         const box = (await period.boundingBox())!;
@@ -133,4 +139,55 @@ test('ordinary mobile text retains the single-row period and workout headers', a
   const title = (await header.locator('strong').boundingBox())!;
   const back = (await header.getByRole('button', { name: 'К сводке' }).boundingBox())!;
   expect(title.x).toBeGreaterThanOrEqual(back.x + back.width - 1);
+});
+
+test('progress heading adapts when text and viewport sizes change', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await installPlatformApi(page, { browserSession: true, fixedDate: '2026-11-17' });
+  await page.goto('/app?section=progress');
+  const title = page.locator('.progress-hero__copy h1');
+  const help = page.locator('.progress-hero__help summary');
+  await expect(title).toBeVisible();
+  const positions = () =>
+    help.evaluate((element) => {
+      const helpBox = element.getBoundingClientRect();
+      const titleBox = document.querySelector('.progress-hero__copy h1')!.getBoundingClientRect();
+      return {
+        helpTop: helpBox.top,
+        helpLeft: helpBox.left,
+        titleBottom: titleBox.bottom,
+        titleRight: titleBox.right,
+      };
+    });
+  await expect
+    .poll(async () => {
+      const box = await positions();
+      return box.helpLeft >= box.titleRight;
+    })
+    .toBe(true);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '32px';
+  });
+  await expect
+    .poll(async () => {
+      const box = await positions();
+      return box.helpTop >= box.titleBottom - 1;
+    })
+    .toBe(true);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '16px';
+  });
+  await expect
+    .poll(async () => {
+      const box = await positions();
+      return box.helpLeft >= box.titleRight;
+    })
+    .toBe(true);
+  await page.setViewportSize({ width: 200, height: 852 });
+  await expect
+    .poll(async () => {
+      const box = await positions();
+      return box.helpTop >= box.titleBottom - 1;
+    })
+    .toBe(true);
 });

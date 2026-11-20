@@ -4,6 +4,8 @@
 
 Ранее принятые изменения: [карточка Today, PR #1501](https://github.com/MikeMoore1337/your-fitness-coach/pull/1501) и [dock, Quick Add и Today, AFTER на точном SHA](https://github.com/MikeMoore1337/your-fitness-coach/blob/973fdb6097ac4d2cd066d95b9e587c216e454d59/docs/ux/final-issues-acceptance/evidence/994-dock-p2-20261119/README.md).
 
+В ранее принятой версии `890f2ae8` листы Progress в WebKit были сняты до завершения перестройки и показывали обрезанный исходный вид. Снимки ниже пересняты после проверки положения справки и двух рядов периода; этот обновлённый AFTER требует отдельной визуальной приёмки.
+
 ## Увеличенный текст 200%
 
 | Состояние | Браузер | Тема | Ширины и снимки |
