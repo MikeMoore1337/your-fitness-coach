@@ -53,7 +53,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      const nav = page.locator('.app-bottom-nav');
+      const nav = page.locator(width < 900 ? '.app-bottom-nav__primary' : '.app-bottom-nav');
       await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(20px\)/ : 'none');
       await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
@@ -170,7 +170,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+      await expect(page.locator('.app-bottom-nav__primary')).toHaveCSS(
+        'backdrop-filter',
+        /blur\(20px\)/,
+      );
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();

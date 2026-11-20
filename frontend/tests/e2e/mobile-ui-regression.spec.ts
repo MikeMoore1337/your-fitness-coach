@@ -122,11 +122,11 @@ async function assertMobileShellGeometry(page: Page): Promise<void> {
   await expectDockWithinViewport(page);
   await expectElementsWithinHorizontalViewport(
     page,
-    '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__primary > button',
+    '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__quick-add',
   );
   await expectTouchTargets(
     page.locator(
-      '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__primary > button',
+      '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__quick-add',
     ),
   );
   await expectUiAuditClean(page, 'mobile shared shell', { checkTouchTargets: true });

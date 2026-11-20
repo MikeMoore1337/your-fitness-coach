@@ -102,10 +102,7 @@ test('current action and floating dock preserve the shared navigation contract',
     await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
     await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    const panelRadius = await dock.evaluate((element) =>
-      getComputedStyle(element).getPropertyValue('--v2-panel-radius').trim(),
-    );
-    await expect(dock).toHaveCSS('border-radius', panelRadius);
+    await expect(dock.locator('.app-bottom-nav__primary')).toHaveCSS('border-radius', '9999px');
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 
@@ -113,7 +110,7 @@ test('current action and floating dock preserve the shared navigation contract',
       const box = element.getBoundingClientRect();
       const targets = Array.from(
         element.querySelectorAll<HTMLElement>(
-          '.app-bottom-nav__primary > a, .app-bottom-nav__primary > button',
+          '.app-bottom-nav__primary > a, .app-bottom-nav__quick-add',
         ),
       ).map((target) => {
         const targetBox = target.getBoundingClientRect();

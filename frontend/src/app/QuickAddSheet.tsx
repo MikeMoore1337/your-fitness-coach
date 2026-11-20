@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { AppLink } from '../shared/navigation/router';
 import { glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
@@ -74,7 +74,7 @@ export function QuickAddTrigger({
     <button
       aria-haspopup="dialog"
       aria-label="Быстро добавить"
-      {...(inNavigation ? {} : glassProps('tinted', true))}
+      {...glassProps(inNavigation ? 'regular' : 'tinted', true)}
       {...(!inNavigation ? { 'data-glass-accent': 'lime' } : {})}
       className={className}
       data-testid="quick-add-trigger"
@@ -91,9 +91,7 @@ export function QuickAddTrigger({
       ) : (
         <Icon name="plus" size={20} className="app-quick-add-trigger__plus" />
       )}
-      <span className={inNavigation ? 'app-bottom-nav__label' : 'app-quick-add-trigger__label'}>
-        Добавить
-      </span>
+      <span className={inNavigation ? 'sr-only' : 'app-quick-add-trigger__label'}>Добавить</span>
     </button>
   );
 }
@@ -108,7 +106,7 @@ export function QuickAddSheet({
   open: boolean;
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const layer = panelRef.current?.parentElement;
     const trigger = layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger');
@@ -159,8 +157,12 @@ export function QuickAddSheet({
         role="dialog"
         tabIndex={-1}
       >
+        <div aria-hidden="true" className="app-quick-add-panel__grip" />
         <header className="app-quick-add-panel__header">
-          <h2 id="quick-add-title">Что добавить?</h2>
+          <div>
+            <p className="app-quick-add-panel__eyebrow">Быстрое добавление</p>
+            <h2 id="quick-add-title">Что добавить?</h2>
+          </div>
           <button
             aria-label="Закрыть быстрые действия"
             className="app-quick-add-panel__close"

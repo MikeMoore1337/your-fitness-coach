@@ -75,6 +75,9 @@ async function assertBottomNavigationGeometry(page: Page, width: number): Promis
     const lastActionRect = lastAction?.getBoundingClientRect() ?? null;
     const floatingAction = document.querySelector<HTMLElement>('.app-quick-add-trigger');
     const floatingActionRect = floatingAction?.getBoundingClientRect() ?? null;
+    const capsuleRect = navigation
+      .querySelector<HTMLElement>('.app-bottom-nav__primary')
+      ?.getBoundingClientRect();
     const overlaps = (left: DOMRect, right: DOMRect) =>
       left.left < right.right &&
       left.right > right.left &&
@@ -91,7 +94,7 @@ async function assertBottomNavigationGeometry(page: Page, width: number): Promis
       viewportHeight: window.innerHeight,
       viewportBottomGap: window.innerHeight - navigationRect.bottom,
       floatingActionOverlap: Boolean(
-        floatingActionRect && overlaps(floatingActionRect, navigationRect),
+        floatingActionRect && capsuleRect && overlaps(floatingActionRect, capsuleRect),
       ),
     };
   });
@@ -1736,7 +1739,7 @@ for (const viewport of DEMO_VIEWPORTS) {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`production composition keeps responsive geometry, utility and keyboard focus (${viewport.name} ${colorScheme})`, async ({
       browser,
-    }) => {
+    }, testInfo) => {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
         colorScheme,
@@ -1755,6 +1758,7 @@ for (const viewport of DEMO_VIEWPORTS) {
           page,
           '.demo-cabinet-boundary, .demo-route, .app-section',
         );
+        await page.screenshot({ path: testInfo.outputPath('demo-before-audit.png') });
         await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} top`, {
           checkTouchTargets: viewport.mobile,
         });

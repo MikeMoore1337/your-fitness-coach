@@ -279,8 +279,10 @@ export function AppShell({
   const brandTo = demo?.brandTo ?? '/app?section=today';
   const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
   const shellVisible = Boolean(user || demo);
-  const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
-  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
+  const quickAddVisible =
+    shellVisible &&
+    (Boolean(demo) || section !== undefined || (mobileNavigation && path === '/admin'));
+  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation;
   const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
   const inlineQuickAdd = Boolean(quickAddTarget && !demo && section === 'progress');
   useLayoutEffect(() => {
@@ -467,30 +469,34 @@ export function AppShell({
   return (
     <AiCoachWorkspaceProvider>
       <div className="app-shell app-shell--design-v2">
-        {!demo && shellVisible && mobileNavigation && (
-          <header className="app-mobile-header">
+        {shellVisible && mobileNavigation && (
+          <header className={`app-mobile-header${demo ? ' app-mobile-header--demo' : ''}`}>
             <AppLink
               className="app-mobile-header__brand"
               to={resolvedBrandTo}
-              aria-label="Your Fitness Coach — сегодня"
+              aria-label={demo ? 'Your Fitness Coach — демо' : 'Your Fitness Coach — сегодня'}
             >
               <BrandLockup markClassName="app-mobile-header__brand-mark" />
             </AppLink>
             <button
-              id="appProfileButton"
+              id={demo ? 'appMoreButton' : 'appProfileButton'}
               type="button"
               className={`app-mobile-header__profile${moreOpen || secondaryActive ? ' is-active' : ''}`}
               aria-expanded={moreOpen}
               aria-controls="appMorePanel"
-              aria-label="Открыть профиль и настройки"
+              aria-label={demo ? 'Сценарии' : 'Открыть профиль и настройки'}
               onClick={(event) => (moreOpen ? closeMore() : openMore(event.currentTarget))}
             >
-              <AccountAvatar
-                className="app-bottom-nav__avatar"
-                customAvatarVersion={user?.custom_avatar?.updated_at}
-                name={displayName}
-                photoUrl={user?.photo_url}
-              />
+              {demo ? (
+                <AppNavigationIcon name="more" />
+              ) : (
+                <AccountAvatar
+                  className="app-bottom-nav__avatar"
+                  customAvatarVersion={user?.custom_avatar?.updated_at}
+                  name={displayName}
+                  photoUrl={user?.photo_url}
+                />
+              )}
             </button>
           </header>
         )}
@@ -520,7 +526,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps('regular', true)}
+              {...(embeddedQuickAddVisible ? {} : glassProps('regular', true))}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >
@@ -578,7 +584,10 @@ export function AppShell({
                 </div>
               )}
 
-              <div className="app-bottom-nav__primary">
+              <div
+                className="app-bottom-nav__primary"
+                {...(embeddedQuickAddVisible ? glassProps('regular') : {})}
+              >
                 {shellDestinations.map((destination) => {
                   const destinationKey =
                     'section' in destination ? destination.section : destination.key;
@@ -613,7 +622,7 @@ export function AppShell({
                     </AppLink>
                   );
                 })}
-                {demo && (
+                {demo && !mobileNavigation && (
                   <button
                     id="appMoreButton"
                     type="button"
@@ -626,8 +635,8 @@ export function AppShell({
                     <span className="app-bottom-nav__label">Сценарии</span>
                   </button>
                 )}
-                {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
               </div>
+              {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
 
               {!demo && (
                 <div

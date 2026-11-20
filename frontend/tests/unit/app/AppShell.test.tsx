@@ -333,10 +333,9 @@ describe('AppShell', () => {
     resize(390);
     await waitFor(() =>
       expect(
-        within(document.querySelector('.app-bottom-nav__primary') as HTMLElement).getByRole(
-          'button',
-          { name: 'Быстро добавить' },
-        ),
+        within(document.querySelector('#appBottomNav') as HTMLElement).getByRole('button', {
+          name: 'Быстро добавить',
+        }),
       ).toBeInTheDocument(),
     );
     expect(
@@ -361,7 +360,7 @@ describe('AppShell', () => {
     expect(screen.getAllByRole('button', { name: 'Быстро добавить' })).toHaveLength(1);
   });
 
-  it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {
+  it('размещает добавление рядом с четырьмя вкладками dock и возвращает на него фокус', () => {
     stubViewport(390);
     navigation.path = '/app';
     render(<AppShell section="today">Содержимое</AppShell>);
@@ -372,9 +371,10 @@ describe('AppShell', () => {
       'План',
       'Питание',
       'Прогресс',
-      'Добавить',
     ]);
-    const add = within(primary as HTMLElement).getByRole('button', { name: 'Быстро добавить' });
+    const dock = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(dock).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(primary.parentElement);
     expect(add.querySelector('svg[data-icon="plus"]')).toBeInTheDocument();
     expect(add).not.toHaveAttribute('aria-current');
     expect(add).not.toHaveClass('is-active');
@@ -385,6 +385,46 @@ describe('AppShell', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
     expect(add).toHaveFocus();
+  });
+
+  it('keeps the demo quick add in the same navigation group and its scenario menu available', () => {
+    stubViewport(390);
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/',
+          moreLinks: [],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо-содержимое
+      </AppShell>,
+    );
+    const navigation = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(navigation).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(
+      navigation.querySelector('.app-bottom-nav__primary')?.parentElement,
+    );
+    expect(document.querySelector('.app-quick-add-trigger--floating')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
+    expect(screen.getByRole('dialog', { name: 'Демо' })).toBeInTheDocument();
+  });
+
+  it('keeps quick add available in the personal dock on the mobile admin route', () => {
+    stubViewport(390);
+    navigation.path = '/admin';
+    user.is_root = true;
+    render(<AppShell>Администрирование</AppShell>);
+    const dock = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(dock).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(dock.querySelector('.app-bottom-nav__primary')?.parentElement);
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
   });
 
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {

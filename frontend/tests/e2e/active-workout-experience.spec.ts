@@ -7683,7 +7683,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
 
   for (const width of [320, 360, 393, 430]) {
     for (const theme of ['dark', 'light'] as const) {
-      test(`five-item dock preserves the workout across quick add and navigation at ${width}px ${theme}`, async ({
+      test(`dock 4+1 preserves the workout across quick add and navigation at ${width}px ${theme}`, async ({
         page,
       }, testInfo) => {
         const pageErrors: string[] = [];
@@ -7702,7 +7702,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         const add = navigation.getByRole('button', { name: 'Быстро добавить', exact: true });
         await expect(
           navigation.locator('.app-bottom-nav__primary > a, .app-bottom-nav__primary > button'),
-        ).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс', 'Добавить']);
+        ).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс']);
         await expect(add).toBeVisible();
         await context.panel.getByRole('button', { name: '+30 сек' }).tap();
         await expect(context.panel.getByRole('timer')).toHaveText('1:58');
