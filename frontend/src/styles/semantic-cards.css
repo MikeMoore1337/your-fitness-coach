@@ -56,8 +56,8 @@
 }
 
 .semantic-card--compact {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--v2-space-3);
   padding: var(--v2-space-4);
@@ -67,6 +67,7 @@
 
 .semantic-card__icon {
   display: grid;
+  flex: 0 0 44px;
   place-items: center;
   width: 44px;
   height: 44px;
@@ -75,8 +76,10 @@
 
 .semantic-card__copy {
   display: grid;
+  flex: 1 1 2.5rem;
   min-width: 0;
   gap: 3px;
+  overflow-wrap: anywhere;
 }
 
 .semantic-card__copy h2,
@@ -107,11 +110,13 @@
 
 .semantic-card__action {
   display: flex;
+  min-width: 0;
   align-items: center;
 }
 
 .semantic-card__action > :where(a, button) {
   display: inline-flex;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
   justify-content: center;
@@ -125,7 +130,7 @@
 }
 
 .semantic-card__body {
-  grid-column: 1 / -1;
+  flex-basis: 100%;
   padding-top: var(--v2-space-3);
   border-top: 1px solid var(--v2-border);
 }

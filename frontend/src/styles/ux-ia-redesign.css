@@ -1682,6 +1682,151 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-width: 44px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-orientation='horizontal']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-height: 52px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 2px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns='1']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-height: 44px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 2px 0;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-orientation='single-mixed']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn:nth-child(n + 4) {
+    min-height: 52px;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__label {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  html:has(.app-bottom-nav[data-dock-columns]:not([data-dock-columns='4']))
+    .app-shell--design-v2
+    #appContent
+    :where(button, a, input, select, textarea, summary) {
+    scroll-margin-bottom: 0;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel {
+    padding-inline: 4px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header {
+    gap: 4px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__actions {
+    grid-auto-rows: max-content;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action {
+    height: auto;
+    grid-template-columns: 20px minmax(0, 1fr) 16px;
+    gap: 4px;
+    padding-inline: 0;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action__icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action__copy strong {
+    display: block;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    .today-dashboard__header
+    h1 {
+    font-size: clamp(2rem, 22vw, 3rem);
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    :is(.today-workout-copy h2, .today-workout-copy p) {
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    .today-workout-actions
+    .today-pulse-action {
+    width: 100%;
+  }
+
+  @media (max-width: 319px) {
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px;
+      gap: 6px;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header h2 {
+      grid-row: 2;
+      grid-column: 1 / -1;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__close {
+      grid-row: 1;
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 240px) {
+    html:has(.app-bottom-nav[data-dock-reflow='true'])
+      .app-shell--design-v2:has(.app-section--today)
+      .app-mobile-header {
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true'])
+      .app-shell--design-v2:has(.app-section--today)
+      .app-mobile-header__brand {
+      flex: 1 0 100%;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true'])
+      .app-shell--design-v2:has(.app-section--today)
+      .app-mobile-header__profile {
+      margin-left: auto;
+    }
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
     .app-bottom-nav__primary
     .app-bottom-nav__btn:not([data-yfc-choice]) {
     min-width: 0;
@@ -1807,6 +1952,16 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     padding: 4px;
     border: 1px solid var(--glass-edge);
     border-radius: 9999px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='2'] .app-bottom-nav__primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 24px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='1'] .app-bottom-nav__primary {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 24px;
   }
 
   :root .app-shell--design-v2 .app-bottom-nav .app-bottom-nav__quick-add {
@@ -2786,4 +2941,11 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   .app-section--progress .progress-experience--approved .cardio-summary-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help:has(.contextual-help[open]) {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
 }

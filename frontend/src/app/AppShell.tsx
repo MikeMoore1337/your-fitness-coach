@@ -393,24 +393,113 @@ export function AppShell({
     }
 
     const syncNavigationHeight = () => {
-      root.style.setProperty(
-        '--app-bottom-nav-height',
-        mobileNavigationMatches() ? `${navigation.getBoundingClientRect().height}px` : '0px',
-      );
+      const height = mobileNavigationMatches()
+        ? `${navigation.getBoundingClientRect().height}px`
+        : '0px';
+      if (root.style.getPropertyValue('--app-bottom-nav-height') !== height) {
+        root.style.setProperty('--app-bottom-nav-height', height);
+      }
     };
 
-    syncNavigationHeight();
-    window.addEventListener('resize', syncNavigationHeight);
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncNavigationHeight);
+    let disposed = false;
+    let rootFontSize = getComputedStyle(root).fontSize;
+    const syncDockLayout = () => {
+      if (disposed || !embeddedQuickAddVisible) return;
+      const labels = Array.from(
+        navigation.querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label'),
+      );
+      const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
+      if (!primary || labels.length !== 4) return;
+      const navStyle = getComputedStyle(primary);
+      const width =
+        primary.clientWidth -
+        parseFloat(navStyle.paddingLeft) -
+        parseFloat(navStyle.paddingRight);
+      const gap = parseFloat(navStyle.columnGap) || 0;
+      const need = Math.max(
+        44,
+        ...labels.map((label) => {
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          return (
+            Math.ceil(
+              typeof range.getBoundingClientRect === 'function'
+                ? range.getBoundingClientRect().width
+                : label.scrollWidth,
+            ) + 2
+          );
+        }),
+      );
+      const largeText = parseFloat(getComputedStyle(labels[0]!).fontSize) >= 20;
+      const horizontal = largeText && (width - gap) / 2 >= need + 25;
+      const standardText =
+        parseFloat(getComputedStyle(root).fontSize) <= 16 && window.innerWidth >= 320;
+      const availableColumns = window.innerWidth < 320 ? [2, 1] : [4, 2, 1];
+      const columns = standardText
+        ? 4
+        : horizontal
+          ? 2
+          : (availableColumns.find((count) => (width - (count - 1) * gap) / count >= need) ?? 1);
+      const orientation = horizontal
+        ? 'horizontal'
+        : columns === 1
+          ? width >= need + 25
+            ? 'single-horizontal'
+            : 'single-mixed'
+          : 'vertical';
+      const reflow = parseFloat(getComputedStyle(root).fontSize) >= 24 || window.innerWidth < 320;
+      if (navigation.dataset.dockColumns !== String(columns)) {
+        navigation.dataset.dockColumns = String(columns);
+      }
+      if (navigation.dataset.dockOrientation !== orientation) {
+        navigation.dataset.dockOrientation = orientation;
+      }
+      if (navigation.dataset.dockReflow !== String(reflow)) {
+        navigation.dataset.dockReflow = String(reflow);
+      }
+    };
+    const sync = () => {
+      if (disposed) return;
+      syncDockLayout();
+      syncNavigationHeight();
+    };
+    const rootObserver = new MutationObserver(() => {
+      const current = getComputedStyle(root).fontSize;
+      if (current !== rootFontSize) {
+        rootFontSize = current;
+        sync();
+      }
+    });
+    const selectionObserver = new MutationObserver(sync);
+    rootObserver.observe(root, { attributes: true, attributeFilter: ['style', 'class'] });
+    selectionObserver.observe(navigation, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-current'],
+    });
+    sync();
+    window.addEventListener('resize', sync);
+    document.fonts?.addEventListener('loadingdone', sync);
+    void document.fonts?.ready.then(sync);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
     observer?.observe(navigation);
+    navigation
+      .querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label')
+      .forEach((label) => observer?.observe(label));
 
     return () => {
+      disposed = true;
       observer?.disconnect();
-      window.removeEventListener('resize', syncNavigationHeight);
+      rootObserver.disconnect();
+      selectionObserver.disconnect();
+      window.removeEventListener('resize', sync);
+      document.fonts?.removeEventListener('loadingdone', sync);
+      delete navigation.dataset.dockColumns;
+      delete navigation.dataset.dockOrientation;
+      delete navigation.dataset.dockReflow;
       root.style.removeProperty('--app-bottom-nav-height');
     };
-  }, [mobileNavigation, shellVisible]);
+  }, [mobileNavigation, shellVisible, embeddedQuickAddVisible]);
 
   useEffect(() => {
     if (moreOpen) {

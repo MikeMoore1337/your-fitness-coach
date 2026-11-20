@@ -3680,10 +3680,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-workout-focus__header {
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
   }
 
   .today-workout-focus__header > div {
+    flex: 1 0 max-content;
+    min-width: 0;
+    max-width: 100%;
     justify-items: end;
   }
 
@@ -3956,6 +3961,30 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   flex: 0 0 28px;
 }
 
+.app-section--progress .progress-hero[data-compact] .progress-hero__heading {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-section--progress .progress-hero[data-compact] .progress-hero__help,
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help:has(.contextual-help[open]) {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+  width: 100%;
+}
+
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help
+  .contextual-help
+  > summary {
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help {
   display: block;
   width: 100%;
@@ -4016,6 +4045,22 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     padding-inline: var(--v2-space-2);
     white-space: nowrap;
   }
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls__tabs {
+  overflow: visible;
+  padding: calc(var(--focus-width) + var(--focus-offset));
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls .ui-tabs {
+  flex-wrap: wrap;
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls .ui-tab {
+  flex: 1 1 40%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .app-section--progress .progress-period-controls__meta {

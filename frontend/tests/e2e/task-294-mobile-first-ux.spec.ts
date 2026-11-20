@@ -406,6 +406,117 @@ test('Task 294 keeps Today secondary cards readable across desktop and mobile wi
   }
 });
 
+test('Today compact cards keep text and actions separate with enlarged text', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-09-06T12:00:00+03:00'));
+  await installPlatformApi(page, {
+    browserSession: true,
+    fixedDate: FIXED_DATE,
+    cardioState: 'completed',
+    progressState: 'sparse',
+    programHistory: 'many',
+  });
+  let saved = false;
+  await page.route(/\/api\/v1\/check-ins\/daily(?:\?.*)?$/, async (route) => {
+    await route.fulfill({
+      json: {
+        local_date: FIXED_DATE,
+        today: FIXED_DATE,
+        timezone: 'Europe/Moscow',
+        record: saved
+          ? {
+              id: 82,
+              user_id: 7,
+              local_date: FIXED_DATE,
+              timezone_at_entry: 'Europe/Moscow',
+              sleep_quality: 4,
+              sleep_duration_minutes: 420,
+              mood: 5,
+              note: null,
+              source: 'manual',
+              created_at: `${FIXED_DATE}T08:00:00`,
+              updated_at: `${FIXED_DATE}T08:00:00`,
+            }
+          : null,
+      },
+    });
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (saved of [false, true]) {
+      await page.goto(`/app?section=today&wellbeing_date=${FIXED_DATE}`);
+      await page.evaluate((value) => localStorage.setItem('app-theme', value), theme);
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      const cards = [
+        page.locator('.today-summary-card--progress'),
+        page.locator('.today-summary-card--activity'),
+        page.locator(saved ? '.daily-wellbeing-card--saved' : '.daily-wellbeing-card--empty'),
+      ];
+      for (const card of cards) {
+        await expect(card).toBeVisible();
+        await expect(card.locator('.semantic-card__action > :is(a, button)')).toBeVisible();
+      }
+      for (const width of [196, 320, 360, 390, 393, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = '32px';
+        });
+        for (const card of cards) {
+          const geometry = await card.evaluate((element) => {
+            const copy = element.querySelector('.semantic-card__copy')!;
+            const action = element.querySelector('.semantic-card__action > :is(a, button)')!;
+            const actionBox = action.getBoundingClientRect();
+            const cardBox = element.getBoundingClientRect();
+            const actionText = document.createRange();
+            actionText.selectNodeContents(action);
+            const actionLines = [...actionText.getClientRects()].filter(
+              (line) => line.width > 0 && line.height > 0,
+            );
+            const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+            const lines: DOMRect[] = [];
+            while (walker.nextNode()) {
+              const node = walker.currentNode;
+              if (!node.textContent?.trim()) continue;
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              lines.push(...range.getClientRects());
+            }
+            return {
+              lines: lines.length,
+              overlaps: lines.some(
+                (line) =>
+                  line.left < actionBox.right &&
+                  line.right > actionBox.left &&
+                  line.top < actionBox.bottom &&
+                  line.bottom > actionBox.top,
+              ),
+              clipped: lines.some(
+                (line) => line.left < cardBox.left - 1 || line.right > cardBox.right + 1,
+              ),
+              actionClipped:
+                actionBox.left < cardBox.left - 1 || actionBox.right > cardBox.right + 1,
+              actionTextClipped: actionLines.some(
+                (line) => line.left < cardBox.left - 1 || line.right > cardBox.right + 1,
+              ),
+              actionHeight: actionBox.height,
+              actionWidth: actionBox.width,
+            };
+          });
+          expect(geometry.lines, `${theme} ${width}px: text is present`).toBeGreaterThan(0);
+          expect(geometry.overlaps, `${theme} ${width}px: text overlaps action`).toBe(false);
+          expect(geometry.clipped, `${theme} ${width}px: text is clipped`).toBe(false);
+          expect(geometry.actionClipped, `${theme} ${width}px: action is clipped`).toBe(false);
+          expect(geometry.actionTextClipped, `${theme} ${width}px: action text is clipped`).toBe(
+            false,
+          );
+          expect(geometry.actionHeight).toBeGreaterThanOrEqual(44);
+          expect(geometry.actionWidth).toBeGreaterThanOrEqual(44);
+        }
+      }
+    }
+  }
+});
+
 test('Task 294 keeps light-theme lime actions readable with dark ink', async ({ page }) => {
   await installPlatformApi(page, {
     browserSession: true,
