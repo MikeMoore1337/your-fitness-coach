@@ -412,9 +412,7 @@ export function AppShell({
       if (!primary || labels.length !== 4) return;
       const navStyle = getComputedStyle(primary);
       const width =
-        primary.clientWidth -
-        parseFloat(navStyle.paddingLeft) -
-        parseFloat(navStyle.paddingRight);
+        primary.clientWidth - parseFloat(navStyle.paddingLeft) - parseFloat(navStyle.paddingRight);
       const gap = parseFloat(navStyle.columnGap) || 0;
       const need = Math.max(
         44,
