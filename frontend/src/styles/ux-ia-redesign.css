@@ -2822,3 +2822,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help:has(.contextual-help[open]) {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+}
