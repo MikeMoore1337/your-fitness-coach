@@ -1,0 +1,8 @@
+{
+  "engine": "chromium-cdp",
+  "width": 320,
+  "scrollAfter": 50,
+  "scrollFirst": true,
+  "weekChangesOnlyNextGestureAtEdge": true,
+  "status": "PASS"
+}

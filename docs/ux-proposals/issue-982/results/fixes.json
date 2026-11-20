@@ -1,0 +1,46 @@
+[
+  {
+    "engine": "chromium",
+    "motion": "native",
+    "partialDragRestoresFull": true,
+    "partialDragRestoresHalf": true,
+    "backgroundRestoresFull": true,
+    "draftPreserved": true,
+    "longDragCloses": true,
+    "weekReleaseContinuous": true,
+    "weekPointerCancel": true
+  },
+  {
+    "engine": "chromium",
+    "motion": "sport",
+    "partialDragRestoresFull": true,
+    "partialDragRestoresHalf": true,
+    "backgroundRestoresFull": true,
+    "draftPreserved": true,
+    "longDragCloses": true,
+    "weekReleaseContinuous": true,
+    "weekPointerCancel": true
+  },
+  {
+    "engine": "webkit",
+    "motion": "native",
+    "partialDragRestoresFull": true,
+    "partialDragRestoresHalf": true,
+    "backgroundRestoresFull": true,
+    "draftPreserved": true,
+    "longDragCloses": true,
+    "weekReleaseContinuous": true,
+    "weekPointerCancel": true
+  },
+  {
+    "engine": "webkit",
+    "motion": "sport",
+    "partialDragRestoresFull": true,
+    "partialDragRestoresHalf": true,
+    "backgroundRestoresFull": true,
+    "draftPreserved": true,
+    "longDragCloses": true,
+    "weekReleaseContinuous": true,
+    "weekPointerCancel": true
+  }
+]

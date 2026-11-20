@@ -1,0 +1,92 @@
+[
+  {
+    "engine": "chromium",
+    "label": "sheet 1:1 opening preview",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "panel pointercancel and draft",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "resize preserves draft and dialog",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "simulated background preserves draft",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "keyboard focus and Escape",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "rapid period changes leave latest data",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "cinematic skip retains confirmed result",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "show result without animation",
+    "status": "PASS"
+  },
+  {
+    "engine": "chromium",
+    "label": "320px scenario controls do not overlap",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "sheet 1:1 opening preview",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "panel pointercancel and draft",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "resize preserves draft and dialog",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "simulated background preserves draft",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "keyboard focus and Escape",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "rapid period changes leave latest data",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "cinematic skip retains confirmed result",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "show result without animation",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "320px scenario controls do not overlap",
+    "status": "PASS"
+  }
+]

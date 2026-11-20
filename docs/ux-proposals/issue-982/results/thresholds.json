@@ -1,0 +1,55 @@
+[
+  {
+    "engine": "chromium",
+    "label": "short",
+    "status": "PASS",
+    "changed": false
+  },
+  {
+    "engine": "chromium",
+    "label": "slow",
+    "status": "PASS",
+    "changed": false
+  },
+  {
+    "engine": "chromium",
+    "label": "fast-left",
+    "status": "PASS",
+    "changed": true
+  },
+  {
+    "engine": "chromium",
+    "label": "fast-right",
+    "status": "PASS",
+    "changed": true
+  },
+  {
+    "engine": "chromium",
+    "label": "CDP vertical touch scroll",
+    "status": "PASS"
+  },
+  {
+    "engine": "webkit",
+    "label": "short",
+    "status": "PASS",
+    "changed": false
+  },
+  {
+    "engine": "webkit",
+    "label": "slow",
+    "status": "PASS",
+    "changed": false
+  },
+  {
+    "engine": "webkit",
+    "label": "fast-left",
+    "status": "PASS",
+    "changed": true
+  },
+  {
+    "engine": "webkit",
+    "label": "fast-right",
+    "status": "PASS",
+    "changed": true
+  }
+]

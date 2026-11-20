@@ -1,0 +1,590 @@
+{
+  "checks": [
+    {
+      "label": "chromium close is animated, focus restored and reopen interrupts exit",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium double close and Telegram back",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium edge drag interrupts closing",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium half snap keeps expand reachable and draft",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium all close paths",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium reduced motion closes immediately",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium finish focus after natural finish and skip",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium progress data is final at first frame and retargetable",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium week direction, vertical gesture, edge and cancellation",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/320/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/360/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/393/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "chromium/430/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit close is animated, focus restored and reopen interrupts exit",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit double close and Telegram back",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit edge drag interrupts closing",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit half snap keeps expand reachable and draft",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit all close paths",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit reduced motion closes immediately",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit finish focus after natural finish and skip",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit progress data is final at first frame and retargetable",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit week direction, vertical gesture, edge and cancellation",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/320/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/360/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/393/light/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/dark/sport/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/native/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/native/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/native/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/native/finish",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/sport/week",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/sport/sheet",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/sport/progress",
+      "status": "PASS"
+    },
+    {
+      "label": "webkit/430/light/sport/finish",
+      "status": "PASS"
+    }
+  ],
+  "errors": [],
+  "screenshots": 64
+}

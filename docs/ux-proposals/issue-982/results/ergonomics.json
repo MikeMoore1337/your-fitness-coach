@@ -1,0 +1,76 @@
+[
+  {
+    "engine": "chromium",
+    "width": 320,
+    "height": 568,
+    "panelHeight": 426,
+    "closeDistancePx": 306.71999999999997,
+    "fastCloseMinimumPx": 149.1
+  },
+  {
+    "engine": "chromium",
+    "width": 360,
+    "height": 640,
+    "panelHeight": 480,
+    "closeDistancePx": 345.59999999999997,
+    "fastCloseMinimumPx": 168
+  },
+  {
+    "engine": "chromium",
+    "width": 393,
+    "height": 852,
+    "panelHeight": 620,
+    "closeDistancePx": 446.4,
+    "fastCloseMinimumPx": 217
+  },
+  {
+    "engine": "chromium",
+    "width": 430,
+    "height": 932,
+    "panelHeight": 620,
+    "closeDistancePx": 446.4,
+    "fastCloseMinimumPx": 217
+  },
+  {
+    "engine": "webkit",
+    "width": 320,
+    "height": 568,
+    "panelHeight": 426,
+    "closeDistancePx": 306.71999999999997,
+    "fastCloseMinimumPx": 149.1
+  },
+  {
+    "engine": "webkit",
+    "width": 360,
+    "height": 640,
+    "panelHeight": 480,
+    "closeDistancePx": 345.59999999999997,
+    "fastCloseMinimumPx": 168
+  },
+  {
+    "engine": "webkit",
+    "width": 393,
+    "height": 852,
+    "panelHeight": 620,
+    "closeDistancePx": 446.4,
+    "fastCloseMinimumPx": 217
+  },
+  {
+    "engine": "webkit",
+    "width": 430,
+    "height": 932,
+    "panelHeight": 620,
+    "closeDistancePx": 446.4,
+    "fastCloseMinimumPx": 217
+  },
+  {
+    "engine": "chromium-cdp",
+    "scenario": "scrollable-test-fixture",
+    "clientWidth": 262,
+    "scrollWidth": 326,
+    "scrollLeft": 0,
+    "touchAction": "pan-y",
+    "scrollLeftAfter": 0,
+    "weekChanged": true
+  }
+]
