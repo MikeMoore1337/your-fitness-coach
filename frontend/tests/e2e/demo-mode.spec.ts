@@ -1299,6 +1299,40 @@ test.describe('#983', () => {
     await expect(trigger).toBeFocused();
   });
 
+  test('#983 gestures stay local after network loss', async ({ page, context }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await installDemoTransport(page);
+    const writes: string[] = [];
+    page.on('request', (request) => {
+      if (!request.url().endsWith('/transport')) return;
+      const payload = request.postDataJSON() as { path: string; method: string };
+      if (payload.method !== 'GET') writes.push(`${payload.method} ${payload.path}`);
+    });
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+    const rail = week.locator('.week-strip__days');
+    await rail.scrollIntoViewIfNeeded();
+    const range = week.locator('.week-strip__context span');
+    const before = await range.textContent();
+    await context.setOffline(true);
+    const box = (await rail.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 110, y, { steps: 8 });
+    await page.mouse.up();
+    await expect(range).not.toHaveText(before!);
+    await week.getByRole('button', { name: 'Следующая неделя' }).click();
+    await expect(range).toHaveText(before!);
+    await page.getByTestId('quick-add-trigger').click();
+    const sheet = page.getByTestId('quick-add-sheet');
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    expect(writes).toEqual([]);
+  });
+
   test('#983 touch scrolls an overflowing rail before changing week', async ({
     browser,
   }, testInfo) => {
