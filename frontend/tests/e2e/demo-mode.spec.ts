@@ -1181,6 +1181,22 @@ test.describe('#983', () => {
         await expect(week.locator('[aria-pressed="true"] .week-strip__weekday')).toHaveText(
           selectedWeekday!,
         );
+        const previous = await range.textContent();
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x - 20, y, { steps: 5 });
+        await page.mouse.up();
+        await expect(range).toHaveText(previous!);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x - 110, y, { steps: 8 });
+        await page.mouse.up();
+        await expect(range).toHaveText(before!);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + 110, y, { steps: 8 });
+        await page.mouse.up();
+        await expect(range).toHaveText(previous!);
         const evidence = process.env.ISSUE_983_EVIDENCE_DIR;
         if (evidence) {
           mkdirSync(evidence, { recursive: true });
