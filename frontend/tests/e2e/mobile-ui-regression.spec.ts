@@ -930,17 +930,11 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() =>
           page.evaluate(() => {
-            const rootStyle = getComputedStyle(document.documentElement);
             const dock = document.querySelector<HTMLElement>('#appBottomNav');
-            if (!dock) return null;
-            return {
-              viewportBottom: rootStyle.getPropertyValue('--yfc-viewport-bottom').trim(),
-              safeBottom: rootStyle.getPropertyValue('--yfc-layout-safe-bottom').trim(),
-              dockBottomGap: window.innerHeight - dock.getBoundingClientRect().bottom,
-            };
+            return dock ? window.innerHeight - dock.getBoundingClientRect().bottom : 0;
           }),
         )
-        .not.toBeNull();
+        .toBeGreaterThanOrEqual(19);
 
       const measureGeometry = () =>
         page.evaluate(() => {

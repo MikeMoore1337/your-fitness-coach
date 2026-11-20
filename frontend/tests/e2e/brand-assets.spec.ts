@@ -438,7 +438,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     if (viewport.name === 'desktop') {
       await expect(page.locator('.app-bottom-nav__brand .yfc-lockup__wordmark')).toBeVisible();
     } else {
-      await expect(page.locator('.app-bottom-nav--demo .app-bottom-nav__more')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Сценарии', exact: true })).toBeVisible();
     }
   }
 });
