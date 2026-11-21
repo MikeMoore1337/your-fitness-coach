@@ -36,7 +36,8 @@ test('desktop workout keeps one truthful heading and a usable return action', as
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
     for (const width of [900, 1024, 1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
-      await expect(header.locator(':scope > div')).toBeHidden();
+      await expect(header.locator(':scope > div > span')).toBeHidden();
+      await expect(header.getByText('Текущая тренировка')).toBeVisible();
       await expect(header.locator(':scope > span')).toBeHidden();
       await expect(back).toBeVisible();
       await expect(hero.getByText('В процессе', { exact: true })).toBeVisible();

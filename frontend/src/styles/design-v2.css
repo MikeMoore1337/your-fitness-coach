@@ -1778,7 +1778,12 @@ body:has(.app-shell--design-v2) {
     border: 0;
   }
 
-  .today-workout-focus__header > div,
+  .today-workout-focus__header > div {
+    display: block;
+    margin-inline-start: auto;
+  }
+
+  .today-workout-focus__header > div > span,
   .today-workout-focus__header > span {
     display: none;
   }
