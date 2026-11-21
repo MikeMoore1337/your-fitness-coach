@@ -3197,7 +3197,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   .app-desktop-header {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 20;
     display: flex;
     min-height: 74px;
     align-items: center;
