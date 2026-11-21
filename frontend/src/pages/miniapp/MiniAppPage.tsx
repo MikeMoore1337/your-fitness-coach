@@ -438,7 +438,12 @@ export default function MiniAppPage({
       {showSectionHero && (
         <header className="card hero-card">
           <div>
-            <span className="eyebrow">Your Fitness Coach</span>
+            <span className="eyebrow app-section__standard-eyebrow">Your Fitness Coach</span>
+            {(section === 'programs' || section === 'profile') && (
+              <span className="eyebrow app-section__desktop-eyebrow">
+                {section === 'programs' ? 'План тренировок' : 'Аккаунт'}
+              </span>
+            )}
             <h1>{heroTitle}</h1>
             <p className="muted">{heroDescription}</p>
           </div>

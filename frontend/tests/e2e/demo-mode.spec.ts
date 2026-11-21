@@ -1204,6 +1204,41 @@ test('#1500 Today week navigation preserves the selected day and mobile controls
   await expect(selectedDay).toBeFocused();
 });
 
+test('#1500 plan heading uses the desktop design and preserves the mobile label', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=plan');
+  await expect(page.getByRole('heading', { name: 'План', level: 1 })).toBeVisible();
+  await expect(page.locator('.app-section__desktop-eyebrow')).toHaveText('План тренировок');
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeHidden();
+  await expect(page.locator('.app-section__standard-eyebrow')).toBeVisible();
+});
+
+test('#1500 nutrition actions keep focus between desktop and mobile', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const action = page.getByTestId('nutrition-add-product');
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
+  await action.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
+});
+
 test.describe('#983', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`#983 week and Quick Add gestures preserve demo interactions (${theme})`, async ({
