@@ -18,6 +18,40 @@ const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EI
 const replacementMediaThumbnailUrl =
   '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg';
 
+test('desktop workout keeps one truthful heading and a usable return action', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const header = page.locator('.today-workout-focus__header');
+  const back = header.getByRole('button', { name: 'К сводке' });
+  const hero = page.locator('.active-workout-hero');
+  await expect(hero.locator('h2')).toBeVisible();
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate((value) => {
+      localStorage.setItem('app-theme', value);
+      window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+    }, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    for (const width of [900, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(header.locator(':scope > div > span')).toBeHidden();
+      await expect(header.getByText('Текущая тренировка')).toBeVisible();
+      await expect(header.locator(':scope > span')).toBeHidden();
+      await expect(back).toBeVisible();
+      await expect(hero.getByText('В процессе', { exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width,
+      );
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(header.getByText('Текущая тренировка')).toBeVisible();
+  await back.click();
+  await expect(page.locator('.today-dashboard')).toBeVisible();
+});
+
 test.use({
   serviceWorkers: 'block',
   video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on',

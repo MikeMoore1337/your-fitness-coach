@@ -398,6 +398,22 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   white-space: nowrap;
 }
 
+.app-section--programs .program-active__summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-section--programs .program-active__desktop-edit {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .app-section--programs .program-active__desktop-edit {
+    display: inline-flex;
+  }
+}
+
 .app-section--programs .programs-content {
   display: grid;
   gap: var(--v2-space-5);
@@ -2583,6 +2599,47 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-section--progress .progress-experience--approved .progress-hero__download {
   grid-area: download;
   min-width: 0;
+}
+
+.app-section--progress .progress-hero__selection {
+  display: none;
+}
+
+@media (min-width: 1101px) {
+  .app-section--progress .progress-experience--approved .progress-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'heading download'
+      'period period';
+    row-gap: var(--v2-space-4);
+  }
+
+  .app-section--progress .progress-hero__selection {
+    display: block;
+  }
+
+  .app-section--progress .progress-hero__download {
+    justify-self: end;
+    align-self: end;
+  }
+
+  .app-section--progress .progress-period-controls {
+    grid-template-columns: minmax(5rem, 1fr) minmax(0, 620px);
+    align-items: center;
+  }
+
+  .app-section--progress .progress-period-controls::before {
+    content: 'Период';
+    color: var(--v2-text-secondary);
+  }
+
+  .app-section--progress .progress-period-controls__meta {
+    grid-column: 2;
+  }
+
+  .app-section--progress .progress-period-controls__custom {
+    grid-column: 1 / -1;
+  }
 }
 
 .app-section--progress .progress-experience--approved .progress-details {

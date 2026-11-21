@@ -1771,6 +1771,24 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-primary);
 }
 
+@media (min-width: 900px) {
+  .today-workout-focus__header {
+    display: flex;
+    padding: 0;
+    border: 0;
+  }
+
+  .today-workout-focus__header > div {
+    display: block;
+    margin-inline-start: auto;
+  }
+
+  .today-workout-focus__header > div > span,
+  .today-workout-focus__header > span {
+    display: none;
+  }
+}
+
 /* Nutrition diary core */
 .nutrition-diary--design-v2 {
   gap: var(--v2-space-4);

@@ -7,6 +7,52 @@ import {
   TelegramHarness,
 } from './fixtures/mobile-tma';
 
+test('desktop plan opens the existing editor and restores focus without changing mobile actions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installPlatformApi(page, { browserSession: true, programHistory: 'many' });
+  const templatesResponse = page.waitForResponse('**/api/v1/programs/templates/mine');
+  await page.goto('/app?section=programs');
+  const templates = await (await templatesResponse).json();
+  const edit = page.getByRole('button', { name: 'Редактировать шаблон', exact: true });
+  await expect(edit).toBeVisible();
+  for (const width of [900, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const actionBounds = await page.locator('.program-active__summary-actions').evaluate((node) => {
+      const parent = node.getBoundingClientRect();
+      return Array.from(node.querySelectorAll('a, button')).every((item) => {
+        const box = item.getBoundingClientRect();
+        return box.left >= parent.left - 1 && box.right <= parent.right + 1;
+      });
+    });
+    expect(actionBounds).toBe(true);
+    await expectNoHorizontalOverflow(page);
+  }
+  await edit.click();
+  const editor = page.locator('.program-editor-modal');
+  await expect(editor.getByLabel('Название', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(editor).toHaveCount(0);
+  await expect(edit).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(edit).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Управление программой' })).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({
+      json: templates.map((template: { is_active_for_current_user: boolean }) =>
+        template.is_active_for_current_user
+          ? { ...template, assigned_by_user_id: 999999 }
+          : template,
+      ),
+    }),
+  );
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Управление программой' })).toBeVisible();
+  await expect(edit).toHaveCount(0);
+});
+
 const longTitle = 'Присед со штангой с контролируемой паузой в нижней точке и медленным подъёмом';
 const exercises = Array.from({ length: 12 }, (_, index) => ({
   id: 11 + index,

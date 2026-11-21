@@ -10,6 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { QuickAddPlacementContext } from '../../app/QuickAddPlacementContext';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
@@ -1679,6 +1680,38 @@ export function ProgressExperience({
   timeZone?: string | null;
 } = {}) {
   const heroRef = useRef<HTMLElement>(null);
+  const [desktopReport, setDesktopReport] = useState(
+    () => window.matchMedia?.('(min-width: 1101px)').matches ?? window.innerWidth >= 1101,
+  );
+  const [reportHost] = useState(() => document.createElement('div'));
+  const desktopReportSlot = useRef<HTMLDivElement>(null);
+  const mobileReportSlot = useRef<HTMLDivElement>(null);
+  const pendingReportFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 1101px)');
+    const sync = () => {
+      pendingReportFocus.current =
+        document.activeElement instanceof HTMLElement && reportHost.contains(document.activeElement)
+          ? document.activeElement
+          : null;
+      setDesktopReport(media?.matches ?? window.innerWidth >= 1101);
+    };
+    media?.addEventListener?.('change', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      media?.removeEventListener?.('change', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [reportHost]);
+  useLayoutEffect(() => {
+    const target = desktopReport ? desktopReportSlot.current : mobileReportSlot.current;
+    if (!target || target.contains(reportHost)) return;
+    target.appendChild(reportHost);
+    if (pendingReportFocus.current?.isConnected && document.activeElement === document.body) {
+      pendingReportFocus.current.focus({ preventScroll: true });
+    }
+    pendingReportFocus.current = null;
+  }, [desktopReport, reportHost]);
   const { navigate, search } = useNavigation();
   const view = progressView ?? parseProgressView(search, window.location.hash);
   const selection = useMemo(() => parseProgressSelection(search), [search]);
@@ -1793,6 +1826,11 @@ export function ProgressExperience({
           <div className="progress-hero__copy">
             <span className="eyebrow">Факты за период</span>
             <h1>Прогресс</h1>
+            <p className="progress-hero__selection">
+              {selection.kind === 'preset'
+                ? `Выбрано: ${selection.days} дней`
+                : `Выбран период: ${periodDateLabel(selection.dateFrom, selection.dateTo)}`}
+            </p>
           </div>
           <div className="progress-hero__help">
             <ContextualHelp
@@ -1806,6 +1844,7 @@ export function ProgressExperience({
             </ContextualHelp>
           </div>
         </div>
+        {desktopReport && <div className="progress-hero__download" ref={desktopReportSlot} />}
         <div className="progress-hero__period">
           <ProgressPeriodControls
             onApplyCustom={applyCustom}
@@ -1815,8 +1854,9 @@ export function ProgressExperience({
             today={today}
           />
         </div>
-        <div className="progress-hero__download">
-          {canExport ? (
+        {!desktopReport && <div className="progress-hero__download" ref={mobileReportSlot} />}
+        {createPortal(
+          canExport ? (
             <AppLink
               className="button-link secondary-link"
               to={progressReportPath(selection, view)}
@@ -1827,8 +1867,9 @@ export function ProgressExperience({
             <button className="button-link secondary-link" disabled type="button">
               <Icon name="print" size={16} /> Скачать отчёт
             </button>
-          )}
-        </div>
+          ),
+          reportHost,
+        )}
       </header>
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />
