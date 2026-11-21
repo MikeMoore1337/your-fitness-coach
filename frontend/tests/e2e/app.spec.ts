@@ -4088,18 +4088,12 @@ test('тренер открывает кабинет', async ({ page }) => {
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .locator('.app-bottom-nav__primary')
-    .getByRole('link', { name: 'Клиенты', exact: true })
-    .click();
+  const clientsTab = page
+    .getByRole('tablist', { name: 'Разделы тренера' })
+    .getByRole('tab', { name: 'Клиенты', exact: true });
+  await clientsTab.click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Основная навигация' })
-      .locator('.app-bottom-nav__primary')
-      .getByRole('link', { name: 'Клиенты', exact: true }),
-  ).toHaveAttribute('aria-current', 'page');
+  await expect(clientsTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveCount(0);
   await expect(page.getByText('Клиентов пока нет')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
