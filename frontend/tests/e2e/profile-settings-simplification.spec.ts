@@ -48,10 +48,11 @@ test('desktop account entry stays available across primary sections and never op
 
   // The profile module is lazy-loaded; ensure all disclosures mounted first.
   await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(6);
-  const cardHeights = await page
-    .locator('.profile-settings > details.card-disclosure')
-    .evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
-  expect(Math.max(...cardHeights) - Math.min(...cardHeights)).toBeLessThanOrEqual(1);
+  await expect(page.locator('#profile-personal')).toHaveJSProperty('open', true);
+  const summaryHeights = await page
+    .locator('.profile-settings > details.card-disclosure:not([open]) > summary')
+    .evaluateAll((summaries) => summaries.map((summary) => summary.getBoundingClientRect().height));
+  expect(Math.max(...summaryHeights) - Math.min(...summaryHeights)).toBeLessThanOrEqual(1);
 
   await accountEntry.click();
   await expect(page).toHaveURL(/\/app\?section=profile$/);
@@ -200,10 +201,12 @@ test('captures matching compact Profile state in light and dark themes', async (
       if (surface.hasTouch) {
         await expect(page.locator('.profile-identity')).not.toBeAttached();
         await expect(page.locator('.app-desktop-account-entry')).not.toBeVisible();
+        await expect(page.locator('.profile-settings > details[open]')).toHaveCount(0);
       } else {
         await expect(page.locator('.app-desktop-account-entry')).toBeVisible();
+        await expect(page.locator('.profile-settings > details[open]')).toHaveCount(1);
+        await expect(page.locator('#profile-personal')).toHaveJSProperty('open', true);
       }
-      await expect(page.locator('.profile-settings > details[open]')).toHaveCount(0);
       await page.screenshot({
         path: `../.artifacts/screenshots/task-122/profile-compact-${surface.name}-${theme}.png`,
         fullPage: surface.fullPage,
