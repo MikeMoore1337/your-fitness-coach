@@ -70,33 +70,39 @@ test('strength stages stay operable with reduced motion', async ({ page }) => {
   await page.goto('/#strength');
   const scene = page.locator('.strength-scene');
   await expect(scene).toHaveAttribute('id', 'strength');
-  const contrast = await scene
-    .locator('.strength-scene__copy > p:last-child')
-    .evaluate((element) => {
-      const channels = (value: string) =>
-        value
-          .match(/\d+/g)!
-          .slice(0, 3)
-          .map(Number)
-          .map((v) => {
-            const c = v / 255;
-            return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-          });
-      const luminance = (value: string) => {
-        const [r, g, b] = channels(value);
-        return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
-      };
-      const foreground = luminance(getComputedStyle(element).color);
-      const background = luminance(
-        getComputedStyle(element.closest('.strength-scene')!).backgroundColor,
-      );
-      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
-    });
-  expect(contrast).toBeGreaterThanOrEqual(4.5);
-  const effort = scene.getByRole('button', { name: 'Усилие' });
-  const record = scene.getByRole('button', { name: 'Запись' });
   const result = scene.getByRole('button', { name: 'Результат' });
   await expect(result).toHaveAttribute('aria-pressed', 'true');
+  const contrast = await scene.evaluate((element) => {
+    const channels = (value: string) =>
+      value
+        .match(/\d+/g)!
+        .slice(0, 3)
+        .map(Number)
+        .map((v) => {
+          const c = v / 255;
+          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+    const luminance = (value: string) => {
+      const [r, g, b] = channels(value);
+      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+    };
+    const ratio = (foreground: Element, background: Element) => {
+      const fg = luminance(getComputedStyle(foreground).color);
+      const bg = luminance(getComputedStyle(background).backgroundColor);
+      return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+    };
+    return {
+      note: ratio(element.querySelector('.strength-scene__copy > p:last-child')!, element),
+      record: ratio(
+        element.querySelector('[data-record]')!,
+        element.querySelector('.strength-scene__record')!,
+      ),
+    };
+  });
+  expect(contrast.note).toBeGreaterThanOrEqual(4.5);
+  expect(contrast.record).toBeGreaterThanOrEqual(4.5);
+  const effort = scene.getByRole('button', { name: 'Усилие' });
+  const record = scene.getByRole('button', { name: 'Запись' });
   await effort.focus();
   await page.keyboard.press('Enter');
   await expect(effort).toHaveAttribute('aria-pressed', 'true');
@@ -122,3 +128,17 @@ test('strength scene stays in flow in a short viewport', async ({ page }) => {
   await scene.getByRole('button', { name: 'Результат' }).click();
   await expect(scene.locator('.strength-scene__result')).toBeVisible();
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`scene choices use the shared selected state in ${theme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await page.goto('/for-trainers');
+    const choices = page.locator('#coach-program .ref-tabs button');
+    await expect(choices.first()).toHaveAttribute('data-yfc-choice', 'compact');
+    await choices.nth(1).click();
+    await expect(choices.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    await expect(choices.first()).toHaveAttribute('aria-pressed', 'false');
+    await expect(choices.nth(1)).toHaveCSS('background-image', /linear-gradient/);
+  });
+}

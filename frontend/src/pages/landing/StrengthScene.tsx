@@ -28,6 +28,9 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
     const result = node.querySelector<HTMLElement>('.strength-scene__result')!;
     const indicators = node.querySelectorAll<HTMLElement>('[data-step]');
     const announcement = node.querySelector<HTMLElement>('[data-strength-announcement]')!;
+    const header = interactive
+      ? document.querySelector<HTMLElement>('.public-shell__header')
+      : null;
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let frame = 0;
     let displayed: number | null = null;
@@ -51,6 +54,14 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
     }
     function render(time: number) {
       frame = 0;
+      if (interactive) {
+        const headerHeight = header?.offsetHeight ?? 0;
+        node!.style.setProperty('--strength-header', `${headerHeight}px`);
+        node!.classList.toggle(
+          'is-flow',
+          sticky.scrollHeight > window.innerHeight - headerHeight + 2,
+        );
+      }
       const bounds = node!.getBoundingClientRect();
       const photoBounds = photo.parentElement!.getBoundingClientRect();
       const target = media?.matches
@@ -99,6 +110,7 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
     if (interactive) indicators.forEach((indicator) => indicator.addEventListener('click', choose));
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     resize?.observe(sticky);
+    if (header) resize?.observe(header);
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', schedule);
     document.addEventListener('visibilitychange', visibility);
@@ -132,6 +144,12 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
           <p>Движение не распознаётся автоматически. Результат отмечаете вы.</p>
         </div>
         <div className="strength-scene__visual">
+          {interactive && (
+            <>
+              <span className="strength-scene__label">Демонстрационный подход · 18 кг</span>
+              <h3>Тяга гантели</h3>
+            </>
+          )}
           <div
             className="strength-scene__steps"
             role={interactive ? 'group' : undefined}
@@ -186,7 +204,7 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
             </div>
             <div className="strength-scene__result" hidden>
               <Icon name="exercise" size={110} />
-              <strong>Подход сохранён.</strong>
+              <strong>{interactive ? 'Подход сохранён в примере.' : 'Подход сохранён.'}</strong>
               <span>18 кг × 3 повторения</span>
             </div>
           </div>

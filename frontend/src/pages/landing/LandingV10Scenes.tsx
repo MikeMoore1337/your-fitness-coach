@@ -173,6 +173,7 @@ export function ArchiveNutrition() {
               <button
                 key={key}
                 {...glassProps('clear', true)}
+                data-yfc-choice="compact"
                 aria-pressed={tab === key}
                 onClick={() => setTab(key!)}
               >
@@ -335,6 +336,7 @@ export function ArchiveCoachWork({ compact = false }: { compact?: boolean } = {}
           <button
             key={key}
             {...glassProps('clear', true)}
+            data-yfc-choice="compact"
             aria-pressed={tab === key}
             onClick={() => setTab(key!)}
           >
