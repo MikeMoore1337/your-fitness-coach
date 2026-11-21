@@ -140,7 +140,7 @@ export function ArchiveNutrition() {
   const [recorded, setRecorded] = useState(false);
   return (
     <LandingChapter id="nutrition" className="ref-section ref-nutrition">
-      <div className="ref-photo-copy">
+      <div className="ref-nutrition-image">
         <img
           src="/assets/marketing/nutrition-photo.webp"
           width="1024"
@@ -148,16 +148,14 @@ export function ArchiveNutrition() {
           alt="Завтрак с овсянкой, фруктами и ягодами"
           loading="lazy"
         />
-        <div>
-          <p className="landing-kicker">КОНТЕКСТ / ПИТАНИЕ</p>
-          <h2>
-            Планируйте.
-            <br />
-            <em>Отмечайте факт.</em>
-          </h2>
-        </div>
       </div>
       <div className="ref-nutrition-body">
+        <p className="landing-kicker">ПИТАНИЕ</p>
+        <h2>
+          Планируйте.
+          <br />
+          <em>Отмечайте факт.</em>
+        </h2>
         <p className="ref-lead">
           От рецепта в плане — к списку покупок. От приёма пищи — к записи в дневнике.
         </p>

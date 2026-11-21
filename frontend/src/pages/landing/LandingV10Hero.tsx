@@ -3,7 +3,7 @@ import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navig
 import { trainerIntentLoginUrl } from '../../shared/auth/trainerIntent';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { glassProps } from '../../shared/ui/Glass';
-import { Icon, type IconName } from '../../shared/ui/Icon';
+import { Icon } from '../../shared/ui/Icon';
 import { LandingAudienceSwitch } from './LandingAudienceSwitch';
 import { LandingChapter } from './LandingChapter';
 import type { LandingAudience } from './landingAudience';
@@ -16,66 +16,28 @@ export function LandingV10Actions({
   placement?: 'hero' | 'section';
 }) {
   const coach = audience === 'coach';
-  const hero = placement === 'hero';
   const hostname = window.location.hostname;
-  const primaryHref = hero
-    ? coach
-      ? trainerIntentLoginUrl(hostname)
-      : appUrlForHostname(hostname)
-    : demoCabinetUrlForHostname(
-        hostname,
-        coach ? 'trainer' : 'self_training',
-        coach ? 'trainer' : 'today',
-      );
-  const secondaryHref = hero
-    ? demoCabinetUrlForHostname(
-        hostname,
-        coach ? 'trainer' : 'self_training',
-        coach ? 'trainer' : 'today',
-      )
-    : coach
-      ? trainerIntentLoginUrl(hostname)
-      : appUrlForHostname(hostname);
-  const primaryLabel = hero
-    ? coach
-      ? 'Начать как тренер'
-      : 'Начать со своими данными'
-    : coach
-      ? 'Посмотреть Coach OS'
-      : 'Попробовать тренировку';
-  const secondaryLabel = hero
-    ? coach
-      ? 'Попробовать демо для тренера'
-      : 'Попробовать демо тренировки'
-    : 'Начать со своими данными';
-  const primaryEvent = hero
-    ? coach
-      ? {
-          name: 'trainer_landing_cta_clicked' as const,
-          surface: productEventSurface(),
-          destination: 'onboarding' as const,
-        }
-      : { name: 'landing_app_selected' as const, surface: productEventSurface() }
-    : {
-        name: 'landing_demo_selected' as const,
-        surface: productEventSurface(),
-        placement,
-        scenario: coach ? ('trainer' as const) : ('self_training' as const),
-      };
-  const secondaryEvent = hero
+  const primaryHref = coach ? trainerIntentLoginUrl(hostname) : appUrlForHostname(hostname);
+  const secondaryHref = demoCabinetUrlForHostname(
+    hostname,
+    coach ? 'trainer' : 'self_training',
+    coach ? 'trainer' : 'today',
+  );
+  const primaryLabel = coach ? 'Начать как тренер' : 'Начать со своими данными';
+  const secondaryLabel = coach ? 'Попробовать демо для тренера' : 'Попробовать демо тренировки';
+  const primaryEvent = coach
     ? {
-        name: 'landing_demo_selected' as const,
+        name: 'trainer_landing_cta_clicked' as const,
         surface: productEventSurface(),
-        placement,
-        scenario: coach ? ('trainer' as const) : ('self_training' as const),
+        destination: 'onboarding' as const,
       }
-    : coach
-      ? {
-          name: 'trainer_landing_cta_clicked' as const,
-          surface: productEventSurface(),
-          destination: 'onboarding' as const,
-        }
-      : { name: 'landing_app_selected' as const, surface: productEventSurface() };
+    : { name: 'landing_app_selected' as const, surface: productEventSurface() };
+  const secondaryEvent = {
+    name: 'landing_demo_selected' as const,
+    surface: productEventSurface(),
+    placement,
+    scenario: coach ? ('trainer' as const) : ('self_training' as const),
+  };
   return (
     <div className="landing-hero__actions">
       <a
@@ -115,13 +77,13 @@ export function LandingV10Hero({ audience }: { audience: LandingAudience }) {
         hidden={unavailable}
         onError={() => setUnavailable(true)}
       />
+      <div className="landing-v10-hero-audience">
+        <LandingAudienceSwitch audience={audience} showLabel={false} />
+      </div>
       <div className="landing-hero__copy">
-        <div className="landing-v10-hero-audience">
-          <LandingAudienceSwitch audience={audience} showLabel={false} />
-        </div>
         {unavailable && <p role="status">Фото не загрузилось. Все действия доступны.</p>}
         <p className="landing-kicker">
-          {coach ? 'COACH OS / ВАШ КЛИЕНТ. ВАШЕ РЕШЕНИЕ.' : 'ПЛАН → ДЕЙСТВИЕ → ФАКТЫ → РЕШЕНИЕ'}
+          {coach ? 'КЛИЕНТ · ПРОГРАММА · ФАКТЫ · РЕШЕНИЕ' : 'ПЛАН · ДЕЙСТВИЕ · ФАКТЫ · РЕШЕНИЕ'}
         </p>
         <h1 id="landing-title">
           <span>{coach ? 'ВАШ МЕТОД' : 'СИЛА'}</span> <span>В ДЕЙСТВИИ.</span>
@@ -154,7 +116,7 @@ export function LandingV10Hero({ audience }: { audience: LandingAudience }) {
             : 'Одна тренировка — часть вашей истории.'}
         </span>
         <a href="#product">
-          Посмотрите, как связаны шаги <Icon name="arrow-right" size={20} />
+          Как связаны шаги <Icon name="arrow-right" size={20} />
         </a>
       </div>
     </section>
@@ -163,18 +125,18 @@ export function LandingV10Hero({ audience }: { audience: LandingAudience }) {
 
 export function LandingV10Cycle({ audience }: { audience: LandingAudience }) {
   const coach = audience === 'coach';
-  const steps: [IconName, string, string][] = coach
+  const steps: [string, string][] = coach
     ? [
-        ['nav-coach', 'Подключить', 'Клиент принимает приглашение.'],
-        ['exercise', 'Назначить', 'Программа и проверка состояния.'],
-        ['nav-progress', 'Посмотреть', 'Факты и значимые изменения.'],
-        ['nav-today', 'Решить', 'Обновление после подтверждения.'],
+        ['Подключить', 'Клиент принимает приглашение.'],
+        ['Назначить', 'Программа и проверка состояния.'],
+        ['Посмотреть', 'Факты и значимые изменения.'],
+        ['Решить', 'Обновление после подтверждения.'],
       ]
     : [
-        ['nav-plan', 'План', 'Выберите или создайте программу.'],
-        ['exercise', 'Действие', 'Выполните тренировку.'],
-        ['nav-progress', 'Факты', 'Запишите результат и питание.'],
-        ['nav-today', 'Решение', 'Сверьтесь с динамикой недели.'],
+        ['План', 'Выберите или создайте программу.'],
+        ['Действие', 'Выполните тренировку.'],
+        ['Факты', 'Запишите результат и питание.'],
+        ['Решение', 'Сверьтесь с динамикой недели.'],
       ];
   return (
     <LandingChapter id="product" className="ref-cycle">
@@ -194,10 +156,9 @@ export function LandingV10Cycle({ audience }: { audience: LandingAudience }) {
         </h2>
       </div>
       <ol>
-        {steps.map(([icon, title, text], i) => (
+        {steps.map(([title, text], i) => (
           <li key={title}>
-            <small>0{i + 1}</small>
-            <Icon name={icon} size={56} />
+            <small>{i + 1}</small>
             <h3>{title}</h3>
             <p>{text}</p>
           </li>

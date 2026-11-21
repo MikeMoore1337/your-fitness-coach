@@ -10,13 +10,14 @@ import { LandingV10SharedSections } from './LandingV10SharedSections';
 import { StrengthScene } from './StrengthScene';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
+import './landing-v14.css';
 export default function LandingV10AthletePage() {
   useLandingHeroMotion();
   return (
     <LandingV10Shell audience="athlete">
       <LandingV10Hero audience="athlete" />
       <LandingV10Cycle audience="athlete" />
-      <StrengthScene />
+      <StrengthScene interactive />
       <ArchiveTraining />
       <ArchiveNutrition />
       <ArchiveProgress />
