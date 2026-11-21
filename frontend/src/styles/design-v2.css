@@ -3223,6 +3223,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     position: static;
   }
 
+  body:has(.ai-coach-workspace--desktop) .app-desktop-header .app-quick-add-trigger--floating {
+    position: fixed;
+  }
+
   body:has(.app-shell--design-v2 #appBottomNav) {
     padding: 28px 30px 44px 250px;
   }

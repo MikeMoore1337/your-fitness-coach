@@ -609,6 +609,7 @@ export function AppShell({
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
+            desktop={!mobileNavigation}
             onClose={() => setQuickAddOpen(false)}
             open={quickAddOpen}
           />

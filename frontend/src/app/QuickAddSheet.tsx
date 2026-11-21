@@ -99,10 +99,12 @@ export function QuickAddTrigger({
 
 export function QuickAddSheet({
   actions,
+  desktop = false,
   onClose,
   open,
 }: {
   actions: ReadonlyArray<QuickAddAction>;
+  desktop?: boolean;
   onClose(): void;
   open: boolean;
 }) {
@@ -212,7 +214,7 @@ export function QuickAddSheet({
           {actions.map((action) => (
             <AppLink
               aria-label={action.label}
-              aria-describedby={`quick-add-detail-${action.key}`}
+              aria-describedby={desktop ? `quick-add-detail-${action.key}` : undefined}
               className="app-quick-add-action"
               key={action.key}
               to={action.to}
@@ -232,16 +234,20 @@ export function QuickAddSheet({
               </span>
               <span className="app-quick-add-action__copy">
                 <strong>{action.label}</strong>
-                <span
-                  id={`quick-add-detail-${action.key}`}
-                  className="app-quick-add-action__detail"
-                >
-                  {action.detail}
+                {desktop && (
+                  <span
+                    id={`quick-add-detail-${action.key}`}
+                    className="app-quick-add-action__detail"
+                  >
+                    {action.detail}
+                  </span>
+                )}
+              </span>
+              {desktop && (
+                <span aria-hidden="true" className="app-quick-add-action__open">
+                  Открыть
                 </span>
-              </span>
-              <span aria-hidden="true" className="app-quick-add-action__open">
-                Открыть
-              </span>
+              )}
               <Icon
                 aria-hidden="true"
                 className="app-quick-add-action__arrow"

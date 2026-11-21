@@ -1821,7 +1821,7 @@ test('deep link показывает тренера до явного подтв
   await expect(page.getByText('Тренер подключён')).toBeVisible();
 });
 
-test('desktop app shell centers the brand lockup and navigation surfaces', async ({ page }) => {
+test('desktop app shell aligns the horizontal brand and navigation surfaces', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApi(page);
@@ -1853,6 +1853,8 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         return Math.abs(referenceBox.left + referenceBox.width / 2 - (left + right) / 2);
       };
       const lockup = element.querySelector('.yfc-lockup');
+      const mark = element.querySelector('.yfc-lockup__mark')?.getBoundingClientRect();
+      const wordmark = element.querySelector('.yfc-lockup__wordmark')?.getBoundingClientRect();
       const groupLabel = element.querySelector<HTMLElement>('.app-bottom-nav__group-label');
       const themeButton = element.querySelector('.app-theme-toggle--nav');
       const logoutButton = element.querySelector('.app-bottom-nav__logout');
@@ -1864,8 +1866,15 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         )
           .filter((button) => button.offsetParent !== null)
           .map(centerOffset),
-        coachOffset: centerOffset(element.querySelector('.yfc-lockup__wordmark > span')),
-        fitnessOffset: centerOffset(element.querySelector('.yfc-lockup__wordmark > strong')),
+        brandGap: mark && wordmark ? wordmark.left - mark.right : -1,
+        brandVerticalOffset:
+          mark && wordmark
+            ? Math.abs(mark.top + mark.height / 2 - wordmark.top - wordmark.height / 2)
+            : Infinity,
+        brandWithinRail:
+          Boolean(mark && wordmark) &&
+          mark!.left >= navigationBox.left &&
+          wordmark!.right <= navigationBox.right,
         groupLabelFits: groupLabel
           ? groupLabel.scrollWidth <= groupLabel.clientWidth &&
             window.getComputedStyle(groupLabel).whiteSpace === 'nowrap'
@@ -1874,7 +1883,6 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
           .filter((label) => label.offsetParent !== null)
           .every((label) => label.scrollWidth <= label.clientWidth),
         lockupDirection: lockup ? window.getComputedStyle(lockup).flexDirection : null,
-        markOffset: centerOffset(element.querySelector('.yfc-lockup__mark')),
         navigationWidth: navigationBox.width,
         primaryLabelSize: window.getComputedStyle(
           element.querySelector('.app-bottom-nav__primary .app-bottom-nav__label')!,
@@ -1914,14 +1922,14 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
       };
     });
 
-    expect(desktopAlignment.lockupDirection).toBe('column');
+    expect(desktopAlignment.lockupDirection).toBe('row');
     expect(desktopAlignment.navigationWidth).toBe(220);
-    expect(desktopAlignment.markOffset).toBeLessThanOrEqual(1);
-    expect(desktopAlignment.fitnessOffset).toBeLessThanOrEqual(1);
-    expect(desktopAlignment.coachOffset).toBeLessThanOrEqual(1);
+    expect(desktopAlignment.brandGap).toBeGreaterThanOrEqual(8);
+    expect(desktopAlignment.brandVerticalOffset).toBeLessThanOrEqual(1);
+    expect(desktopAlignment.brandWithinRail).toBe(true);
     expect(desktopAlignment.groupLabelFits).toBe(true);
     expect(desktopAlignment.labelsFit).toBe(true);
-    expect(desktopAlignment.primaryLabelSize).toBe('13px');
+    expect(desktopAlignment.primaryLabelSize).toBe('15px');
     expect(desktopAlignment.secondaryLabelSize).toBe('12.8px');
     expect(desktopAlignment.buttonOffsets.length).toBeGreaterThan(0);
     expect(desktopAlignment.buttonOffsets.every((offset) => offset <= 1)).toBe(true);
