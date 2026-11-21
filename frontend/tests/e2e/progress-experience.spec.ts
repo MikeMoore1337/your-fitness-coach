@@ -3766,13 +3766,24 @@ test('progress header keeps the title row separate from period and report contro
         );
       }
       if (width >= 1280) {
-        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.right + 1);
-        expect(boxes.help!.right).toBeLessThan(boxes.period!.left);
-        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
-        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
+        await expect(page.locator('.progress-hero__selection')).toHaveText('Выбрано: 30 дней');
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.heading!.right);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.heading!.bottom - 1);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.report!.bottom - 1);
+        expect(boxes.period!.left).toBeLessThanOrEqual(boxes.heading!.left + 1);
       }
     }
   }
+  await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
+  await expect(page.locator('.progress-hero__selection')).toHaveText('Выбрано: 7 дней');
+  const report = page.getByRole('link', { name: 'Скачать отчёт' });
+  await report.focus();
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await expect(report).toBeFocused();
+  await expect(page.locator('.progress-hero__period + .progress-hero__download')).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(report).toBeFocused();
+  await expect(page.locator('.progress-hero__download + .progress-hero__period')).toBeVisible();
 });
 
 test('progress header keeps expanded help and custom period in normal flow', async ({ page }) => {
