@@ -2954,7 +2954,8 @@ test('Issue 388 оставляет Today компактным и ведёт CRM-
 
   await primaryNavigation.getByRole('link', { name: 'Сегодня', exact: true }).click();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.getByRole('heading', { name: 'Сегодня', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кабинет тренера', exact: true })).toBeVisible();
+  await expect(trainerDestination(page, 'Сегодня')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.coach-operations__agenda')).toHaveCount(0);
   await captureTask388Evidence(page, '1440-today-light');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
