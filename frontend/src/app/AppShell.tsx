@@ -587,16 +587,29 @@ export function AppShell({
             </button>
           </header>
         )}
+        {shellVisible && !mobileNavigation && (
+          <header className="app-desktop-header">
+            <div className="app-desktop-header__workspace">
+              <span>Рабочее пространство</span>
+              <strong>
+                {trainerWorkspace
+                  ? 'Клиенты'
+                  : path === '/admin'
+                    ? 'Администрирование'
+                    : 'Для себя'}
+              </strong>
+            </div>
+            {floatingQuickAddVisible && <div ref={quickAddAnchor} />}
+          </header>
+        )}
         {showPwaInstallPrompt && <PwaInstallPrompt />}
         {floatingQuickAddVisible && (
-          <>
-            <div ref={quickAddAnchor} style={{ display: 'contents' }} />
-            {createPortal(<QuickAddTrigger onOpen={openQuickAdd} />, quickAddHost)}
-          </>
+          <>{createPortal(<QuickAddTrigger onOpen={openQuickAdd} />, quickAddHost)}</>
         )}
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
+            desktop={!mobileNavigation}
             onClose={() => setQuickAddOpen(false)}
             open={quickAddOpen}
           />

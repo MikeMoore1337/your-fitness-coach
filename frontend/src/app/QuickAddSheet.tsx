@@ -50,7 +50,7 @@ export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
   {
     key: 'wellbeing',
     label: 'Самочувствие',
-    detail: 'Короткий ежедневный check-in',
+    detail: 'Ежедневная отметка самочувствия',
     icon: 'checklist',
     to: '/app?section=today&wellbeing=1',
   },
@@ -99,10 +99,12 @@ export function QuickAddTrigger({
 
 export function QuickAddSheet({
   actions,
+  desktop = false,
   onClose,
   open,
 }: {
   actions: ReadonlyArray<QuickAddAction>;
+  desktop?: boolean;
   onClose(): void;
   open: boolean;
 }) {
@@ -211,6 +213,8 @@ export function QuickAddSheet({
         <nav aria-label="Быстрые действия" className="app-quick-add-panel__actions">
           {actions.map((action) => (
             <AppLink
+              aria-label={action.label}
+              aria-describedby={desktop ? `quick-add-detail-${action.key}` : undefined}
               className="app-quick-add-action"
               key={action.key}
               to={action.to}
@@ -230,7 +234,20 @@ export function QuickAddSheet({
               </span>
               <span className="app-quick-add-action__copy">
                 <strong>{action.label}</strong>
+                {desktop && (
+                  <span
+                    id={`quick-add-detail-${action.key}`}
+                    className="app-quick-add-action__detail"
+                  >
+                    {action.detail}
+                  </span>
+                )}
               </span>
+              {desktop && (
+                <span aria-hidden="true" className="app-quick-add-action__open">
+                  Открыть
+                </span>
+              )}
               <Icon
                 aria-hidden="true"
                 className="app-quick-add-action__arrow"
