@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import {
@@ -20,7 +21,12 @@ import type {
   WorkoutScheduleItem,
   ApiSchemas,
 } from '../../shared/api/types';
-import { calendarWeek, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
+import {
+  addCalendarDays,
+  calendarWeek,
+  dateInputValue,
+  formatCalendarDate,
+} from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { queryKeys } from '../../shared/queryKeys';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
@@ -152,7 +158,9 @@ function combinedWeekStatus(
 }
 
 function WeekContext({
+  anchorDate,
   cardio,
+  navigation,
   selectedDate,
   today,
   timeZone,
@@ -162,7 +170,9 @@ function WeekContext({
   onRetry,
   onSelect,
 }: {
+  anchorDate: string;
   cardio?: CardioSession[];
+  navigation?: { onPrevious(): void; onNext(): void };
   selectedDate: string;
   today: string;
   timeZone: string;
@@ -173,42 +183,50 @@ function WeekContext({
   onSelect(value: string): void;
 }) {
   return (
-    <WeekStrip
-      anchorDate={today}
-      ariaLabel="Эта неделя"
-      getDayMeta={(date): WeekStripDayMeta => {
-        const item = weekWorkoutForDate(workouts, date);
-        const cardioSessions = weekCardioForDate(cardio, date, timeZone);
-        const status = combinedWeekStatus(item, cardioSessions, date, today);
-        const activities: WeekStripActivity[] = [];
-        if (item) activities.push({ key: 'strength', label: 'Силовая' });
-        if (cardioSessions.length > 0) {
-          activities.push({ key: 'cardio', label: 'Кардио' });
+    <>
+      <WeekStrip
+        anchorDate={anchorDate}
+        ariaLabel="Эта неделя"
+        getDayMeta={(date): WeekStripDayMeta => {
+          const item = weekWorkoutForDate(workouts, date);
+          const cardioSessions = weekCardioForDate(cardio, date, timeZone);
+          const status = combinedWeekStatus(item, cardioSessions, date, today);
+          const activities: WeekStripActivity[] = [];
+          if (item) activities.push({ key: 'strength', label: 'Силовая' });
+          if (cardioSessions.length > 0) {
+            activities.push({ key: 'cardio', label: 'Кардио' });
+          }
+          if (activities.length === 0 && !loading && !error) {
+            activities.push({ key: 'rest', label: 'Отдых' });
+          }
+          return {
+            activities,
+            status,
+          };
+        }}
+        headerAction={
+          error && !navigation ? (
+            <button className="today-text-link" type="button" onClick={onRetry}>
+              Обновить план
+            </button>
+          ) : undefined
         }
-        if (activities.length === 0 && !loading && !error) {
-          activities.push({ key: 'rest', label: 'Отдых' });
-        }
-        return {
-          activities,
-          status,
-        };
-      }}
-      headerAction={
-        error ? (
-          <button className="today-text-link" type="button" onClick={onRetry}>
-            Обновить план
-          </button>
-        ) : undefined
-      }
-      loading={loading}
-      loadingLabel="Загружаем план недели"
-      legend={TRAINING_WEEK_LEGEND}
-      mode="picker"
-      onSelect={onSelect}
-      selectedDate={selectedDate}
-      title="Эта неделя"
-      today={today}
-    />
+        loading={loading}
+        loadingLabel="Загружаем план недели"
+        legend={TRAINING_WEEK_LEGEND}
+        mode="picker"
+        navigation={navigation}
+        onSelect={onSelect}
+        selectedDate={selectedDate}
+        title="Эта неделя"
+        today={today}
+      />
+      {error && navigation && (
+        <button className="today-text-link" type="button" onClick={onRetry}>
+          Обновить план
+        </button>
+      )}
+    </>
   );
 }
 
@@ -1088,6 +1106,43 @@ export function TodayDashboard({
   const timeZone = user?.profile?.timezone || 'UTC';
   const today = useCalendarDay(timeZone);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [weekAnchor, setWeekAnchor] = useState(today);
+  const [weekHost] = useState(() => document.createElement('div'));
+  const desktopWeekSlot = useRef<HTMLDivElement>(null);
+  const mobileWeekSlot = useRef<HTMLDivElement>(null);
+  const pendingWeekFocus = useRef<HTMLElement | null>(null);
+  const [desktopWeekNavigation, setDesktopWeekNavigation] = useState(
+    () => window.matchMedia?.('(min-width: 900px)').matches ?? window.innerWidth >= 900,
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 900px)');
+    const sync = () => {
+      pendingWeekFocus.current =
+        document.activeElement instanceof HTMLElement && weekHost.contains(document.activeElement)
+          ? document.activeElement
+          : null;
+      const desktop = media?.matches ?? window.innerWidth >= 900;
+      setDesktopWeekNavigation(desktop);
+      if (!desktop) setWeekAnchor(selectedDate);
+    };
+    media?.addEventListener?.('change', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      media?.removeEventListener?.('change', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [selectedDate, weekHost]);
+
+  useLayoutEffect(() => {
+    const target = desktopWeekNavigation ? desktopWeekSlot.current : mobileWeekSlot.current;
+    if (!target || target.contains(weekHost)) return;
+    target.appendChild(weekHost);
+    if (pendingWeekFocus.current?.isConnected && document.activeElement === document.body) {
+      pendingWeekFocus.current.focus({ preventScroll: true });
+    }
+    pendingWeekFocus.current = null;
+  }, [desktopWeekNavigation, detailsOpen, weekHost]);
 
   useEffect(() => {
     if (initialCardioOpen && !previousCardioOpenRef.current) {
@@ -1119,13 +1174,35 @@ export function TodayDashboard({
   const nutritionConfirmed =
     selectedDate === today &&
     hasNutritionConfirmation(nutrition.diary.data, nutrition.hydration.data);
-  const weekDates = calendarWeek(today);
+  const weekDates = calendarWeek(weekAnchor);
   const weekStart = weekDates[0] ?? today;
   const weekEnd = weekDates.at(-1) ?? today;
+  const currentWeekStart = calendarWeek(today)[0] ?? today;
+  const selectedWeekDates = calendarWeek(selectedDate);
+  const selectedWeekStart = selectedWeekDates[0] ?? today;
+  const selectedWeekEnd = selectedWeekDates.at(-1) ?? today;
   const week = useQuery({
     queryKey: ['workout', 'week'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/week'),
   });
+  const viewedSchedule = useQuery({
+    queryKey: ['workout', 'schedule', weekStart, weekEnd],
+    queryFn: () =>
+      api<WorkoutScheduleItem[]>(
+        `/api/v1/workouts/schedule?date_from=${weekStart}&date_to=${weekEnd}`,
+      ),
+    enabled: weekStart !== currentWeekStart,
+  });
+  const selectedSchedule = useQuery({
+    queryKey: ['workout', 'schedule', selectedWeekStart, selectedWeekEnd],
+    queryFn: () =>
+      api<WorkoutScheduleItem[]>(
+        `/api/v1/workouts/schedule?date_from=${selectedWeekStart}&date_to=${selectedWeekEnd}`,
+      ),
+    enabled: selectedWeekStart !== currentWeekStart,
+  });
+  const displayedSchedule = weekStart === currentWeekStart ? week : viewedSchedule;
+  const selectedScheduleQuery = selectedWeekStart === currentWeekStart ? week : selectedSchedule;
   const recovery = useQuery({
     queryKey: ['workout', 'recovery'],
     queryFn: () => api<WorkoutRecoveryState>('/api/v1/workouts/recovery'),
@@ -1145,6 +1222,13 @@ export function TodayDashboard({
     queryFn: () =>
       api<CardioSession[]>(
         `/api/v1/workouts/cardio?date_from=${weekStart}&date_to=${weekEnd}&limit=100`,
+      ),
+  });
+  const selectedCardioWeek = useQuery({
+    queryKey: queryKeys.cardio.range(selectedWeekStart, selectedWeekEnd),
+    queryFn: () =>
+      api<CardioSession[]>(
+        `/api/v1/workouts/cardio?date_from=${selectedWeekStart}&date_to=${selectedWeekEnd}&limit=100`,
       ),
   });
   const weeklyReview = useQuery({
@@ -1236,7 +1320,7 @@ export function TodayDashboard({
           week_number: visibleWorkout.week_number,
         }
       : undefined);
-  const selectedScheduleItem = weekWorkoutForDate(week.data, selectedDate);
+  const selectedScheduleItem = weekWorkoutForDate(selectedScheduleQuery.data, selectedDate);
   const comments = useQuery({
     queryKey: todayScheduleItem
       ? queryKeys.workoutComments.client(todayScheduleItem.id)
@@ -1390,6 +1474,7 @@ export function TodayDashboard({
     if (calendarContextRef.current === calendarContext) return;
     calendarContextRef.current = calendarContext;
     setSelectedDate(today);
+    setWeekAnchor(today);
     setDetailsOpen(false);
     setRecoveryOpen(false);
     void Promise.all([
@@ -1454,6 +1539,42 @@ export function TodayDashboard({
         <p className="today-dashboard__desktop-summary">Тренировки, питание и прогресс за день</p>
       </header>
 
+      {desktopWeekNavigation && <div ref={desktopWeekSlot} />}
+      {createPortal(
+        <WeekContext
+          anchorDate={weekAnchor}
+          cardio={cardioWeek.data}
+          navigation={
+            desktopWeekNavigation
+              ? {
+                  onPrevious: () => setWeekAnchor((anchor) => addCalendarDays(anchor, -7)),
+                  onNext: () => setWeekAnchor((anchor) => addCalendarDays(anchor, 7)),
+                }
+              : undefined
+          }
+          selectedDate={selectedDate}
+          today={today}
+          timeZone={timeZone}
+          workouts={displayedSchedule.data}
+          loading={displayedSchedule.isLoading || cardioWeek.isLoading}
+          error={Boolean(displayedSchedule.error || cardioWeek.error)}
+          onRetry={() => void Promise.all([displayedSchedule.refetch(), cardioWeek.refetch()])}
+          onSelect={(date) => {
+            setSelectedDate(date);
+            setDetailsOpen(false);
+            setRecoveryDialogOpen(false);
+            if (date !== today) {
+              trackProductEvent({
+                name: 'today_week_navigated',
+                surface: productEventSurface(),
+                direction: 'workout_day',
+              });
+            }
+          }}
+        />,
+        weekHost,
+      )}
+
       <div className="today-dashboard__overview">
         <div className="today-dashboard__training">
           <section
@@ -1463,7 +1584,7 @@ export function TodayDashboard({
             aria-labelledby="today-workout-title"
           >
             {selectedDate !== today ? (
-              week.isLoading ? (
+              selectedScheduleQuery.isLoading ? (
                 <div
                   className="today-summary-skeleton"
                   aria-label="Загружаем выбранный день"
@@ -1472,13 +1593,13 @@ export function TodayDashboard({
                   <Skeleton height="34px" width="62%" />
                   <Skeleton height="20px" width="44%" />
                 </div>
-              ) : week.error ? (
+              ) : selectedScheduleQuery.error ? (
                 <div className="today-inline-state" role="alert">
                   <strong id="today-workout-title">Не удалось загрузить выбранный день</strong>
                   <button
                     className="today-text-link"
                     type="button"
-                    onClick={() => void week.refetch()}
+                    onClick={() => void selectedScheduleQuery.refetch()}
                   >
                     Повторить
                   </button>
@@ -1604,28 +1725,7 @@ export function TodayDashboard({
               />
             )}
 
-          <WeekContext
-            cardio={cardioWeek.data}
-            selectedDate={selectedDate}
-            today={today}
-            timeZone={timeZone}
-            workouts={week.data}
-            loading={week.isLoading || cardioWeek.isLoading}
-            error={Boolean(week.error || cardioWeek.error)}
-            onRetry={() => void Promise.all([week.refetch(), cardioWeek.refetch()])}
-            onSelect={(date) => {
-              setSelectedDate(date);
-              setDetailsOpen(false);
-              setRecoveryDialogOpen(false);
-              if (date !== today) {
-                trackProductEvent({
-                  name: 'today_week_navigated',
-                  surface: productEventSurface(),
-                  direction: 'workout_day',
-                });
-              }
-            }}
-          />
+          {!desktopWeekNavigation && <div ref={mobileWeekSlot} />}
         </div>
         <div className="today-dashboard__facts">
           <NutritionSummary
@@ -1637,10 +1737,10 @@ export function TodayDashboard({
             }
           />
           <ActivitySummary
-            cardio={cardioWeek.data}
+            cardio={selectedCardioWeek.data}
             date={selectedDate}
-            error={Boolean(cardioWeek.error)}
-            loading={cardioWeek.isLoading}
+            error={Boolean(selectedCardioWeek.error)}
+            loading={selectedCardioWeek.isLoading}
             timeZone={timeZone}
             today={today}
           />

@@ -660,7 +660,11 @@ function timeline() {
 function transport(snapshot: DemoSessionSnapshot, path: string, method: string, body: unknown) {
   if (path === '/api/v1/me') return demoUser(snapshot);
   if (path === '/api/v1/workouts/today') return workout(snapshot);
-  if (path === '/api/v1/workouts/week' || path === '/api/v1/workouts/schedule')
+  if (
+    path === '/api/v1/workouts/week' ||
+    path === '/api/v1/workouts/schedule' ||
+    path.startsWith('/api/v1/workouts/schedule?')
+  )
     return [
       {
         id: 50001,
@@ -1174,6 +1178,30 @@ test('#1500 Today header adapts without changing the mobile composition', async 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(summary).toBeHidden();
   await expect(heading).toHaveCSS('text-transform', 'uppercase');
+});
+
+test('#1500 Today week navigation preserves the selected day and mobile controls', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const week = page.getByRole('navigation', { name: 'Эта неделя' });
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  await expect(heading).toBeVisible();
+  const headingBefore = await heading.getAttribute('aria-label');
+  const range = week.locator('.week-strip__context > span');
+  const before = await range.textContent();
+  await week.getByRole('button', { name: 'Следующая неделя' }).click();
+  await expect(range).not.toHaveText(before!);
+  await expect(heading).toHaveAttribute('aria-label', headingBefore!);
+  await week.getByRole('button', { name: 'Предыдущая неделя' }).click();
+  await expect(range).toHaveText(before!);
+  const selectedDay = week.locator('[aria-pressed="true"]');
+  await selectedDay.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(week.getByRole('button', { name: 'Следующая неделя' })).toHaveCount(0);
+  await expect(selectedDay).toBeFocused();
 });
 
 test.describe('#983', () => {

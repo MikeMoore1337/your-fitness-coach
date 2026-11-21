@@ -383,7 +383,7 @@ export default function AdminPage() {
       <div className="page-stack admin-workspace">
         <header className="admin-root-context">
           <div>
-            <span className="eyebrow">ROOT · ТОЛЬКО ВЕБ</span>
+            <span className="eyebrow">АДМИНИСТРАТОР · ТОЛЬКО ВЕБ</span>
             <h1>Операции поддержки и безопасности</h1>
             <p>
               Только минимальные действия с аудитом. Личные данные клиента, SQL, impersonation и
