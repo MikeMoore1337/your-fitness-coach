@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import { addCalendarDays, calendarWeek, dateInputValue } from '../../shared/dateTime';
@@ -926,6 +927,39 @@ export function NutritionDiary({
   const today = dateInputValue(new Date(), timeZone || undefined);
   const [uncontrolledDate, setUncontrolledDate] = useState(initialDate || today);
   const selectedDate = controlledDate ?? uncontrolledDate;
+  const [desktopActions, setDesktopActions] = useState(
+    () => window.matchMedia?.('(min-width: 900px)').matches ?? window.innerWidth >= 900,
+  );
+  const [actionsHost] = useState(() => document.createElement('div'));
+  const desktopActionsSlot = useRef<HTMLDivElement>(null);
+  const mobileActionsSlot = useRef<HTMLDivElement>(null);
+  const pendingActionFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 900px)');
+    const sync = () => {
+      pendingActionFocus.current =
+        document.activeElement instanceof HTMLElement &&
+        actionsHost.contains(document.activeElement)
+          ? document.activeElement
+          : null;
+      setDesktopActions(media?.matches ?? window.innerWidth >= 900);
+    };
+    media?.addEventListener?.('change', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      media?.removeEventListener?.('change', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [actionsHost]);
+  useLayoutEffect(() => {
+    const target = desktopActions ? desktopActionsSlot.current : mobileActionsSlot.current;
+    if (!target || target.contains(actionsHost)) return;
+    target.appendChild(actionsHost);
+    if (pendingActionFocus.current?.isConnected && document.activeElement === document.body) {
+      pendingActionFocus.current.focus({ preventScroll: true });
+    }
+    pendingActionFocus.current = null;
+  }, [actionsHost, desktopActions]);
   const notesConsent = useNutritionNotesConsent(!readOnlyEntries && !demoSafeMode);
   const [addingTo, setAddingTo] = useState<{
     mealType: MealType;
@@ -1113,6 +1147,7 @@ export function NutritionDiary({
           <h1>Питание</h1>
           <p>{dateLabel.subtitle}</p>
         </div>
+        {desktopActions && <div ref={desktopActionsSlot} />}
       </header>
 
       <NutritionWeekSelector
@@ -1126,19 +1161,23 @@ export function NutritionDiary({
         }}
       />
 
-      <div className="nutrition-diary__primary-actions">
-        <Button
-          type="button"
-          aria-label="Добавить еду в текущий приём пищи"
-          data-testid="nutrition-add-product"
-          onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
-        >
-          <Icon name="plus" size={16} /> <span>Добавить еду</span>
-        </Button>
-        <Button type="button" onClick={() => setHydrationQuickAddRequest((value) => value + 1)}>
-          <Icon name="plus" size={16} /> <span>Добавить воду</span>
-        </Button>
-      </div>
+      {!desktopActions && <div ref={mobileActionsSlot} />}
+      {createPortal(
+        <div className="nutrition-diary__primary-actions">
+          <Button
+            type="button"
+            aria-label="Добавить еду в текущий приём пищи"
+            data-testid="nutrition-add-product"
+            onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
+          >
+            <Icon name="plus" size={16} /> <span>Добавить еду</span>
+          </Button>
+          <Button type="button" onClick={() => setHydrationQuickAddRequest((value) => value + 1)}>
+            <Icon name="plus" size={16} /> <span>Добавить воду</span>
+          </Button>
+        </div>,
+        actionsHost,
+      )}
 
       {diary.isLoading && <LoadingState label="Загружаем дневник…" />}
       {diary.error && (

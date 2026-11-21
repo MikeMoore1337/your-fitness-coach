@@ -346,7 +346,7 @@ test('Task 294 keeps Today secondary cards readable across desktop and mobile wi
     await openApp(page, 'today');
 
     const training = page.locator('.today-dashboard__training');
-    const calendar = training.locator('.week-strip');
+    const calendar = page.locator('.today-dashboard .week-strip');
     const nutrition = page.locator('.today-nutrition');
     const progress = page.locator('.today-progress-grid');
     const nutritionBox = await nutrition.boundingBox();
@@ -362,7 +362,8 @@ test('Task 294 keeps Today secondary cards readable across desktop and mobile wi
     expect(Math.abs(nutritionBox!.x - progressBox!.x)).toBeLessThanOrEqual(1);
     expect(progressBox!.y).toBeGreaterThanOrEqual(nutritionBox!.y + nutritionBox!.height - 1);
     expect(Math.abs(calendarBox!.x - trainingBox!.x)).toBeLessThanOrEqual(1);
-    expect(calendarBox!.width).toBeLessThanOrEqual(trainingBox!.width + 1);
+    expect(calendarBox!.width).toBeGreaterThanOrEqual(trainingBox!.width);
+    expect(calendarBox!.y + calendarBox!.height).toBeLessThanOrEqual(trainingBox!.y + 1);
 
     const foodValuesBox = await nutrition.locator('.today-nutrition__values').boundingBox();
     const foodActionBox = await nutrition

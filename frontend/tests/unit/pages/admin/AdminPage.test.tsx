@@ -381,14 +381,26 @@ describe('AdminPage', () => {
 
   it('показывает агрегаты без raw events и отдельный audit history', async () => {
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Агрегаты' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Агрегаты' }));
 
     expect(await screen.findByText('60%')).toBeInTheDocument();
     expect(screen.getByText('Данные проверены')).toBeInTheDocument();
     expect(screen.getByText('Только агрегаты подтверждённых данных аккаунта.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Аудит' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Аудит' }));
     expect(await screen.findByText('Аккаунт заблокирован')).toBeInTheDocument();
     expect(screen.getByText('Инцидент безопасности')).toBeInTheDocument();
+  });
+
+  it('переключает разделы клавиатурой и отмечает выбранную вкладку', async () => {
+    renderPage();
+    const accounts = screen.getByRole('tab', { name: 'Аккаунты' });
+    const jobs = screen.getByRole('tab', { name: 'Задачи' });
+    expect(accounts).toHaveAttribute('aria-selected', 'true');
+    accounts.focus();
+    fireEvent.keyDown(accounts, { key: 'ArrowRight' });
+    expect(jobs).toHaveFocus();
+    expect(jobs).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Последние задачи' })).toBeInTheDocument();
   });
 });

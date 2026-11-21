@@ -660,7 +660,11 @@ function timeline() {
 function transport(snapshot: DemoSessionSnapshot, path: string, method: string, body: unknown) {
   if (path === '/api/v1/me') return demoUser(snapshot);
   if (path === '/api/v1/workouts/today') return workout(snapshot);
-  if (path === '/api/v1/workouts/week' || path === '/api/v1/workouts/schedule')
+  if (
+    path === '/api/v1/workouts/week' ||
+    path === '/api/v1/workouts/schedule' ||
+    path.startsWith('/api/v1/workouts/schedule?')
+  )
     return [
       {
         id: 50001,
@@ -1160,6 +1164,83 @@ test('#1500 desktop Quick Add restores focus and can reopen during exit', async 
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('quick-add-layer')).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test('#1500 Today header adapts without changing the mobile composition', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  const summary = page.locator('.today-dashboard__desktop-summary');
+  await expect(heading).toBeVisible();
+  await expect(summary).toBeVisible();
+  await expect(heading).toHaveCSS('text-transform', 'none');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(summary).toBeHidden();
+  await expect(heading).toHaveCSS('text-transform', 'uppercase');
+});
+
+test('#1500 Today week navigation preserves the selected day and mobile controls', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const week = page.getByRole('navigation', { name: 'Эта неделя' });
+  const workout = page.locator('.today-workout-spotlight');
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  await expect(heading).toBeVisible();
+  await expect(workout).toBeVisible();
+  expect((await week.boundingBox())!.y).toBeLessThan((await workout.boundingBox())!.y);
+  const headingBefore = await heading.getAttribute('aria-label');
+  const range = week.locator('.week-strip__context > span');
+  const before = await range.textContent();
+  await week.getByRole('button', { name: 'Следующая неделя' }).click();
+  await expect(range).not.toHaveText(before!);
+  await expect(heading).toHaveAttribute('aria-label', headingBefore!);
+  await week.getByRole('button', { name: 'Предыдущая неделя' }).click();
+  await expect(range).toHaveText(before!);
+  const selectedDay = week.locator('[aria-pressed="true"]');
+  await selectedDay.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(week.getByRole('button', { name: 'Следующая неделя' })).toHaveCount(0);
+  await expect(selectedDay).toBeFocused();
+  expect((await week.boundingBox())!.y).toBeGreaterThan((await workout.boundingBox())!.y);
+});
+
+test('#1500 plan heading uses the desktop design and preserves the mobile label', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=plan');
+  await expect(page.getByRole('heading', { name: 'План', level: 1 })).toBeVisible();
+  await expect(page.locator('.app-section__desktop-eyebrow')).toHaveText('План тренировок');
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeHidden();
+  await expect(page.locator('.app-section__standard-eyebrow')).toBeVisible();
+});
+
+test('#1500 nutrition actions keep focus between desktop and mobile', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const action = page.getByTestId('nutrition-add-product');
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
+  await action.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
 });
 
 test.describe('#983', () => {

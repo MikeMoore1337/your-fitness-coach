@@ -479,6 +479,92 @@ describe('TodayDashboard', () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('loads a bounded desktop week without changing the selected day', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 900px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAvailableData();
+    const original = apiMock.getMockImplementation()!;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) =>
+      path.startsWith('/api/v1/workouts/schedule?') ? Promise.resolve([]) : original(path, ...args),
+    );
+    renderDashboard();
+    const heading = await screen.findByRole('heading', { level: 1, name: /^Сегодня ·/ });
+    const selectedLabel = heading.getAttribute('aria-label');
+    fireEvent.click(screen.getByRole('button', { name: 'Следующая неделя' }));
+    await waitFor(() =>
+      expect(
+        apiMock.mock.calls.some(([path]) => path.startsWith('/api/v1/workouts/schedule?')),
+      ).toBe(true),
+    );
+    const request = apiMock.mock.calls.find(([path]) =>
+      path.startsWith('/api/v1/workouts/schedule?'),
+    )?.[0] as string;
+    const params = new URL(request, 'http://localhost').searchParams;
+    const start = Date.parse(`${params.get('date_from')}T00:00:00Z`);
+    const end = Date.parse(`${params.get('date_to')}T00:00:00Z`);
+    expect((end - start) / 86_400_000).toBe(6);
+    expect(heading).toHaveAttribute('aria-label', selectedLabel);
+    fireEvent.click(screen.getByRole('button', { name: 'Предыдущая неделя' }));
+    expect(heading).toHaveAttribute('aria-label', selectedLabel);
+  });
+
+  it('keeps week navigation and retry available if the range request fails', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 900px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAvailableData();
+    const original = apiMock.getMockImplementation()!;
+    let failRange = true;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) =>
+      path.startsWith('/api/v1/workouts/schedule?')
+        ? failRange
+          ? Promise.reject(new Error('unavailable'))
+          : Promise.resolve([])
+        : original(path, ...args),
+    );
+    renderDashboard();
+    fireEvent.click(await screen.findByRole('button', { name: 'Следующая неделя' }));
+    const retry = await screen.findByRole('button', { name: 'Обновить план' });
+    expect(screen.getByRole('button', { name: 'Предыдущая неделя' })).toBeInTheDocument();
+    failRange = false;
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Обновить план' })).toBeNull());
+  });
+
+  it('shows the selected day from the requested week after navigation', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(min-width: 900px)',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    useAvailableData();
+    const original = apiMock.getMockImplementation()!;
+    apiMock.mockImplementation((path: string, ...args: unknown[]) => {
+      if (!path.startsWith('/api/v1/workouts/schedule?')) return original(path, ...args);
+      const date = new URL(path, 'http://localhost').searchParams.get('date_from');
+      return Promise.resolve([{ ...plannedWorkout, scheduled_date: date, title: 'Будущий план' }]);
+    });
+    renderDashboard();
+    fireEvent.click(await screen.findByRole('button', { name: 'Следующая неделя' }));
+    await waitFor(() =>
+      expect(
+        apiMock.mock.calls.some(([path]) => path.startsWith('/api/v1/workouts/schedule?')),
+      ).toBe(true),
+    );
+    const day = screen.getByRole('navigation', { name: 'Эта неделя' }).querySelector('ol button');
+    expect(day).not.toBeNull();
+    fireEvent.click(day!);
+    expect(await screen.findByRole('heading', { name: 'Будущий план' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Предыдущая неделя' }));
+    expect(screen.getByRole('heading', { name: 'Будущий план' })).toBeInTheDocument();
   });
 
   it('formats the day context in clear Russian', () => {

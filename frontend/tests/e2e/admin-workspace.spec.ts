@@ -377,7 +377,7 @@ test('tablet dark state keeps job status readable and retry bounded to exports',
   await setTheme(page, 'dark');
   await mockAdminApi(page);
   await page.goto('/admin');
-  await page.getByRole('button', { name: 'Задачи' }).click();
+  await page.getByRole('tab', { name: 'Задачи' }).click();
 
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(page.getByText('Notification retry отключён')).toBeVisible();
@@ -396,7 +396,7 @@ test('root workspace keeps trainer capacity metrics outside the client funnel', 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await mockAdminApi(page);
   await page.goto('/admin');
-  await page.getByRole('button', { name: 'Ёмкость тренеров' }).click();
+  await page.getByRole('tab', { name: 'Ёмкость тренеров' }).click();
 
   await expect(page.getByRole('heading', { name: 'Ёмкость тренеров' })).toBeVisible();
   await expect(page.getByText('Не клиентский funnel')).toBeVisible();
@@ -511,7 +511,7 @@ for (const viewport of [
     await expectNoHorizontalOverflow(page);
     const navButtons = await page
       .getByRole('navigation', { name: 'Разделы Root workspace' })
-      .getByRole('button')
+      .getByRole('tab')
       .evaluateAll((buttons) =>
         buttons.map((button) => {
           const box = button.getBoundingClientRect();
