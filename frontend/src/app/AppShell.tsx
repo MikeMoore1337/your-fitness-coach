@@ -283,11 +283,13 @@ export function AppShell({
   }, []);
   const mobileNavigation = useMobileNavigation(captureTrainerFocus);
   const renderedMobileNavigation = useRef(mobileNavigation);
-  renderedMobileNavigation.current = mobileNavigation;
   const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
   const desktopTrainerNavigation = trainerWorkspace && !mobileNavigation && !isMiniApp;
   const currentTrainerTab = useRef(coachTabFromSearch(search));
-  currentTrainerTab.current = coachTabFromSearch(search);
+  useLayoutEffect(() => {
+    renderedMobileNavigation.current = mobileNavigation;
+    currentTrainerTab.current = coachTabFromSearch(search);
+  }, [mobileNavigation, search]);
   useEffect(() => {
     if (!trainerWorkspace || isMiniApp) return;
     const trackFocus = (event: FocusEvent) => {
