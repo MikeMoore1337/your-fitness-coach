@@ -1187,8 +1187,11 @@ test('#1500 Today week navigation preserves the selected day and mobile controls
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
   const week = page.getByRole('navigation', { name: 'Эта неделя' });
+  const workout = page.locator('.today-workout-spotlight');
   const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
   await expect(heading).toBeVisible();
+  await expect(workout).toBeVisible();
+  expect((await week.boundingBox())!.y).toBeLessThan((await workout.boundingBox())!.y);
   const headingBefore = await heading.getAttribute('aria-label');
   const range = week.locator('.week-strip__context > span');
   const before = await range.textContent();
@@ -1202,6 +1205,7 @@ test('#1500 Today week navigation preserves the selected day and mobile controls
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(week.getByRole('button', { name: 'Следующая неделя' })).toHaveCount(0);
   await expect(selectedDay).toBeFocused();
+  expect((await week.boundingBox())!.y).toBeGreaterThan((await workout.boundingBox())!.y);
 });
 
 test('#1500 plan heading uses the desktop design and preserves the mobile label', async ({
