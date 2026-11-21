@@ -44,6 +44,37 @@
   color: var(--v2-text-secondary);
 }
 
+.coach-os-desktop-copy,
+.coach-os-desktop-nav {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .coach-os-desktop-copy {
+    display: inline;
+  }
+
+  .coach-os-mobile-copy {
+    display: none;
+  }
+
+  .coach-os .coach-os-desktop-nav {
+    display: block;
+    width: min(100%, 1440px);
+    margin-inline: auto;
+  }
+
+  .coach-os-desktop-nav .ui-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .coach-os-desktop-nav .ui-tab {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
 .coach-os-header__actions,
 .coach-today__hero-actions {
   display: flex;

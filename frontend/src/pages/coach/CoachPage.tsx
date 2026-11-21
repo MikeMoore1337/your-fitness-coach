@@ -48,6 +48,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  SegmentedControl,
 } from '../../shared/ui/common';
 import {
   coachPathForTab,
@@ -1278,6 +1279,7 @@ export default function CoachPage({
   const { user } = useAuth();
   const { navigate, path, search } = useNavigation();
   const runtime = useRuntime();
+  const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
   const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
@@ -1546,8 +1548,34 @@ export default function CoachPage({
       <header className="coach-os-header">
         <div>
           <span className="eyebrow">Тренер · рабочее пространство</span>
-          <h1>{tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}</h1>
-          <p>Сначала действие, затем детали клиента — без потери глубины YFC.</p>
+          <h1>
+            {demo || isMiniApp ? (
+              tab === 'today' ? (
+                'Сегодня'
+              ) : (
+                'Кабинет тренера'
+              )
+            ) : (
+              <>
+                <span className="coach-os-desktop-copy">Кабинет тренера</span>
+                <span className="coach-os-mobile-copy">
+                  {tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}
+                </span>
+              </>
+            )}
+          </h1>
+          <p>
+            {demo || isMiniApp ? (
+              'Сначала действие, затем детали клиента — без потери глубины YFC.'
+            ) : (
+              <>
+                <span className="coach-os-desktop-copy">Клиенты, программы и рабочие действия</span>
+                <span className="coach-os-mobile-copy">
+                  Сначала действие, затем детали клиента — без потери глубины YFC.
+                </span>
+              </>
+            )}
+          </p>
         </div>
         <div className="coach-os-header__actions app-action-group">
           <Button
@@ -1560,6 +1588,29 @@ export default function CoachPage({
           </Button>
         </div>
       </header>
+      {!demo && !isMiniApp && (
+        <nav className="coach-os-desktop-nav" aria-label="Разделы тренера">
+          <SegmentedControl
+            ariaLabel="Разделы тренера"
+            options={[
+              { value: 'today', label: 'Сегодня' },
+              { value: 'clients', label: 'Клиенты' },
+              { value: 'programs', label: 'Программы' },
+              { value: 'tools', label: 'Ещё' },
+            ]}
+            value={tab}
+            onChange={(value) => {
+              if (
+                value === 'today' ||
+                value === 'clients' ||
+                value === 'programs' ||
+                value === 'tools'
+              )
+                navigateCoach(value);
+            }}
+          />
+        </nav>
+      )}
       {demo && (
         <nav className="coach-os-nav" aria-label="Разделы тренера">
           {(

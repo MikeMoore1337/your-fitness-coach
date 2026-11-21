@@ -75,14 +75,9 @@ vi.mock('../../../src/shared/pwa/PwaProvider', () => ({
   usePwa: () => pwa,
 }));
 
-vi.mock('../../../src/shared/navigation/router', () => ({
+vi.mock('../../../src/shared/navigation/router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/shared/navigation/router')>()),
   useNavigation: () => navigation,
-  coachTabFromSearch: (search: string) => new URLSearchParams(search).get('tab') ?? 'today',
-  safeTrainerReturnPath: (value: string | null | undefined) => {
-    if (!value) return null;
-    const parsed = new URL(value, 'http://localhost');
-    return `${parsed.pathname}${parsed.search}`;
-  },
   AppLink: ({ to, className, children, ...props }: React.ComponentProps<'a'> & { to: string }) => (
     <a href={to} className={className} {...props}>
       {children}
@@ -113,18 +108,17 @@ describe('AppShell', () => {
       'Рабочее пространствоКлиенты',
     );
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute('href', '/coach');
-    expect(screen.getByRole('link', { name: 'Клиенты' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute(
       'href',
-      '/coach?tab=clients',
+      '/app?section=today&trainer_return=%2Fcoach',
     );
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
       ),
-    ).toEqual(['Сегодня', 'Клиенты', 'Программы', 'Ещё']);
+    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
     expect(screen.queryByRole('button', { name: 'Ещё' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Тренер' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Админ-панель' })).not.toBeInTheDocument();
     expect(screen.getByText('Ресурсы')).toBeInTheDocument();
     expect(screen.getByText('Михаил')).toBeInTheDocument();

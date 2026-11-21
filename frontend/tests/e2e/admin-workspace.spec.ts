@@ -339,6 +339,36 @@ async function expectNoHorizontalOverflow(page: Page) {
   ).toBe(true);
 }
 
+test('desktop admin navigation stays visible below the sticky header after scrolling', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await mockAdminApi(page);
+  await page.goto('/admin');
+  const search = page.getByLabel('Безопасный идентификатор');
+  await search.scrollIntoViewIfNeeded();
+  await search.focus();
+  const tab = page.getByRole('tab', { name: 'Задачи', exact: true });
+  await tab.scrollIntoViewIfNeeded();
+  await tab.focus();
+  await expect(tab).toBeFocused();
+  const geometry = await tab.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const header = document.querySelector('.app-desktop-header')!.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      (rect.left + rect.right) / 2,
+      (rect.top + rect.bottom) / 2,
+    );
+    return {
+      top: rect.top,
+      headerBottom: header.bottom,
+      unobscured: !!hit && (hit === element || element.contains(hit)),
+    };
+  });
+  expect(geometry.top).toBeGreaterThanOrEqual(geometry.headerBottom);
+  expect(geometry.unobscured).toBe(true);
+});
+
 test('root workspace keeps one desktop scan path and semantic operation boundaries', async ({
   page,
 }) => {

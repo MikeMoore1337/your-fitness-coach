@@ -3237,6 +3237,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (min-width: 900px) {
+  html:has(.app-desktop-header) {
+    scroll-padding-block-start: calc(74px + var(--v2-space-3, 12px));
+  }
+
   .today-dashboard--design-v2 .today-dashboard__header h1 {
     text-transform: none;
   }
