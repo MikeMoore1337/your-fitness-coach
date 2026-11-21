@@ -250,7 +250,10 @@ for (const theme of themes) {
           await expect(page.locator(target)).toHaveCount(1);
         }
       }
-      await page.locator('.profile-primary-card > summary').click();
+      const personal = page.locator('.profile-primary-card');
+      if (!(await personal.evaluate((element: HTMLDetailsElement) => element.open))) {
+        await personal.locator('> summary').click();
+      }
       const goal = page.locator('#profile-goal');
       await expect(goal).toBeVisible();
       await goal.selectOption('recomposition');
