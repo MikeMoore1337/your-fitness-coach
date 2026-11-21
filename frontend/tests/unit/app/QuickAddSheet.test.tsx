@@ -1,11 +1,60 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { QuickAddSheet } from '../../../src/app/QuickAddSheet';
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it('makes desktop exit inert and cancels the old close when reopened', () => {
+  vi.useFakeTimers();
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('min-width'),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  const content = (open: boolean) => (
+    <QuickAddSheet actions={[]} onClose={() => undefined} open={open} />
+  );
+  const view = render(content(true));
+  view.rerender(content(false));
+  const layer = screen.getByTestId('quick-add-layer');
+  expect(layer).toHaveAttribute('aria-hidden', 'true');
+  expect(layer).toHaveAttribute('inert');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  view.rerender(content(true));
+  act(() => vi.advanceTimersByTime(350));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByTestId('quick-add-layer')).not.toHaveAttribute('inert');
+  view.rerender(content(false));
+  act(() => vi.advanceTimersByTime(260));
+  expect(screen.queryByTestId('quick-add-layer')).toBeNull();
+});
+
+it('does not retain the desktop exit with reduced motion', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  const view = render(<QuickAddSheet actions={[]} onClose={() => undefined} open />);
+  view.rerender(<QuickAddSheet actions={[]} onClose={() => undefined} open={false} />);
+  expect(screen.queryByTestId('quick-add-layer')).toBeNull();
+});
+
+it('stops the desktop exit when reduced motion is enabled during closing', () => {
+  let onChange: ((event: MediaQueryListEvent) => void) | undefined;
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('min-width'),
+    addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => {
+      onChange = listener;
+    },
+    removeEventListener: vi.fn(),
+  }));
+  const view = render(<QuickAddSheet actions={[]} onClose={() => undefined} open />);
+  view.rerender(<QuickAddSheet actions={[]} onClose={() => undefined} open={false} />);
+  expect(screen.getByTestId('quick-add-layer')).toHaveAttribute('inert');
+  act(() => onChange?.({ matches: true } as MediaQueryListEvent));
+  expect(screen.queryByTestId('quick-add-layer')).toBeNull();
 });
 
 function pointer(target: Element, type: string, y: number) {

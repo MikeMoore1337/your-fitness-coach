@@ -1141,6 +1141,26 @@ async function installDemoTransport(page: Page) {
 
 test.use({ video: process.env.ISSUE_983_EVIDENCE_DIR ? 'on' : 'off' });
 
+test('#1500 desktop Quick Add restores focus and can reopen during exit', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const trigger = page.getByTestId('quick-add-trigger');
+  const sheet = page.getByTestId('quick-add-sheet');
+  await trigger.click();
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(sheet).toBeVisible();
+  await page.waitForTimeout(350);
+  await expect(sheet).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('quick-add-layer')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
 test.describe('#983', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`#983 week and Quick Add gestures preserve demo interactions (${theme})`, async ({
