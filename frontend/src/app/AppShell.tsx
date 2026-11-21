@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { QuickAddPlacementContext } from './QuickAddPlacementContext';
 import {
   AppLink,
+  coachPathForTab,
   coachTabFromSearch,
   safeTrainerReturnPath,
   useNavigation,
@@ -274,10 +275,17 @@ export function AppShell({
     ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
     : null;
   const shellDestinations =
-    demo?.destinations ?? (trainerWorkspace ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+    demo?.destinations ??
+    (trainerWorkspace && mobileNavigation ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+  const personalSearch =
+    trainerWorkspace && !mobileNavigation
+      ? `?trainer_return=${encodeURIComponent(coachPathForTab(coachTabFromSearch(search)))}`
+      : search;
   const quickAddLinks = demo?.quickAddLinks ?? DEFAULT_QUICK_ADD_ACTIONS;
   const brandTo = demo?.brandTo ?? '/app?section=today';
-  const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
+  const resolvedBrandTo = demo
+    ? brandTo
+    : personalDestinationWithTrainerReturn(brandTo, personalSearch);
   const shellVisible = Boolean(user || demo);
   const quickAddVisible =
     shellVisible &&
@@ -330,7 +338,7 @@ export function AppShell({
       to: '/coach',
       icon: 'coach' as const,
       desktopGroup: 'workspaces' as const,
-      visible: Boolean(user?.is_coach) && !trainerWorkspace,
+      visible: Boolean(user?.is_coach) && (!trainerWorkspace || !mobileNavigation),
     },
     {
       key: 'admin',
@@ -645,7 +653,7 @@ export function AppShell({
                     data-yfc-choice="compact"
                     to={
                       demo?.accountTo ??
-                      personalDestinationWithTrainerReturn('/app?section=profile', search)
+                      personalDestinationWithTrainerReturn('/app?section=profile', personalSearch)
                     }
                     className={`app-desktop-account-entry${
                       (
@@ -695,10 +703,10 @@ export function AppShell({
                     'to' in destination ? destination.to : `/app?section=${destination.section}`;
                   const destinationTo = demo
                     ? rawDestinationTo
-                    : personalDestinationWithTrainerReturn(rawDestinationTo, search);
+                    : personalDestinationWithTrainerReturn(rawDestinationTo, personalSearch);
                   const active = demo
                     ? demo.activeSection === destinationKey
-                    : trainerWorkspace
+                    : trainerWorkspace && mobileNavigation
                       ? path === '/coach' && coachTabFromSearch(search) === destinationKey
                       : path === '/app' && section === destinationKey;
                   return (
@@ -764,13 +772,19 @@ export function AppShell({
                           return (
                             <AppLink
                               key={destination.key}
-                              to={personalDestinationWithTrainerReturn(destination.to, search)}
+                              to={personalDestinationWithTrainerReturn(
+                                destination.to,
+                                personalSearch,
+                              )}
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
                               data-yfc-choice="compact"
                               aria-current={active ? 'page' : undefined}
                               onClick={() =>
                                 trackSectionNavigation(
-                                  personalDestinationWithTrainerReturn(destination.to, search),
+                                  personalDestinationWithTrainerReturn(
+                                    destination.to,
+                                    personalSearch,
+                                  ),
                                 )
                               }
                             >
@@ -931,13 +945,19 @@ export function AppShell({
                         return (
                           <AppLink
                             key={destination.key}
-                            to={personalDestinationWithTrainerReturn(destination.to, search)}
+                            to={personalDestinationWithTrainerReturn(
+                              destination.to,
+                              personalSearch,
+                            )}
                             className="app-more-panel__item"
                             data-yfc-choice="compact"
                             aria-current={active ? 'page' : undefined}
                             onClick={() => {
                               trackSectionNavigation(
-                                personalDestinationWithTrainerReturn(destination.to, search),
+                                personalDestinationWithTrainerReturn(
+                                  destination.to,
+                                  personalSearch,
+                                ),
                               );
                               setMoreOpen(false);
                               hideMorePresence();

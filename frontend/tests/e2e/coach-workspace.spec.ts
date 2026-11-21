@@ -1477,7 +1477,7 @@ async function openCoach(page: Page) {
   await mockCoachWorkspace(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
 }
 
@@ -1541,9 +1541,7 @@ for (const surface of ['desktop', 'mobile', 'tma'] as const) {
     });
     await page.goto('/coach');
     if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
-    await trainerPrimaryNavigation(page)
-      .getByRole('link', { name: 'Клиенты', exact: true })
-      .click();
+    await trainerDestination(page, 'Клиенты').click();
     if (surface !== 'desktop')
       await page
         .getByRole('button', { name: /Анна Петрова/ })
@@ -1671,6 +1669,48 @@ function trainerPrimaryNavigation(page: Page) {
     .locator('.app-bottom-nav__primary');
 }
 
+function trainerDestination(page: Page, name: string) {
+  if ((page.viewportSize()?.width ?? 1280) >= 900) {
+    return page.getByRole('tablist', { name: 'Разделы тренера' }).getByRole('tab', {
+      name,
+      exact: true,
+    });
+  }
+  return trainerPrimaryNavigation(page).getByRole('link', { name, exact: true });
+}
+
+test('desktop Coach OS uses workspace tabs and preserves trainer return on personal navigation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер', exact: true }).click();
+  const tabs = page.getByRole('tablist', { name: 'Разделы тренера' });
+  await expect(tabs.getByRole('tab', { name: 'Сегодня' })).toHaveAttribute('aria-selected', 'true');
+  await tabs.getByRole('tab', { name: 'Программы' }).click();
+  await expect(page).toHaveURL('/coach?tab=programs');
+  await expect(tabs.getByRole('tab', { name: 'Программы' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  const nav = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(nav.getByRole('link', { name: 'Тренер', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await nav.getByRole('link', { name: 'Питание', exact: true }).click();
+  expect(new URL(page.url()).searchParams.get('trainer_return')).toBe('/coach?tab=programs');
+  await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
+  await expect(page).toHaveURL('/coach?tab=programs');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(tabs).toBeHidden();
+  await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
 test('Issue 954: отзыв убирает ранее загруженные данные питания', async ({ page }) => {
   await mockCoachWorkspace(page);
   let revoked = false;
@@ -1694,7 +1734,7 @@ test('Issue 954: отзыв убирает ранее загруженные д�
   });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await page.locator('#coach-client-nutrition > summary').click();
   await page.getByRole('button', { name: 'Открыть питание клиента' }).click();
   await expect(page.locator('.coach-nutrition-assigned')).toContainText('1900');
@@ -1725,9 +1765,7 @@ for (const surface of ['desktop', 'mobile', 'tma'] as const) {
     );
     await page.goto('/coach');
     if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
-    await trainerPrimaryNavigation(page)
-      .getByRole('link', { name: 'Клиенты', exact: true })
-      .click();
+    await trainerDestination(page, 'Клиенты').click();
     if (surface !== 'desktop')
       await page
         .getByRole('button', { name: /Анна Петрова/ })
@@ -1824,9 +1862,7 @@ for (const scenario of ['empty', 'program', 'error', 'loading'] as const) {
       }
       await page.goto('/coach');
       if (surface !== 'tma') await page.getByRole('button', { name: 'Тренер' }).click();
-      await trainerPrimaryNavigation(page)
-        .getByRole('link', { name: 'Клиенты', exact: true })
-        .click();
+      await trainerDestination(page, 'Клиенты').click();
       if (surface !== 'desktop')
         await page
           .getByRole('button', { name: /Анна Петрова/ })
@@ -1893,6 +1929,15 @@ async function assertAboveMobileDock(page: Page, locator: Locator) {
 
 async function assertCoachNavigationFits(page: Page, width: number) {
   await page.setViewportSize({ width, height: 844 });
+  if (width >= 900) {
+    const tabs = page.getByRole('tablist', { name: 'Разделы тренера' });
+    await expect(tabs).toBeVisible();
+    await expect(tabs.getByRole('tab')).toHaveCount(4);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    return;
+  }
   const duplicateNavigation = page.getByRole('navigation', { name: 'Разделы тренера' });
   const primaryNavigation = trainerPrimaryNavigation(page);
   const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
@@ -1941,15 +1986,13 @@ for (const width of [320, 360, 393, 430, 1280]) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
       await openCoach(page);
-      await expectSelectedChoice(
-        trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }),
-      );
+      await expectSelectedChoice(trainerDestination(page, 'Клиенты'));
       await expectSelectedChoice(
         page
           .getByRole('navigation', { name: 'Режим работы' })
           .getByRole('link', { name: 'Клиенты', exact: true }),
       );
-      await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+      await trainerDestination(page, 'Ещё').click();
       await page.getByRole('button', { name: 'Расписание и встречи' }).click();
       const modes = page.getByRole('tablist', { name: 'Режим просмотра расписания' });
       const week = modes.getByRole('tab', { name: 'Неделя', exact: true });
@@ -2063,9 +2106,7 @@ test('операционный roster даёт факты и не загружа
   }
 
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-  await expectSelectedChoice(
-    trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }),
-  );
+  await expectSelectedChoice(trainerDestination(page, 'Клиенты'));
   await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(20, 23, 23)');
   await expect(page.getByRole('button', { name: 'Пригласить клиента', exact: true })).toHaveCSS(
     'background-color',
@@ -2099,7 +2140,7 @@ test('операционный roster даёт факты и не загружа
   await expect(page.locator('.coach-client-roster .coach-client-row')).toHaveCount(1);
   await expect(page.getByText('Елена — приглашение ожидает подтверждения')).toBeVisible();
   await page.getByRole('button', { name: 'Пригласить клиента', exact: true }).first().click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Приглашения и подключения' }).click();
   await expect(page.getByLabel('Ссылка для браузера и Telegram')).toHaveValue(
     'https://example.test/join/test',
@@ -2282,9 +2323,7 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
     await targetPage.goto(telegram ? '/coach?tgWebAppPlatform=android' : '/coach');
     if (!telegram) await targetPage.getByRole('button', { name: 'Тренер' }).click();
     await expect(targetPage.getByRole('button', { name: 'Пригласить клиента' })).toBeVisible();
-    await trainerPrimaryNavigation(targetPage)
-      .getByRole('link', { name: 'Ещё', exact: true })
-      .click();
+    await trainerDestination(targetPage, 'Ещё').click();
     const hub = targetPage.getByTestId('coach-tools-hub');
     await hub.getByRole('button', { name: /Подключение и сообщения/ }).click();
     const workflow = targetPage.getByTestId('coach-workflow-templates');
@@ -2447,7 +2486,7 @@ test('Task 291 показывает action-first Today и ленивый кон�
   ).toHaveCount(4);
   await captureTask291Evidence(page, 'today-actionable-mobile-light');
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await page.getByLabel('Показать').selectOption('pending');
   await expect(page.locator('.coach-client-roster .coach-client-row')).toHaveCount(1);
   await expect(page.getByText('Елена — приглашение ожидает подтверждения')).toBeVisible();
@@ -2460,7 +2499,7 @@ test('Task 291 показывает action-first Today и ленивый кон�
   await page.getByLabel('Найти клиента').fill('');
   await page.getByLabel('Найти клиента').evaluate((element) => (element as HTMLElement).blur());
   await expect(page.locator('#appBottomNav')).toBeVisible();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Сегодня', exact: true }).click();
+  await trainerDestination(page, 'Сегодня').click();
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
@@ -2471,7 +2510,7 @@ test('Task 291 показывает action-first Today и ленивый кон�
   await page.keyboard.press('Escape');
   await expect(page.locator('#appMorePanel')).toBeHidden();
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await page.getByRole('button', { name: /Анна Петрова/ }).click();
   await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
   expect(contextRequests).toEqual([]);
@@ -2769,12 +2808,7 @@ test('Stage 1 сохраняет trainer-first entry и явное перекл�
   await page.keyboard.press('Escape');
   await expect(page.locator('#appMorePanel')).toBeHidden();
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Основная навигация' })
-      .locator('.app-bottom-nav__primary')
-      .getByRole('link', { name: 'Программы', exact: true }),
-  ).toHaveAttribute('aria-current', 'page');
+  await expect(trainerDestination(page, 'Программы')).toHaveAttribute('aria-selected', 'true');
   await captureTask387Evidence(page, '1440-trainer-programs');
 
   await page.setViewportSize({ width: 320, height: 844 });
@@ -2929,7 +2963,7 @@ test('Task 291 сохраняет плотную desktop-композицию и
   await captureTask291Evidence(page, 'today-actionable-desktop-dark');
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
   await captureTask291Evidence(page, 'client-workspace-desktop-light');
   await page.getByLabel('Данные клиента').getByRole('link', { name: 'Последние события' }).click();
@@ -3133,7 +3167,7 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
   await mockCoachWorkspace(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
 
   const rosterBox = await page.locator('.coach-client-roster').boundingBox();
   const detailBox = await page.locator('.coach-client-detail').boundingBox();
@@ -3219,9 +3253,7 @@ test('Program lifecycle summary stays compact on a phone', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
   await page.setViewportSize({ width: 390, height: 844 });
   await openCoach(page);
-  await trainerPrimaryNavigation(page)
-    .getByRole('link', { name: 'Программы', exact: true })
-    .click();
+  await trainerDestination(page, 'Программы').click();
   const card = page.locator('.coach-programs-card');
   await card.locator(':scope > summary').click();
 
@@ -3239,9 +3271,7 @@ test('Coach Programs keeps responsive geometry content-driven', async ({ page })
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
   await page.setViewportSize({ width: 390, height: 844 });
   await openCoach(page);
-  await trainerPrimaryNavigation(page)
-    .getByRole('link', { name: 'Программы', exact: true })
-    .click();
+  await trainerDestination(page, 'Программы').click();
 
   const card = page.locator('.coach-programs-card');
   await card.locator(':scope > summary').click();
@@ -3492,7 +3522,7 @@ test('desktop package actions keep the shared horizontal gap', async ({ page }) 
   await mockCoachWorkspace(page, { operations: 'seeded' });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Пакеты и оплаты' }).click();
   await expect(page.getByRole('heading', { name: 'Пакеты и оплаты', exact: true })).toBeVisible();
 
@@ -3526,7 +3556,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   });
 
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Реестр и факты' }).click();
   await expect(page.getByTestId('coach-roster-analytics')).toBeVisible();
   await expect(page.getByText('Список клиентов', { exact: true })).toBeVisible();
@@ -3594,7 +3624,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   });
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Проверка итогов' }).click();
   await expect(page.getByTestId('coach-check-in-reviews')).toBeVisible();
   await expect(page.getByText('Энергии на этой неделе было достаточно.')).toBeVisible();
@@ -3618,7 +3648,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   });
   await page.getByRole('button', { name: 'Закрыть сообщение' }).click();
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await trainerDestination(page, 'Клиенты').click();
   await page
     .getByRole('button', { name: /Анна Петрова/ })
     .first()
@@ -3626,16 +3656,14 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   await expect(page.getByText('Профиль клиента 360', { exact: true })).toBeVisible();
   await page.screenshot({ path: `${task525VisualDir}/client-360.png`, fullPage: true });
 
-  await trainerPrimaryNavigation(page)
-    .getByRole('link', { name: 'Программы', exact: true })
-    .click();
+  await trainerDestination(page, 'Программы').click();
   await expect(page.getByText('Программы клиентов', { exact: true })).toBeVisible();
   await page.screenshot({
     path: `${task525VisualDir}/program-template-revision.png`,
     fullPage: true,
   });
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Задачи' }).click();
   await expect(page.getByText('Проверить технику приседа', { exact: true })).toBeVisible();
   await page.screenshot({ path: `${task525VisualDir}/tasks-follow-ups.png`, fullPage: true });
@@ -3647,7 +3675,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   expect(scrollWidth).toBeLessThanOrEqual(390);
   await page.screenshot({ path: `${task525VisualDir}/mobile-attention-queue.png`, fullPage: true });
 
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Реестр и факты' }).click();
   await expect(page.getByTestId('coach-roster-table')).toBeVisible();
   await expect(page.locator('.coach-roster-table__header')).toBeHidden();
@@ -3672,7 +3700,7 @@ test('task 525 visual package covers empty and permission-error states', async (
       json: { detail: 'Недоступно для этого рабочего кабинета' },
     });
   });
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Проверка итогов' }).click();
   await expect(
     page.getByText('Не удалось загрузить итоги клиентов.', { exact: true }),
@@ -3687,7 +3715,7 @@ test('Task 751 check-in templates stay usable on desktop and mobile', async ({ p
   await mockCoachWorkspace(page, { operations: 'empty' });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await trainerDestination(page, 'Ещё').click();
   await page.getByRole('button', { name: 'Шаблоны проверок' }).click();
 
   await expect(page).toHaveURL('/coach?tab=tools&tool=templates');
@@ -3739,10 +3767,7 @@ test('Product V10 B5 rollout preview keeps compatible and manual cases visible',
       await targetPage.getByRole('button', { name: 'Тренер' }).click();
     }
     await expect(targetPage.getByRole('button', { name: 'Пригласить клиента' })).toBeVisible();
-    const programsLink = trainerPrimaryNavigation(targetPage).getByRole('link', {
-      name: 'Программы',
-      exact: true,
-    });
+    const programsLink = trainerDestination(targetPage, 'Программы');
     if (await programsLink.count()) {
       await programsLink.click();
     } else {
