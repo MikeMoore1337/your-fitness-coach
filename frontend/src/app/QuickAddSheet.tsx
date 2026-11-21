@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { AppLink } from '../shared/navigation/router';
 import { glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
@@ -108,10 +108,35 @@ export function QuickAddSheet({
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
   const drag = useQuickAddDrag(panelRef, open, onClose);
+  const [previousOpen, setPreviousOpen] = useState(open);
+  const [exiting, setExiting] = useState(false);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
+    setExiting(
+      !open &&
+        (window.matchMedia?.('(min-width: 900px)').matches ?? false) &&
+        !(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false),
+    );
+  }
+  useLayoutEffect(() => {
+    if (!exiting) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const timer = window.setTimeout(() => setExiting(false), 260);
+    const stopForReducedMotion = (event: MediaQueryListEvent) => {
+      if (event.matches) setExiting(false);
+    };
+    reduced?.addEventListener?.('change', stopForReducedMotion);
+    return () => {
+      window.clearTimeout(timer);
+      reduced?.removeEventListener?.('change', stopForReducedMotion);
+    };
+  }, [exiting]);
   useLayoutEffect(() => {
     if (!open) return;
     const layer = panelRef.current?.parentElement;
-    const trigger = layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger');
+    const trigger =
+      layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger') ??
+      document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]');
     const background = [...(layer?.parentElement?.children ?? [])].filter(
       (element): element is HTMLElement => element instanceof HTMLElement && element !== layer,
     );
@@ -126,21 +151,30 @@ export function QuickAddSheet({
       // Modal cleanup runs before the background inert state is fully released.
       // Restore keyboard focus on the next frame, after the close commit.
       window.requestAnimationFrame(() => {
+        const activeDialog = document.querySelector<HTMLElement>(
+          '[data-testid="quick-add-layer"]:not([inert])',
+        );
         if (
           trigger?.isConnected &&
+          !activeDialog &&
           !trigger.closest('[inert]') &&
-          (document.activeElement === document.body || document.activeElement === trigger)
+          (document.activeElement === document.body ||
+            document.activeElement === trigger ||
+            layer?.contains(document.activeElement))
         ) {
           trigger.focus({ preventScroll: true });
         }
       });
     };
   }, [open, panelRef]);
-  if (!open) return null;
+  if (!open && !exiting) return null;
 
   return (
     <div
       className="app-quick-add-layer"
+      aria-hidden={!open || undefined}
+      inert={!open}
+      data-motion-phase={!open ? 'closing' : undefined}
       data-testid="quick-add-layer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {

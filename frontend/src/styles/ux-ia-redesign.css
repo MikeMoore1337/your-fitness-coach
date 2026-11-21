@@ -1023,14 +1023,43 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 
 @media (min-width: 900px) {
+  .app-quick-add-layer {
+    align-items: center;
+  }
+
+  .app-quick-add-layer[data-motion-phase='closing'] {
+    pointer-events: none;
+    animation: quick-add-desktop-backdrop-out 260ms ease both;
+  }
+
+  .app-quick-add-layer[data-motion-phase='closing'] .app-quick-add-panel {
+    animation: quick-add-desktop-panel-out 260ms ease both;
+  }
+
   .app-quick-add-trigger--floating {
     right: 30px;
     bottom: 28px;
   }
 
   .app-quick-add-panel {
+    width: min(600px, calc(100% - 32px));
     margin-left: 250px;
-    border-radius: var(--v2-region-radius);
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+  }
+}
+
+@keyframes quick-add-desktop-backdrop-out {
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes quick-add-desktop-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
 
