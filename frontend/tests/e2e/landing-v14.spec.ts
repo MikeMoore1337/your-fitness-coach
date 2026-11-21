@@ -26,6 +26,11 @@ for (const width of [320, 360, 390, 393, 430, 768, 1024, 1280, 1440, 1920]) {
           'href',
           audience === 'coach' ? '#coach-work' : '#training',
         );
+        const telegram = page.locator('#continuity').getByRole('link', {
+          name: 'Открыть мини-приложение Telegram',
+        });
+        await expect(telegram).toHaveAttribute('href', /^https:\/\/t\.me\//);
+        await expect(telegram).toHaveAttribute('rel', 'noreferrer');
         const geometry = await hero.evaluate((element) => {
           const image = element.querySelector('.landing-hero__image')!.getBoundingClientRect();
           const copy = element.querySelector('.landing-hero__copy')!.getBoundingClientRect();

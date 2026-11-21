@@ -209,6 +209,13 @@
   padding: 0;
 }
 
+.landing-v10-page .ref-continuity .ref-continuity-visual {
+  display: inline-flex;
+  width: auto;
+  min-height: 48px;
+  margin-top: 26px;
+}
+
 .landing-v10-page .ref-tabs button[data-yfc-choice][aria-pressed='true'] {
   border-color: var(--v2-selected-outline) !important;
   background: var(--v2-selected-surface) !important;
