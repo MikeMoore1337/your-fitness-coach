@@ -1279,6 +1279,7 @@ export default function CoachPage({
   const { user } = useAuth();
   const { navigate, path, search } = useNavigation();
   const runtime = useRuntime();
+  const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
   const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
@@ -1548,7 +1549,7 @@ export default function CoachPage({
         <div>
           <span className="eyebrow">Тренер · рабочее пространство</span>
           <h1>
-            {demo ? (
+            {demo || isMiniApp ? (
               tab === 'today' ? (
                 'Сегодня'
               ) : (
@@ -1564,7 +1565,7 @@ export default function CoachPage({
             )}
           </h1>
           <p>
-            {demo ? (
+            {demo || isMiniApp ? (
               'Сначала действие, затем детали клиента — без потери глубины YFC.'
             ) : (
               <>
@@ -1587,7 +1588,7 @@ export default function CoachPage({
           </Button>
         </div>
       </header>
-      {!demo && (
+      {!demo && !isMiniApp && (
         <nav className="coach-os-desktop-nav" aria-label="Разделы тренера">
           <SegmentedControl
             ariaLabel="Разделы тренера"

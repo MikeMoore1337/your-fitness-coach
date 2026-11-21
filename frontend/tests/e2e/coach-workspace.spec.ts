@@ -1721,6 +1721,24 @@ test('desktop Coach OS uses workspace tabs and preserves trainer return on perso
   await invite.focus();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(invite).toBeFocused();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await nav.getByRole('link', { name: 'Питание', exact: true }).focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toBeFocused();
+});
+
+test('wide Telegram Coach OS retains its existing navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await installTelegramHarness(page, { colorScheme: 'dark' });
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+  await page.goto('/coach?tgWebAppPlatform=android');
+  await expect(page.getByRole('navigation', { name: 'Разделы тренера' })).toHaveCount(0);
+  const nav = page.getByRole('navigation', { name: 'Основная навигация' });
+  await nav.getByRole('link', { name: 'Программы', exact: true }).click();
+  await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
 });
 
 test('Issue 954: отзыв убирает ранее загруженные данные питания', async ({ page }) => {

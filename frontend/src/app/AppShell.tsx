@@ -282,18 +282,28 @@ export function AppShell({
     pendingTrainerFocus.current = focusedTrainerTab.current;
   }, []);
   const mobileNavigation = useMobileNavigation(captureTrainerFocus);
+  const renderedMobileNavigation = useRef(mobileNavigation);
+  renderedMobileNavigation.current = mobileNavigation;
   const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
+  const desktopTrainerNavigation = trainerWorkspace && !mobileNavigation && !isMiniApp;
+  const currentTrainerTab = useRef(coachTabFromSearch(search));
+  currentTrainerTab.current = coachTabFromSearch(search);
   useEffect(() => {
-    if (!trainerWorkspace) return;
+    if (!trainerWorkspace || isMiniApp) return;
     const trackFocus = (event: FocusEvent) => {
       const focused = event.target instanceof Element ? event.target : null;
+      if (
+        focused === document.body &&
+        mobileNavigationMatches() !== renderedMobileNavigation.current
+      )
+        return;
       const tabs = Array.from(document.querySelectorAll('.coach-os-desktop-nav [role="tab"]'));
       const tabIndex = focused ? tabs.indexOf(focused) : -1;
       const mobileTab = focused?.getAttribute('data-trainer-tab');
       focusedTrainerTab.current =
         tabIndex >= 0
           ? (['today', 'clients', 'programs', 'tools'][tabIndex] ?? null)
-          : (mobileTab ?? null);
+          : (mobileTab ?? (focused?.closest('#appBottomNav') ? currentTrainerTab.current : null));
     };
     const clearOnPointer = (event: PointerEvent) => {
       if (
@@ -310,28 +320,27 @@ export function AppShell({
       focusedTrainerTab.current = null;
       pendingTrainerFocus.current = null;
     };
-  }, [trainerWorkspace]);
+  }, [isMiniApp, trainerWorkspace]);
   useLayoutEffect(() => {
     const key = pendingTrainerFocus.current;
-    if (!trainerWorkspace || !key) return;
+    if (!trainerWorkspace || isMiniApp || !key) return;
     const index = ['today', 'clients', 'programs', 'tools'].indexOf(key);
     const target = mobileNavigation
       ? document.querySelector<HTMLElement>(`[data-trainer-tab="${key}"]`)
       : document.querySelectorAll<HTMLElement>('.coach-os-desktop-nav [role="tab"]')[index];
     target?.focus({ preventScroll: true });
     pendingTrainerFocus.current = null;
-  }, [mobileNavigation, trainerWorkspace]);
+  }, [isMiniApp, mobileNavigation, trainerWorkspace]);
   const personalWorkspace = Boolean(!demo && user?.is_coach && path === '/app' && section);
   const trainerReturnTo = personalWorkspace
     ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
     : null;
   const shellDestinations =
     demo?.destinations ??
-    (trainerWorkspace && mobileNavigation ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
-  const personalSearch =
-    trainerWorkspace && !mobileNavigation
-      ? `?trainer_return=${encodeURIComponent(coachPathForTab(coachTabFromSearch(search)))}`
-      : search;
+    (trainerWorkspace && !desktopTrainerNavigation ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+  const personalSearch = desktopTrainerNavigation
+    ? `?trainer_return=${encodeURIComponent(coachPathForTab(coachTabFromSearch(search)))}`
+    : search;
   const quickAddLinks = demo?.quickAddLinks ?? DEFAULT_QUICK_ADD_ACTIONS;
   const brandTo = demo?.brandTo ?? '/app?section=today';
   const resolvedBrandTo = demo
@@ -389,7 +398,7 @@ export function AppShell({
       to: '/coach',
       icon: 'coach' as const,
       desktopGroup: 'workspaces' as const,
-      visible: Boolean(user?.is_coach) && (!trainerWorkspace || !mobileNavigation),
+      visible: Boolean(user?.is_coach) && (!trainerWorkspace || desktopTrainerNavigation),
     },
     {
       key: 'admin',
@@ -757,7 +766,7 @@ export function AppShell({
                     : personalDestinationWithTrainerReturn(rawDestinationTo, personalSearch);
                   const active = demo
                     ? demo.activeSection === destinationKey
-                    : trainerWorkspace && mobileNavigation
+                    : trainerWorkspace && !desktopTrainerNavigation
                       ? path === '/coach' && coachTabFromSearch(search) === destinationKey
                       : path === '/app' && section === destinationKey;
                   return (
@@ -771,7 +780,7 @@ export function AppShell({
                       }`}
                       data-yfc-choice="capsule"
                       data-trainer-tab={
-                        trainerWorkspace && mobileNavigation ? destinationKey : undefined
+                        trainerWorkspace && !desktopTrainerNavigation ? destinationKey : undefined
                       }
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
