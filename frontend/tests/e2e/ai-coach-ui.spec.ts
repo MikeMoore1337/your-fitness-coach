@@ -584,11 +584,12 @@ test('Task 284 owner visual remediation keeps Profile rows aligned and dark sele
   const aiRowHeight = await lightPage
     .getByTestId('ai-coach-entry-profile')
     .evaluate((node) => node.getBoundingClientRect().height);
+  await expect(lightPage.locator('#profile-personal')).toHaveJSProperty('open', true);
   const neighborRowHeights = await lightPage
-    .locator('.profile-settings > details.card-disclosure')
+    .locator('.profile-settings > details.card-disclosure:not([open])')
     .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
   expect(neighborRowHeights.length).toBeGreaterThanOrEqual(2);
-  expect(aiRowHeight).toBe(neighborRowHeights[0]);
+  expect(neighborRowHeights.every((height) => height === aiRowHeight)).toBe(true);
   const lightRow = lightPage.getByTestId('ai-coach-entry-profile');
   const lightRowBox = await lightRow.boundingBox();
   if (!lightRowBox) throw new Error('Profile AI Coach row has no geometry');
