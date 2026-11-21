@@ -1162,6 +1162,20 @@ test('#1500 desktop Quick Add restores focus and can reopen during exit', async 
   await expect(trigger).toBeFocused();
 });
 
+test('#1500 Today header adapts without changing the mobile composition', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  const summary = page.locator('.today-dashboard__desktop-summary');
+  await expect(heading).toBeVisible();
+  await expect(summary).toBeVisible();
+  await expect(heading).toHaveCSS('text-transform', 'none');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(summary).toBeHidden();
+  await expect(heading).toHaveCSS('text-transform', 'uppercase');
+});
+
 test.describe('#983', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`#983 week and Quick Add gestures preserve demo interactions (${theme})`, async ({

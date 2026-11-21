@@ -25,6 +25,7 @@ import {
   Field,
   Input,
   LoadingState,
+  SegmentedControl,
   Select,
   Surface,
 } from '../../shared/ui/common';
@@ -382,7 +383,7 @@ export default function AdminPage() {
       <div className="page-stack admin-workspace">
         <header className="admin-root-context">
           <div>
-            <span className="eyebrow">ROOT · WEB ONLY</span>
+            <span className="eyebrow">ROOT · ТОЛЬКО ВЕБ</span>
             <h1>Операции поддержки и безопасности</h1>
             <p>
               Только минимальные действия с аудитом. Личные данные клиента, SQL, impersonation и
@@ -398,18 +399,17 @@ export default function AdminPage() {
         </header>
 
         <nav className="admin-view-nav" aria-label="Разделы Root workspace">
-          {(Object.keys(VIEW_LABELS) as AdminView[]).map((item) => (
-            <Button
-              aria-current={view === item ? 'page' : undefined}
-              className={view === item ? 'is-active' : ''}
-              key={item}
-              onClick={() => setView(item)}
-              type="button"
-              variant="secondary"
-            >
-              {VIEW_LABELS[item]}
-            </Button>
-          ))}
+          <SegmentedControl
+            ariaLabel="Разделы администрирования"
+            onChange={(value) => {
+              if (Object.hasOwn(VIEW_LABELS, value)) setView(value as AdminView);
+            }}
+            options={(Object.keys(VIEW_LABELS) as AdminView[]).map((item) => ({
+              label: VIEW_LABELS[item],
+              value: item,
+            }))}
+            value={view}
+          />
         </nav>
 
         {view === 'accounts' && (

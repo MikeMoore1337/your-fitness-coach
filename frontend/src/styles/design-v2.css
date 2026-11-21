@@ -1146,6 +1146,11 @@ body:has(.app-shell--design-v2) {
   font-size: clamp(3rem, 7vw, 4.5rem);
   letter-spacing: -0.025em;
   line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.today-dashboard__desktop-summary {
+  display: none;
 }
 
 /* Shared week context/date-picker used by Today, Nutrition and future weekly surfaces. */
@@ -3194,6 +3199,23 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (min-width: 900px) {
+  .today-dashboard--design-v2 .today-dashboard__header h1 {
+    text-transform: none;
+  }
+
+  .today-dashboard--design-v2 .today-dashboard__date {
+    color: var(--v2-accent-text);
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .today-dashboard__desktop-summary {
+    display: block;
+    margin: 0;
+    color: var(--v2-text-secondary);
+    font-size: var(--font-size-body-lg);
+  }
+
   .app-desktop-header {
     position: sticky;
     top: 0;

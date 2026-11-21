@@ -1450,7 +1450,8 @@ export function TodayDashboard({
       {user && capabilities.canMutatePrograms && <ExerciseNoteRecovery userId={user.id} />}
       <header className="today-dashboard__header">
         <p className="today-dashboard__date">{heading.title.replace(/^Сегодня · /, '')}</p>
-        <h1 aria-label={heading.title}>СЕГОДНЯ</h1>
+        <h1 aria-label={heading.title}>Сегодня</h1>
+        <p className="today-dashboard__desktop-summary">Тренировки, питание и прогресс за день</p>
       </header>
 
       <div className="today-dashboard__overview">
