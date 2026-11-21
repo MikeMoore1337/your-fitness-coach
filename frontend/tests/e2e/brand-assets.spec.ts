@@ -409,7 +409,10 @@ test('canonical brand assets render on light and dark public surfaces', async ({
       await page.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
     }
     await assertHeaderMark(page, 'dark', 38, 44);
-    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(page.locator('#landing-title')).toHaveCSS(
+      'color',
+      viewport.name === 'mobile' ? 'rgb(250, 250, 250)' : 'rgb(255, 255, 255)',
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {

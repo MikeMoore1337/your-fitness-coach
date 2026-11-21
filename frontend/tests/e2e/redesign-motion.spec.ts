@@ -24,9 +24,12 @@ async function scrollToProgress(page: Page, scene: Locator, progress: number) {
   );
 }
 
-for (const width of [390, 1440]) {
-  test(`scroll-driven strength sequence ${width}`, async ({ page }, testInfo) => {
-    const height = width === 390 ? 844 : 1000;
+for (const { width, height } of [
+  { width: 390, height: 844 },
+  { width: 1440, height: 1000 },
+  { width: 1440, height: 1600 },
+]) {
+  test(`scroll-driven strength sequence ${width}x${height}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height });
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
@@ -35,7 +38,7 @@ for (const width of [390, 1440]) {
     await scene.scrollIntoViewIfNeeded();
     await expectNoHorizontalOverflow(page);
     await expect(scene.locator('[data-step]')).toHaveCount(3);
-    await expect(scene.getByRole('button')).toHaveCount(0);
+    await expect(scene.getByRole('button')).toHaveCount(3);
 
     const metrics = await scene.evaluate((element) => {
       const sticky = element.querySelector<HTMLElement>('.strength-scene__sticky');
@@ -47,6 +50,20 @@ for (const width of [390, 1440]) {
         viewportHeight: window.innerHeight,
       };
     });
+    if (height === 1600) expect(metrics.position).toBe('sticky');
+    if (metrics.position === 'relative') {
+      await expect(scene).toHaveClass(/\bis-flow\b/);
+      const steps = scene.getByRole('button');
+      for (const [index, button] of (await steps.all()).entries()) {
+        await button.click();
+        await expect(scene).toHaveAttribute('data-phase', String(index));
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+      }
+      await expect(scene.locator('.strength-scene__result')).toBeVisible();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expect(scene.locator('.strength-scene__result')).toHaveCSS('opacity', '1');
+      return;
+    }
     expect(metrics.position).toBe('sticky');
     expect(metrics.sceneHeight / metrics.viewportHeight).toBeGreaterThanOrEqual(2);
     expect(metrics.sceneHeight / metrics.viewportHeight).toBeLessThanOrEqual(2.5);
@@ -87,7 +104,7 @@ for (const width of [390, 1440]) {
     const stickyPosition = await scene.evaluate((element) => {
       const sticky = element.querySelector<HTMLElement>('.strength-scene__sticky');
       if (!sticky) throw new Error('Strength scene content is missing');
-      return sticky.getBoundingClientRect().top;
+      return sticky.getBoundingClientRect().top - Number.parseFloat(getComputedStyle(sticky).top);
     });
     expect(Math.abs(stickyPosition)).toBeLessThanOrEqual(1);
 

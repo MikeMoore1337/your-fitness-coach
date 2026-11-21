@@ -48,10 +48,15 @@ async function assertHeroGeometry(page: Page, viewport: { width: number; height:
   expect(geometry.copy).not.toBeNull();
   expect(geometry.cta).not.toBeNull();
 
-  const expectedHeight = viewport.width < 768 ? 850 : Math.min(Math.max(viewport.height, 860), 980);
-  expect(geometry.hero!.height).toBeCloseTo(expectedHeight, 0);
   expect(geometry.image!.top).toBeCloseTo(geometry.hero!.top, 0);
-  expect(geometry.image!.bottom).toBeCloseTo(geometry.hero!.bottom, 0);
+  if (viewport.width <= 680) {
+    expect(geometry.image!.height).toBeCloseTo(330, 0);
+    expect(Math.abs(geometry.image!.bottom - geometry.copy!.top)).toBeLessThanOrEqual(20);
+    expect(geometry.hero!.bottom).toBeGreaterThan(geometry.image!.bottom);
+  } else {
+    expect(geometry.hero!.height).toBeGreaterThanOrEqual(viewport.height - 1);
+    expect(geometry.image!.bottom).toBeCloseTo(geometry.hero!.bottom, 0);
+  }
   expect(geometry.cta!.left).toBeGreaterThanOrEqual(0);
   expect(geometry.cta!.right).toBeLessThanOrEqual(viewport.width + 1);
   expect(geometry.cta!.bottom).toBeLessThanOrEqual(geometry.hero!.bottom + 1);
