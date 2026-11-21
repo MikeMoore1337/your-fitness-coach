@@ -367,6 +367,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-quick-add-action__arrow {
   color: var(--v2-text-secondary);
 }
+.app-quick-add-action__detail,
+.app-quick-add-action__open {
+  display: none;
+}
 
 .app-section--today .today-dashboard__facts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1023,6 +1027,38 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 
 @media (min-width: 900px) {
+  .app-quick-add-action {
+    min-height: 72px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 12px 4px;
+  }
+
+  .app-quick-add-action + .app-quick-add-action::before {
+    inset-inline-start: 4px;
+  }
+
+  .app-quick-add-action__icon,
+  .app-quick-add-action__arrow {
+    display: none;
+  }
+
+  .app-quick-add-action__detail {
+    display: block;
+    margin-top: 4px;
+    color: var(--v2-text-secondary);
+    font-size: var(--font-size-body);
+  }
+
+  .app-quick-add-action__open {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 8px 14px;
+    border: 1px solid var(--v2-border);
+    border-radius: var(--v2-control-radius);
+    font-weight: 700;
+  }
+
   .app-quick-add-layer {
     align-items: center;
   }

@@ -109,6 +109,9 @@ describe('AppShell', () => {
   it('показывает основные направления и отделяет рабочее пространство тренера', () => {
     render(<AppShell>Содержимое</AppShell>);
 
+    expect(document.querySelector('.app-desktop-header__workspace')).toHaveTextContent(
+      'Рабочее пространствоКлиенты',
+    );
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute('href', '/coach');
     expect(screen.getByRole('link', { name: 'Клиенты' })).toHaveAttribute(
@@ -135,6 +138,14 @@ describe('AppShell', () => {
     navigation.path = '/app';
     render(<AppShell section="today">Содержимое</AppShell>);
 
+    expect(document.querySelector('.app-desktop-header__workspace')).toHaveTextContent(
+      'Рабочее пространствоДля себя',
+    );
+    expect(
+      within(document.querySelector('.app-desktop-header') as HTMLElement).getByRole('button', {
+        name: 'Быстро добавить',
+      }),
+    ).toBeInTheDocument();
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
@@ -208,10 +219,13 @@ describe('AppShell', () => {
       'href',
       '/app?section=nutrition&quick_add=food',
     );
+    expect(within(dialog).getByRole('link', { name: 'Еда' })).toHaveAccessibleDescription(
+      'Быстрый ввод в дневник питания',
+    );
     expect(
       within(dialog)
         .getAllByRole('link')
-        .map((link) => link.textContent),
+        .map((link) => link.getAttribute('aria-label')),
     ).toEqual(['Еда', 'Вода', 'Кардио', 'Замер', 'Самочувствие']);
     expect(document.getElementById('appContent')?.inert).toBe(true);
     expect(

@@ -1147,6 +1147,7 @@ test('#1500 desktop Quick Add restores focus and can reopen during exit', async 
   await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   const trigger = page.getByTestId('quick-add-trigger');
   const sheet = page.getByTestId('quick-add-sheet');
+  await expect(page.locator('.app-desktop-header').getByTestId('quick-add-trigger')).toBeVisible();
   await trigger.click();
   await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
