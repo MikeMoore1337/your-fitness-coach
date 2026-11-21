@@ -60,7 +60,9 @@ for (const width of [390, 1440]) {
       await expect(
         page.getByRole('heading', { name: 'Профиль и настройки', exact: true }),
       ).toBeVisible();
-      await page.locator('#profile-personal > summary').click();
+      const personal = page.locator('#profile-personal');
+      await expect(personal).toHaveJSProperty('open', width >= 900);
+      if (width < 900) await personal.locator('> summary').click();
       const date = page.getByLabel('Дата рождения', { exact: true });
       await expect(date).toBeVisible();
       await expect(date.locator('..').locator('[data-icon="calendar"]')).toBeVisible();

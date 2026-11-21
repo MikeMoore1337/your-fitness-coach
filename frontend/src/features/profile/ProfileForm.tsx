@@ -280,6 +280,7 @@ export function ProfileForm() {
     <>
       <Card
         className="profile-primary-card"
+        defaultOpen={window.matchMedia?.('(min-width: 900px)').matches ?? false}
         family="neutral"
         id="profile-personal"
         title={
