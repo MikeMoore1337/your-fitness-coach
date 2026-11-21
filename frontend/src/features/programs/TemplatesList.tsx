@@ -588,9 +588,28 @@ export function TemplatesList({
                   {readOnly ? (
                     <span className="muted">Управление доступно после входа.</span>
                   ) : (
-                    <AppLink className="button-link" to="/app?section=programs&view=manage">
-                      Управление программой
-                    </AppLink>
+                    <div className="program-active__summary-actions">
+                      <AppLink className="button-link" to="/app?section=programs&view=manage">
+                        Управление программой
+                      </AppLink>
+                      {!(
+                        activeTemplate.assigned_by_user_id &&
+                        activeTemplate.assigned_by_user_id !== user?.id
+                      ) && (
+                        <button
+                          type="button"
+                          className="secondary program-active__desktop-edit"
+                          onClick={() => {
+                            setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
+                            setEditingTemplate(activeTemplate);
+                          }}
+                        >
+                          {shouldSaveTemplateAsCopy(activeTemplate)
+                            ? 'Настроить свою копию'
+                            : 'Редактировать шаблон'}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               ) : (

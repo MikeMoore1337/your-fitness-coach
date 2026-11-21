@@ -398,6 +398,22 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   white-space: nowrap;
 }
 
+.app-section--programs .program-active__summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-section--programs .program-active__desktop-edit {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .app-section--programs .program-active__desktop-edit {
+    display: inline-flex;
+  }
+}
+
 .app-section--programs .programs-content {
   display: grid;
   gap: var(--v2-space-5);
