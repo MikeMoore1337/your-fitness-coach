@@ -2960,7 +2960,9 @@ test('поля профиля и питания выровнены на деск
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.locator('#profile-personal > summary').click();
+  const personal = page.locator('#profile-personal');
+  await expect(personal).toHaveJSProperty('open', true);
+  await expect(page.locator('.profile-form-grid--fitness')).toBeVisible();
   const profileControlTops = await page.locator('.profile-form-grid--fitness').evaluate((grid) =>
     Array.from(grid.querySelectorAll<HTMLElement>(':scope > .field'))
       .slice(0, 3)
