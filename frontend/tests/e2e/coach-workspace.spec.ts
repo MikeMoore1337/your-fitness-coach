@@ -1688,6 +1688,10 @@ test('desktop Coach OS uses workspace tabs and preserves trainer return on perso
   await page.getByRole('button', { name: 'Тренер', exact: true }).click();
   const tabs = page.getByRole('tablist', { name: 'Разделы тренера' });
   await expect(tabs.getByRole('tab', { name: 'Сегодня' })).toHaveAttribute('aria-selected', 'true');
+  await tabs.getByRole('tab', { name: 'Сегодня' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page).toHaveURL('/coach?tab=clients');
+  await expect(tabs.getByRole('tab', { name: 'Клиенты' })).toBeFocused();
   await tabs.getByRole('tab', { name: 'Программы' }).click();
   await expect(page).toHaveURL('/coach?tab=programs');
   await expect(tabs.getByRole('tab', { name: 'Программы' })).toHaveAttribute(
@@ -1713,6 +1717,10 @@ test('desktop Coach OS uses workspace tabs and preserves trainer return on perso
   await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toBeFocused();
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(tabs.getByRole('tab', { name: 'Программы' })).toBeFocused();
+  const invite = page.getByRole('button', { name: 'Пригласить клиента', exact: true }).first();
+  await invite.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(invite).toBeFocused();
 });
 
 test('Issue 954: отзыв убирает ранее загруженные данные питания', async ({ page }) => {

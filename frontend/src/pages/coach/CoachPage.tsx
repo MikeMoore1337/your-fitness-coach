@@ -1548,16 +1548,32 @@ export default function CoachPage({
         <div>
           <span className="eyebrow">Тренер · рабочее пространство</span>
           <h1>
-            <span className="coach-os-desktop-copy">Кабинет тренера</span>
-            <span className="coach-os-mobile-copy">
-              {tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}
-            </span>
+            {demo ? (
+              tab === 'today' ? (
+                'Сегодня'
+              ) : (
+                'Кабинет тренера'
+              )
+            ) : (
+              <>
+                <span className="coach-os-desktop-copy">Кабинет тренера</span>
+                <span className="coach-os-mobile-copy">
+                  {tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}
+                </span>
+              </>
+            )}
           </h1>
           <p>
-            <span className="coach-os-desktop-copy">Клиенты, программы и рабочие действия</span>
-            <span className="coach-os-mobile-copy">
-              Сначала действие, затем детали клиента — без потери глубины YFC.
-            </span>
+            {demo ? (
+              'Сначала действие, затем детали клиента — без потери глубины YFC.'
+            ) : (
+              <>
+                <span className="coach-os-desktop-copy">Клиенты, программы и рабочие действия</span>
+                <span className="coach-os-mobile-copy">
+                  Сначала действие, затем детали клиента — без потери глубины YFC.
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="coach-os-header__actions app-action-group">

@@ -308,6 +308,7 @@ export function AppShell({
       document.removeEventListener('focusin', trackFocus);
       document.removeEventListener('pointerdown', clearOnPointer);
       focusedTrainerTab.current = null;
+      pendingTrainerFocus.current = null;
     };
   }, [trainerWorkspace]);
   useLayoutEffect(() => {
