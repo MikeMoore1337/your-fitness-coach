@@ -1703,12 +1703,16 @@ test('desktop Coach OS uses workspace tabs and preserves trainer return on perso
   expect(new URL(page.url()).searchParams.get('trainer_return')).toBe('/coach?tab=programs');
   await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
   await expect(page).toHaveURL('/coach?tab=programs');
+  await tabs.getByRole('tab', { name: 'Программы' }).focus();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(tabs).toBeHidden();
   await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
   );
+  await expect(nav.getByRole('link', { name: 'Программы', exact: true })).toBeFocused();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(tabs.getByRole('tab', { name: 'Программы' })).toBeFocused();
 });
 
 test('Issue 954: отзыв убирает ранее загруженные данные питания', async ({ page }) => {

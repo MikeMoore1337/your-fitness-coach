@@ -139,12 +139,20 @@ function analyticsSectionForDestination(to: string): ProductSection | null {
   }
 }
 
-function useMobileNavigation(): boolean {
+function useMobileNavigation(beforeChange?: () => void): boolean {
   const [mobile, setMobile] = useState(mobileNavigationMatches);
+  const previousMobile = useRef(mobile);
 
   useEffect(() => {
     const media = window.matchMedia?.('(max-width: 899px)');
-    const sync = () => setMobile(media?.matches ?? window.innerWidth < 900);
+    const sync = () => {
+      const next = media?.matches ?? window.innerWidth < 900;
+      if (previousMobile.current !== next) {
+        beforeChange?.();
+        previousMobile.current = next;
+      }
+      setMobile(next);
+    };
     media?.addEventListener?.('change', sync);
     window.addEventListener('resize', sync);
     sync();
@@ -152,7 +160,7 @@ function useMobileNavigation(): boolean {
       media?.removeEventListener?.('change', sync);
       window.removeEventListener('resize', sync);
     };
-  }, []);
+  }, [beforeChange]);
 
   return mobile;
 }
@@ -268,8 +276,50 @@ export function AppShell({
   const accountRole = accountRoleLabel(Boolean(user?.is_root), Boolean(user?.is_coach));
   const secondaryActive = section === 'catalog' || section === 'profile';
   const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
-  const mobileNavigation = useMobileNavigation();
+  const focusedTrainerTab = useRef<string | null>(null);
+  const pendingTrainerFocus = useRef<string | null>(null);
+  const captureTrainerFocus = useCallback(() => {
+    pendingTrainerFocus.current = focusedTrainerTab.current;
+  }, []);
+  const mobileNavigation = useMobileNavigation(captureTrainerFocus);
   const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
+  useEffect(() => {
+    if (!trainerWorkspace) return;
+    const trackFocus = (event: FocusEvent) => {
+      const focused = event.target instanceof Element ? event.target : null;
+      const tabs = Array.from(document.querySelectorAll('.coach-os-desktop-nav [role="tab"]'));
+      const tabIndex = focused ? tabs.indexOf(focused) : -1;
+      const mobileTab = focused?.getAttribute('data-trainer-tab');
+      focusedTrainerTab.current =
+        tabIndex >= 0
+          ? (['today', 'clients', 'programs', 'tools'][tabIndex] ?? null)
+          : (mobileTab ?? null);
+    };
+    const clearOnPointer = (event: PointerEvent) => {
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest('.coach-os-desktop-nav, [data-trainer-tab]')
+      )
+        focusedTrainerTab.current = null;
+    };
+    document.addEventListener('focusin', trackFocus);
+    document.addEventListener('pointerdown', clearOnPointer);
+    return () => {
+      document.removeEventListener('focusin', trackFocus);
+      document.removeEventListener('pointerdown', clearOnPointer);
+      focusedTrainerTab.current = null;
+    };
+  }, [trainerWorkspace]);
+  useLayoutEffect(() => {
+    const key = pendingTrainerFocus.current;
+    if (!trainerWorkspace || !key) return;
+    const index = ['today', 'clients', 'programs', 'tools'].indexOf(key);
+    const target = mobileNavigation
+      ? document.querySelector<HTMLElement>(`[data-trainer-tab="${key}"]`)
+      : document.querySelectorAll<HTMLElement>('.coach-os-desktop-nav [role="tab"]')[index];
+    target?.focus({ preventScroll: true });
+    pendingTrainerFocus.current = null;
+  }, [mobileNavigation, trainerWorkspace]);
   const personalWorkspace = Boolean(!demo && user?.is_coach && path === '/app' && section);
   const trainerReturnTo = personalWorkspace
     ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
@@ -719,6 +769,9 @@ export function AppShell({
                           : ''
                       }`}
                       data-yfc-choice="capsule"
+                      data-trainer-tab={
+                        trainerWorkspace && mobileNavigation ? destinationKey : undefined
+                      }
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);
