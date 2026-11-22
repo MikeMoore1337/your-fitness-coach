@@ -983,7 +983,17 @@ function TrainingSection({
           </div>
         }
       />
-      {analytics.isLoading || analytics.isPlaceholderData ? (
+      {analytics.isPlaceholderData && analytics.data ? (
+        <>
+          <LoadingState label="Собираем историю тренировок…" />
+          <DataConfidence
+            isStale
+            kind="training"
+            signal={analytics.data.data_sufficiency.working_sets}
+            staleBasis={`Оценка сохранена за ${formatDate(analytics.data.period_start, true)} — ${formatDate(analytics.data.period_end, true)}. Данные выбранного периода ещё загружаются.`}
+          />
+        </>
+      ) : analytics.isLoading ? (
         <LoadingState label="Собираем историю тренировок…" />
       ) : analytics.error ? (
         <ErrorState

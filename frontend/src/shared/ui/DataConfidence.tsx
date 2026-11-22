@@ -154,6 +154,7 @@ export function DataConfidence({
   action,
   className = '',
   isStale = false,
+  staleBasis,
   label,
   kind,
   signal,
@@ -161,6 +162,7 @@ export function DataConfidence({
   action?: ReactNode;
   className?: string;
   isStale?: boolean;
+  staleBasis?: string;
   label?: string;
   kind: DataConfidenceKind;
   signal: DataConfidenceSignal;
@@ -182,7 +184,9 @@ export function DataConfidence({
       <ConfidenceIcon state={state} />
       <div className="data-confidence__content">
         <strong className="data-confidence__status">{labeledStatus}</strong>
-        <p className="data-confidence__basis">{dataConfidenceBasis(kind, signal)}</p>
+        <p className="data-confidence__basis">
+          {isStale && staleBasis ? staleBasis : dataConfidenceBasis(kind, signal)}
+        </p>
         <details className="data-confidence__details">
           <summary className="yfc-disclosure-summary">
             <span>Почему такой вывод</span>

@@ -2567,7 +2567,10 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
   await refreshStarted;
   const loadingState = page.getByRole('status').filter({ hasText: 'Обновляем динамику за период' });
   await expect(loadingState).toBeVisible();
-  await expect(progressOverview(page)).toBeVisible();
+  await expect(progressOverview(page)).toHaveCount(0);
+  const previousContent = page.locator('.progress-local-context');
+  await expect(previousContent).toHaveAttribute('inert', '');
+  await expect(previousContent).toHaveAttribute('aria-hidden', 'true');
   await page.setViewportSize({ width: 390, height: 844 });
   await loadingState.scrollIntoViewIfNeeded();
   await page.screenshot({
@@ -3366,7 +3369,7 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
     ),
   );
   expect(href.searchParams.get('return_to')).toBe(
-    '/app?section=progress&progress_view=nutrition#nutrition-period-report',
+    '/app?section=progress&progress_period=days_30&progress_view=nutrition#nutrition-period-report',
   );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
