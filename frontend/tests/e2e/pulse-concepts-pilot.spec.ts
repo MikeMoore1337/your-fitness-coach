@@ -530,6 +530,8 @@ test('#985 finish can be skipped with the keyboard and is not replayed on reload
   const server = await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
   const completion = await completeWorkout(page);
   await expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+  await expect(completion.getByRole('heading', { name: 'Тренировка завершена' })).toBeInViewport();
+  await expect(completion.getByText('1 ч')).toBeInViewport();
   await expect(completion.getByText('1 ч')).toBeVisible();
   await expect(completion.getByText(/максимальный вес 40 кг/)).toBeVisible();
   const skip = completion.getByRole('button', { name: 'Показать сразу' });

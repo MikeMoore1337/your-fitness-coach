@@ -106,8 +106,7 @@ export function WorkoutCompletionSummary({
 
   useEffect(() => {
     if (playFinishMotion) {
-      if (document.activeElement === document.body)
-        titleRef.current?.focus({ preventScroll: true });
+      if (document.activeElement === document.body) titleRef.current?.focus();
       onFinishMotionConsumed?.();
     }
   }, [onFinishMotionConsumed, playFinishMotion]);
