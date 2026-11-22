@@ -6358,6 +6358,47 @@ test('#985 cardio confirms only after save and does not replay on reload', async
   await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
 });
 
+for (const theme of ['dark', 'light'] as const) {
+  test(`#985 cardio AFTER ${theme}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: theme });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page, true);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+    await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+    await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+    await server.cardioCompleted;
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    const saved = cardio.getByRole('button', { name: 'Кардио сохранено' });
+    if (await saved.isVisible()) await saved.click();
+    const row = cardio.locator('.active-workout-set--cardio');
+    await expect(row.getByText('Выполнено', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      393,
+    );
+    if (process.env.CAPTURE_985 === '1') {
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux-proposals',
+        'issue-985-after',
+        'screens',
+      );
+      await mkdir(directory, { recursive: true });
+      await row.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: resolve(directory, `${info.project.name}-web-${theme}-393-cardio.png`),
+      });
+    }
+  });
+}
+
 test('mixed workout keeps cardio type-aware, compact and stable during input', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
   await page.setViewportSize({ width: 390, height: 844 });

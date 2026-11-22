@@ -15,6 +15,8 @@
 
 Примеры: [Chromium Web Dark 320 — подход](screens/chromium-web-dark-320-set.png), [итог и рекорд](screens/chromium-web-dark-320-summary.png); [WebKit TMA Light 430 — подход](screens/webkit-tma-light-430-set.png), [итог и рекорд](screens/webkit-tma-light-430-summary.png). Полностраничный снимок показывает положение фиксированного Dock в момент съёмки; доступность кнопки дополнительно проверена попаданием указателя после прокрутки.
 
+Завершённое кардио отдельно: [Chromium Dark](screens/chromium-web-dark-393-cardio.png), [Chromium Light](screens/chromium-web-light-393-cardio.png), [WebKit Dark](screens/webkit-web-dark-393-cardio.png), [WebKit Light](screens/webkit-web-light-393-cardio.png); viewport 393 × 852 CSS px. Это Web на синтетических данных; кардио в реальном Telegram WebView не проверено.
+
 ## Сопоставление с #982
 
 Принятый [Sport-прототип](https://github.com/MikeMoore1337/your-fitness-coach/blob/5e26a4724bb8e7cda5f20f92d6d69bca94baeb78/docs/ux-proposals/issue-982/SPEC.md) задаёт 560 мс, начальные opacity 0,85 и смещение 16 px, три акцента фактов по 180 мс с задержкой 90 мс, доступность чисел сразу и пропуск. Реализация использует эти параметры и существующие данные итога.
