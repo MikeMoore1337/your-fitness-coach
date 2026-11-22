@@ -10,7 +10,7 @@
 
 ## Обнаруженная проблема и вариант
 
-При настоящем Chromium zoom 200% с исходной ширины 393 px словесный знак пересекает кнопку профиля на четырёх разделах. Контейнер текста остаётся в пределах, но сами строки выходят за его край: замер сделан через `Range.getClientRects()`. Перенос увеличивает высоту шапки и требует проверки короткого экрана, клавиатуры, фокуса и safe-area при реализации.
+При настоящем Chromium zoom 200% с исходной ширины 393 px словесный знак пересекает кнопку профиля на четырёх разделах и в Coach OS. Контейнер текста остаётся в пределах, но сами строки выходят за его край: замер сделан через `Range.getClientRects()`. Перенос увеличивает высоту шапки и требует проверки короткого экрана, клавиатуры, фокуса и safe-area при реализации.
 
 | Экран | Light: до | Light: вариант | Dark: до | Dark: вариант |
 |---|---|---|---|---|
@@ -18,12 +18,13 @@
 | Nutrition | [до](screens/header-nutrition-light-before.png) | [вариант](screens/header-nutrition-light-proposal.png) | [до](screens/header-nutrition-dark-before.png) | [вариант](screens/header-nutrition-dark-proposal.png) |
 | Progress | [до](screens/header-progress-light-before.png) | [вариант](screens/header-progress-light-proposal.png) | [до](screens/header-progress-dark-before.png) | [вариант](screens/header-progress-dark-proposal.png) |
 | Profile | [до](screens/header-profile-light-before.png) | [вариант](screens/header-profile-light-proposal.png) | [до](screens/header-profile-dark-before.png) | [вариант](screens/header-profile-dark-proposal.png) |
+| Coach OS | [до](screens/header-coach-light-before.png) | [вариант](screens/header-coach-light-proposal.png) | [до](screens/header-coach-dark-before.png) | [вариант](screens/header-coach-dark-proposal.png) |
 
 Источник: [`AppShell.tsx`](https://github.com/MikeMoore1337/your-fitness-coach/blob/17c5f29921f379d1f5229eede40c88d5183ddcf9/frontend/src/app/AppShell.tsx), [`ux-ia-redesign.css`](https://github.com/MikeMoore1337/your-fitness-coach/blob/17c5f29921f379d1f5229eede40c88d5183ddcf9/frontend/src/styles/ux-ia-redesign.css). [Замеры Light](metrics/header-light-geometry.json), [замеры Dark](metrics/header-dark-geometry.json).
 
 ## Экраны: текущий вид, предложенный к сохранению
 
-Полностраничные снимки: закреплённая панель может находиться в середине изображения из-за способа съёмки. Это не свидетельство перекрытия после прокрутки. Все размеры — CSS px. Два снимка Today в WebKit на 1440 px отдельно пересняты с `scale: css`.
+Полностраничные снимки: закреплённая панель может находиться в середине изображения из-за способа съёмки. Это не свидетельство перекрытия после прокрутки. Все размеры — CSS px. Два снимка Today в WebKit на 1440 px пересняты с `scale: css`.
 
 | Экран | Chromium 393 Light | Chromium 393 Dark | WebKit 393 Light | WebKit 393 Dark | Chromium 1280 Light | Chromium 1280 Dark | WebKit 1280 Light | WebKit 1280 Dark |
 |---|---|---|---|---|---|---|---|---|
@@ -38,6 +39,19 @@
 | Profile | [chromium 393 light](screens/chromium-393-light-profile.png) | [chromium 393 dark](screens/chromium-393-dark-profile.png) | [webkit 393 light](screens/webkit-393-light-profile.png) | [webkit 393 dark](screens/webkit-393-dark-profile.png) | [chromium 1280 light](screens/chromium-1280-light-profile.png) | [chromium 1280 dark](screens/chromium-1280-dark-profile.png) | [webkit 1280 light](screens/webkit-1280-light-profile.png) | [webkit 1280 dark](screens/webkit-1280-dark-profile.png) |
 | Coach OS | [chromium 393 light](screens/chromium-393-light-coach.png) | [chromium 393 dark](screens/chromium-393-dark-coach.png) | [webkit 393 light](screens/webkit-393-light-coach.png) | [webkit 393 dark](screens/webkit-393-dark-coach.png) | [chromium 1280 light](screens/chromium-1280-light-coach.png) | [chromium 1280 dark](screens/chromium-1280-dark-coach.png) | [webkit 1280 light](screens/webkit-1280-light-coach.png) | [webkit 1280 dark](screens/webkit-1280-dark-coach.png) |
 
+## Решения по общим компонентам
+
+Все пункты ниже — предложение сохранить текущий внешний вид **в показанных состояниях**. Токены остаются общими; эта таблица не разрешает массовую замену внешнего вида на непоказанных экранах.
+
+| Область | Предлагаемое решение | Пример и место в коде | Проверка при реализации |
+|---|---|---|---|
+| Карточки и вложенная геометрия | Сохранить существующие радиусы областей, контролов и панелей; согласовывать вложенные радиусы с отступом, не менять несвязанные карточки. | [Nutrition Light](screens/chromium-393-light-nutrition.png), [токены](https://github.com/MikeMoore1337/your-fitness-coach/blob/17c5f29921f379d1f5229eede40c88d5183ddcf9/frontend/src/styles/design-system.css) | Оба режима, увеличенный текст, контур фокуса и соседние вызовы. |
+| Primary / Secondary / Ghost / Destructive | Сохранить различие по смыслу и текущую опасную кнопку; не делать удаление обычным действием. | [Удаление Dark](screens/chromium-393-dark-destructive-menu.png), [Button](https://github.com/MikeMoore1337/your-fitness-coach/blob/17c5f29921f379d1f5229eede40c88d5183ddcf9/frontend/src/shared/ui/common.tsx) | Hover, pressed, disabled, loading и клавиатура; никаких удалений на реальных данных. |
+| Выбор, раскрытие, кнопки | Сохранить существующие choice-токены и отдельный focus, канонический `Icon` для раскрытия. | [Progress Dark](screens/chromium-393-dark-progress.png), [действия дня](screens/chromium-393-dark-program-day-menu.png), [Icon](https://github.com/MikeMoore1337/your-fitness-coach/blob/17c5f29921f379d1f5229eede40c88d5183ddcf9/frontend/src/shared/ui/Icon.tsx) | Selected, expanded и focus-visible отдельно; направления значков и 44 px для применимых целей. |
+| Ввод, menu, listbox, sheet | Сохранить показанные контекстные формы, подписи, destructive-иерархию и семантику; не менять жизненный цикл Dock #1504. | [поиск WebKit](screens/webkit-1280-light-exercise-listbox.png), [быстрый ввод](screens/chromium-393-dark-food-quick.png) | Escape, возврат фокуса, scroll и последняя CTA; настоящий TMA отдельно. |
+| Текст и данные | Сохранить Oswald/Inter и фактические значения, масштабирование и читаемые единицы. | [тренировка](screens/chromium-393-light-active-workout.png), [Progress](screens/chromium-393-light-progress.png) | Кириллица, длинные строки, табличные цифры, реальный zoom и отсутствие перекрытия. |
+| Материалы | Сохранить матовый материал в предусмотренных местах и fallback; не превращать все карточки в стекло. | [Today](screens/chromium-393-light-today.png), [Coach OS](screens/chromium-393-dark-coach.png) | Контраст Dark/Light, WebKit, производительность и reduced motion. |
+
 ## Выбранные состояния: текущий вид
 
 | Состояние | Chromium Light | Chromium Dark | WebKit Light | WebKit Dark |
@@ -50,6 +64,13 @@
 | Кнопка: hover | [chromium light](screens/chromium-393-light-button-hover.png) | [chromium dark](screens/chromium-393-dark-button-hover.png) | [webkit light](screens/webkit-393-light-button-hover.png) | [webkit dark](screens/webkit-393-dark-button-hover.png) |
 | Кнопка: focus | [chromium light](screens/chromium-393-light-button-focus.png) | [chromium dark](screens/chromium-393-dark-button-focus.png) | [webkit light](screens/webkit-393-light-button-focus.png) | [webkit dark](screens/webkit-393-dark-button-focus.png) |
 | Кнопка: pressed | [chromium light](screens/chromium-393-light-button-pressed.png) | [chromium dark](screens/chromium-393-dark-button-pressed.png) | [webkit light](screens/webkit-393-light-button-pressed.png) | [webkit dark](screens/webkit-393-dark-button-pressed.png) |
+| Тренировка: disabled | [chromium light](screens/chromium-393-light-workout-disabled.png) | [chromium dark](screens/chromium-393-dark-workout-disabled.png) | [webkit light](screens/webkit-393-light-workout-disabled.png) | [webkit dark](screens/webkit-393-dark-workout-disabled.png) |
+| Редактор: действия дня | [chromium light](screens/chromium-393-light-program-day-menu.png) | [chromium dark](screens/chromium-393-dark-program-day-menu.png) | [webkit light](screens/webkit-393-light-program-day-menu.png) | [webkit dark](screens/webkit-393-dark-program-day-menu.png) |
+| Coach OS: loading | [chromium light](screens/chromium-393-light-coach-loading.png) | [chromium dark](screens/chromium-393-dark-coach-loading.png) | [webkit light](screens/webkit-393-light-coach-loading.png) | [webkit dark](screens/webkit-393-dark-coach-loading.png) |
+| Coach OS: пустое состояние | [chromium light](screens/chromium-393-light-coach-empty.png) | [chromium dark](screens/chromium-393-dark-coach-empty.png) | [webkit light](screens/webkit-393-light-coach-empty.png) | [webkit dark](screens/webkit-393-dark-coach-empty.png) |
+| Программа: опасное действие | [chromium light](screens/chromium-393-light-destructive-menu.png) | [chromium dark](screens/chromium-393-dark-destructive-menu.png) | [webkit light](screens/webkit-393-light-destructive-menu.png) | [webkit dark](screens/webkit-393-dark-destructive-menu.png) |
+
+Desktop listbox, 1280×900: [chromium light](screens/chromium-1280-light-exercise-listbox.png) · [chromium dark](screens/chromium-1280-dark-exercise-listbox.png) · [webkit light](screens/webkit-1280-light-exercise-listbox.png) · [webkit dark](screens/webkit-1280-dark-exercise-listbox.png).
 
 Эмуляция TMA, активная тренировка и фокус поля:
 
@@ -102,10 +123,11 @@
 
 - Chromium/WebKit, Dark/Light: 36 запусков сбора пяти основных экранов на 320/360/390/393/430/768/1024/1280/1440 px; 180 сохранённых замеров корня без горизонтального переполнения. Только выбранные состояния.
 - Дополнительные состояния на 393 px: 4/4 запуска тренировки, редактора, гидратации, быстрого ввода и Coach OS; 4/4 на 1280 px; 4/4 запуска меню, раскрытия профиля, поиска упражнения, ввода воды и синтетической ошибки с повтором. Получение снимка не доказывает корректность всех действий.
+- Disabled в тренировке, раскрытое меню дня и загрузка/пустой Coach OS: 4/4 запуска. Desktop listbox и Escape с возвратом фокуса: 4/4. Видимая кнопка опасного действия: 4/4, удаление не выполнялось. Первые попытки имели ошибки тестового локатора и ожидаемого текста; результаты выше относятся к исправленным сценариям.
 - `collectUiAudit`: 8/8 запусков шести выбранных экранов на 320/393 px без сигналов в сохранённых отчётах; 4/4 запуска выбранных дополнительных состояний без сигналов. Проверялись только правила анализатора.
-- Настоящий Chromium tab zoom 200%: карточка Today 4/4; шапка — восемь сочетаний четырёх экранов и тем до/после. В варианте пересечения нет. Chromium/WebKit на CSS-ширинах 196/320/393 px: 12/12 тестов по четырём экранам, в варианте пересечений нет. Это не WebKit browser zoom.
+- Настоящий Chromium tab zoom 200%: карточка Today 4/4; шапка — десять сочетаний пяти экранов и тем до/после. В варианте пересечения нет. Chromium/WebKit на CSS-ширинах 196/320/393 px: 12/12 тестов по четырём личным экранам, в варианте пересечений нет. Это не WebKit browser zoom; общий компонент шапки и Demo при реализации требуют отдельной проверки.
 - Клавиатурный переход к раскрытию профиля — 4/4 сочетания тем и движков; геометрия после прокрутки и `:focus-visible`. TMA-эмуляция: 8/8 запусков в двух ориентациях и темах. Реальная системная клавиатура и safe-area устройства не доказаны.
-- Физический iPhone, настоящий Safari/Telegram, VoiceOver, PWA и production: **NOT_VERIFIED**. Все ошибки, loading/disabled, popover, роли и варианты данных не покрыты. Независимый Impeccable critique и detector: **NOT_RUN**.
+- Физический iPhone, настоящий Safari/Telegram, VoiceOver, PWA и production: **NOT_VERIFIED**. Проверены только показанные примеры ошибок, loading/disabled, menu/listbox, ролей и данных; исчерпывающее покрытие отсутствует. Независимый Impeccable critique и detector: **NOT_RUN**.
 
 ## Решение владельца
 
