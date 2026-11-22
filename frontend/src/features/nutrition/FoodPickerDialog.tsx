@@ -1,5 +1,5 @@
 import { TimeInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { ApiError, api } from '../../shared/api/client';
@@ -47,7 +47,7 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
-import { FoodEditor } from './FoodEditor';
+import { FoodEditor, type FoodDraft } from './FoodEditor';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
 import { PhotoMealScanner } from './PhotoMealScanner';
 import { MealTemplateBrowser } from './MealTemplateBrowser';
@@ -130,6 +130,7 @@ interface AddDraft {
   food: FoodDraftSelection | null;
   recipe?: Recipe | null;
   recipeAmount?: string;
+  editor?: { food?: Food; barcode: string; values: FoodDraft } | null;
   amount: string;
   amountUnit: FoodAmountUnit;
   quick?: QuickAddDraft;
@@ -595,15 +596,12 @@ export function FoodPickerDialog({
   const { user } = useAuth();
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<PickerView>(initialView);
   const [source, setSource] = useState<PickerSource>('recent');
   const [entryMethod, setEntryMethod] = useState<FoodEntryMethod>(
     initialView === 'quick-add' ? 'quick_add' : 'recent',
   );
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingFood, setEditingFood] = useState<Food | undefined>();
-  const [editorBarcode, setEditorBarcode] = useState('');
   const [scanBarcode, setScanBarcode] = useState('');
   const [flowStartedAt, setFlowStartedAt] = useState(() => Date.now());
   const [draft, setDraft, clearDraft] = usePersistentState<AddDraft>(
@@ -615,6 +613,17 @@ export function FoodPickerDialog({
       quick: emptyQuickAdd,
       requestId: newEntryRequestId(),
     },
+  );
+  const [view, setView] = useState<PickerView>(() => (draft.editor ? 'food-editor' : initialView));
+  const [editingFood, setEditingFood] = useState<Food | undefined>(() => draft.editor?.food);
+  const [editorBarcode, setEditorBarcode] = useState(() => draft.editor?.barcode ?? '');
+  const onEditorDraftChange = useCallback(
+    (values: FoodDraft) =>
+      setDraft((current) => ({
+        ...current,
+        editor: { food: editingFood, barcode: editorBarcode, values },
+      })),
+    [editingFood, editorBarcode, setDraft],
   );
   const selectedRecipe = draft.recipe ?? null;
   const recipeAmount = draft.recipeAmount ?? '100';
@@ -640,11 +649,11 @@ export function FoodPickerDialog({
 
   useEffect(() => {
     if (draft.requestId && draft.quick?.nutritionSource) return;
-    setDraft({
-      ...draft,
-      quick,
-      requestId: draft.requestId ?? newEntryRequestId(),
-    });
+    setDraft((current) => ({
+      ...current,
+      quick: { ...emptyQuickAdd, ...(current.quick ?? {}) },
+      requestId: current.requestId ?? newEntryRequestId(),
+    }));
   }, [draft, quick, setDraft]);
 
   const normalizedSearchInput = searchInput.trim().replace(/\s+/g, ' ');
@@ -1107,6 +1116,7 @@ export function FoodPickerDialog({
     updateDraft({
       food: foodDraftSelection(food),
       recipe: null,
+      editor: null,
       amount: amountUnit === 'serving' ? '1' : '100',
       amountUnit,
     });
@@ -1490,7 +1500,12 @@ export function FoodPickerDialog({
               userId={user?.id ?? 'anonymous'}
               barcode={editorBarcode}
               food={editingFood}
-              onCancel={() => setView('browse')}
+              initialValues={draft.editor?.values}
+              onDraftChange={onEditorDraftChange}
+              onCancel={() => {
+                updateDraft({ editor: null });
+                setView('browse');
+              }}
               onSaved={(food) => {
                 toast(editingFood ? 'Продукт обновлён' : 'Продукт создан');
                 setEditingFood(undefined);

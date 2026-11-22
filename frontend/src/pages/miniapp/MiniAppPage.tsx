@@ -423,8 +423,8 @@ export default function MiniAppPage({
         if (destination === section) return;
         if (scrollMemory.current.owner !== userContextKey)
           scrollMemory.current = { owner: userContextKey, positions: {} };
-        if (section === 'progress' || section === 'nutrition')
-          scrollMemory.current.positions[section] = window.scrollY;
+        if (section === 'progress') scrollMemory.current.positions.progress = window.scrollY;
+        if (section === 'nutrition') scrollMemory.current.positions.nutrition = window.scrollY;
         const ordinaryKeys =
           destination === 'progress'
             ? new Set([
@@ -438,7 +438,10 @@ export default function MiniAppPage({
         const ordinaryDestination =
           !url.hash && [...url.searchParams.keys()].every((key) => ordinaryKeys.has(key));
         if ((destination === 'progress' || destination === 'nutrition') && ordinaryDestination) {
-          const top = scrollMemory.current.positions[destination];
+          const top =
+            destination === 'progress'
+              ? scrollMemory.current.positions.progress
+              : scrollMemory.current.positions.nutrition;
           pendingScroll.current =
             top === undefined ? null : { owner: userContextKey, section: destination, top };
         } else pendingScroll.current = null;

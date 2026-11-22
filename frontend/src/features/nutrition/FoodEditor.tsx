@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/client';
 import type { Food, UserFoodCreate } from '../../shared/api/types';
@@ -15,11 +15,13 @@ interface FoodEditorProps {
   barcode?: string;
   initialName?: string;
   food?: Food;
+  initialValues?: FoodDraft;
+  onDraftChange?: (draft: FoodDraft) => void;
   onCancel: () => void;
   onSaved: (food: Food) => void;
 }
 
-interface FoodDraft {
+export interface FoodDraft {
   name: string;
   brand: string;
   barcode: string;
@@ -134,11 +136,18 @@ export function FoodEditor({
   barcode = '',
   initialName = '',
   food,
+  initialValues,
+  onDraftChange,
   onCancel,
   onSaved,
 }: FoodEditorProps) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState(() => initialDraft(food, barcode, initialName));
+  const [draft, setDraft] = useState(
+    () => initialValues ?? initialDraft(food, barcode, initialName),
+  );
+  useEffect(() => {
+    onDraftChange?.(draft);
+  }, [draft, onDraftChange]);
   const [errors, setErrors] = useState<FoodErrors>({});
   const [photoScanOpen, setPhotoScanOpen] = useState(false);
   const [photoConflicts, setPhotoConflicts] = useState<PhotoConflict[]>([]);

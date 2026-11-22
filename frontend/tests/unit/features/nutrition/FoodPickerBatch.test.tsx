@@ -116,6 +116,32 @@ describe('FoodPicker batch selection', () => {
     expect(screen.queryByLabelText('Порция готового блюда, г')).not.toBeInTheDocument();
   });
 
+  it('restores an unfinished custom product when the picker is closed and reopened', async () => {
+    apiMock.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    const first = renderPicker();
+    fireEvent.click(await screen.findByRole('button', { name: /Ввести вручную/ }));
+    fireEvent.change(screen.getByLabelText('Название *'), { target: { value: 'Мой завтрак' } });
+    fireEvent.change(screen.getByLabelText('Бренд'), { target: { value: 'Пример' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть добавление' }));
+    first.unmount();
+    const second = renderPicker();
+    expect(await screen.findByLabelText('Название *')).toHaveValue('Мой завтрак');
+    expect(screen.getByLabelText('Бренд')).toHaveValue('Пример');
+    expect(apiMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    second.unmount();
+    mockUser.id = 11;
+    const otherUser = renderPicker();
+    expect(screen.queryByLabelText('Название *')).not.toBeInTheDocument();
+    otherUser.unmount();
+    mockUser.id = 10;
+    const restored = renderPicker();
+    expect(await screen.findByLabelText('Название *')).toHaveValue('Мой завтрак');
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    restored.unmount();
+    renderPicker();
+    expect(screen.queryByLabelText('Название *')).not.toBeInTheDocument();
+  });
+
   it('keeps distinct brands and retries the same confirmed payload after a lost response', async () => {
     let rejectFirst: ((error: Error) => void) | undefined;
     let attempts = 0;
