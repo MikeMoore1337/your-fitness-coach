@@ -6302,6 +6302,62 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
   }
 });
 
+test('#985 double tap completes a strength set only once', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  const done = row.getByRole('button', { name: /^Завершить:/ });
+  await done.scrollIntoViewIfNeeded();
+  const bounds = await done.boundingBox();
+  expect(bounds).not.toBeNull();
+  const release = server.holdNextPatch();
+  await page.mouse.dblclick(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2, {
+    delay: 25,
+  });
+  release();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+});
+
+test('#985 cardio confirms only after save and does not replay on reload', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  const release = server.holdNextPatch();
+  const row = cardio.locator('.active-workout-set--cardio');
+  await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  release();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await page.reload();
+  const entry = page.getByRole('button', { name: 'Клиент' });
+  if (await entry.isVisible()) await entry.click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await cardio.getByRole('button', { name: 'Кардио сохранено' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+});
+
 test('mixed workout keeps cardio type-aware, compact and stable during input', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
   await page.setViewportSize({ width: 390, height: 844 });

@@ -604,7 +604,7 @@ function WorkoutSetRow({
       );
       if (accepted && immediate && startRest && nextCompleted) {
         haptic('success');
-        setJustConfirmed(true);
+        if (!completed) setJustConfirmed(true);
       }
       if (accepted && immediate && startRest && canStartRest(nextSetKind, nextCompleted)) {
         // Persist measured rest before the UI event so freeze/resume cannot leave a bare deadline.
@@ -1259,6 +1259,7 @@ function SideWorkoutSetRow({
   );
   const [editingCompleted, setEditingCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(false);
   const activeInput = useRef(false);
   const inFlight = useRef(false);
   const completed = pending?.values.is_completed ?? set.is_completed;
@@ -1316,6 +1317,7 @@ function SideWorkoutSetRow({
       );
       if (accepted && startRest && parentCompleted) {
         haptic('success');
+        if (!completed) setJustConfirmed(true);
         if (
           userId &&
           setKind === 'working' &&
@@ -1480,8 +1482,12 @@ function SideWorkoutSetRow({
     <div
       className={`active-workout-set ${isCurrent ? 'is-current' : ''} ${completed ? 'is-completed' : ''}`}
       data-workout-set-id={set.id}
+      data-motion-confirm={justConfirmed || undefined}
       aria-current={isCurrent ? 'step' : undefined}
       aria-busy={syncing || undefined}
+      onAnimationEnd={(event) => {
+        if (event.animationName === 'active-workout-set-confirm') setJustConfirmed(false);
+      }}
     >
       <div className="active-workout-set__head">
         <div className="active-workout-set__identity">
@@ -1787,6 +1793,7 @@ function CardioWorkoutRow({
   const completionInFlight = useRef(false);
   const reopenInFlight = useRef(false);
   const retryCompletion = syncFailed && pending?.values.is_completed;
+  const [justConfirmed, setJustConfirmed] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
@@ -1857,7 +1864,10 @@ function CardioWorkoutRow({
         immediate,
         immediate && startRest && nextCompleted,
       );
-      if (accepted && immediate && startRest && nextCompleted) haptic('success');
+      if (accepted && immediate && startRest && nextCompleted) {
+        haptic('success');
+        if (!completed) setJustConfirmed(true);
+      }
       return accepted;
     } finally {
       if (immediate) {
@@ -1970,8 +1980,12 @@ function CardioWorkoutRow({
       ref={rowRef}
       className={`active-workout-set active-workout-set--cardio ${isCurrent ? 'is-current' : ''} ${completed ? 'is-completed' : ''}`}
       data-workout-set-id={set.id}
+      data-motion-confirm={justConfirmed || undefined}
       aria-busy={syncing || undefined}
       aria-current={isCurrent ? 'step' : undefined}
+      onAnimationEnd={(event) => {
+        if (event.animationName === 'active-workout-set-confirm') setJustConfirmed(false);
+      }}
     >
       <div className="active-workout-set__head">
         <div className="active-workout-set__identity">
@@ -3214,6 +3228,8 @@ export function TodayWorkout({
         ? 'loading'
         : 'ready';
   useScreenWakeLock(workout.data?.status === 'in_progress');
+  const [finishMotionWorkoutId, setFinishMotionWorkoutId] = useState<number | null>(null);
+  const consumeFinishMotion = useCallback(() => setFinishMotionWorkoutId(null), []);
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
       api<Workout | void>(path, { method, body }),
@@ -3235,8 +3251,10 @@ export function TodayWorkout({
         if (user?.has_workout_history === false) {
           trackGrowthEvent('first_workout_completed', { dedupe: 'session' });
         }
-        if (result) await reconcileFinishedWorkout(queryClient, result, activeSync.clear);
-        else {
+        if (result) {
+          if (result.status === 'completed') setFinishMotionWorkoutId(result.id);
+          await reconcileFinishedWorkout(queryClient, result, activeSync.clear);
+        } else {
           await activeSync.clear();
           await queryClient.invalidateQueries({ queryKey: ['workout'] });
         }
@@ -3723,6 +3741,8 @@ export function TodayWorkout({
         readOnly={!capabilities.canMutateProgress}
         workout={data}
         onReturnToday={onCompletionClose}
+        playFinishMotion={finishMotionWorkoutId === data.id}
+        onFinishMotionConsumed={consumeFinishMotion}
       />
     );
   }

@@ -522,3 +522,43 @@ test('reduced motion keeps completion confirmation and final values without trav
     await page.screenshot({ path: `${screenshotRoot}/completion-reduced-390-dark.png` });
   }
 });
+
+test('#985 finish can be skipped with the keyboard and is not replayed on reload', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+  const completion = await completeWorkout(page);
+  await expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+  await expect(completion.getByText('1 ч')).toBeVisible();
+  await expect(completion.getByText(/максимальный вес 40 кг/)).toBeVisible();
+  const skip = completion.getByRole('button', { name: 'Показать сразу' });
+  await skip.focus();
+  await skip.press('Enter');
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.getByRole('heading', { name: 'Тренировка завершена' })).toBeFocused();
+  expect(server.finishCalls()).toBe(1);
+
+  await page.reload();
+  await expect(completion).toBeVisible();
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.locator('.workout-completion__skip')).toBeHidden();
+  expect(server.finishCalls()).toBe(1);
+});
+
+test('#985 finish stops when backgrounded and does not replay on resume', async ({ page }) => {
+  await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+  const completion = await completeWorkout(page);
+  await expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.getByText('1 ч')).toBeVisible();
+});
