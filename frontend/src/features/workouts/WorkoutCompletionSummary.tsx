@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
@@ -6,7 +6,6 @@ import { formatCalendarDate } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
 import { DisclosureIcon, Badge, Button } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
-import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { WorkoutCopyButton } from './WorkoutCopyButton';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
@@ -68,10 +67,14 @@ export function WorkoutCompletionSummary({
   workout,
   onReturnToday,
   readOnly = false,
+  playFinishMotion = false,
+  onFinishMotionConsumed,
 }: {
   workout: Workout;
   onReturnToday?: () => void;
   readOnly?: boolean;
+  playFinishMotion?: boolean;
+  onFinishMotionConsumed?: () => void;
 }) {
   const queryClient = useQueryClient();
   const summary = workout.completion_summary;
@@ -87,7 +90,50 @@ export function WorkoutCompletionSummary({
     note: summary?.note ?? '',
   });
   const changed = feedback !== saved.feedback || note.trim() !== saved.note;
-  const motion = useSemanticMotion<HTMLElement>(`workout-completion:${workout.id}`);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const skipRef = useRef<HTMLButtonElement>(null);
+  const [sportMotion, setSportMotion] = useState(
+    () =>
+      playFinishMotion &&
+      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches &&
+      document.visibilityState !== 'hidden' &&
+      document.documentElement.dataset.yfcViewportActive !== 'false',
+  );
+  const stopSportMotion = useCallback(() => {
+    if (document.activeElement === skipRef.current) titleRef.current?.focus();
+    setSportMotion(false);
+  }, []);
+
+  useEffect(() => {
+    if (playFinishMotion) {
+      if (document.activeElement === document.body) titleRef.current?.focus();
+      onFinishMotionConsumed?.();
+    }
+  }, [onFinishMotionConsumed, playFinishMotion]);
+
+  useEffect(() => {
+    if (!sportMotion) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const cancelWhenUnavailable = () => {
+      if (
+        reduced?.matches ||
+        document.visibilityState === 'hidden' ||
+        document.documentElement.dataset.yfcViewportActive === 'false'
+      )
+        stopSportMotion();
+    };
+    const observer = new MutationObserver(cancelWhenUnavailable);
+    observer.observe(document.documentElement, { attributeFilter: ['data-yfc-viewport-active'] });
+    document.addEventListener('visibilitychange', cancelWhenUnavailable);
+    reduced?.addEventListener?.('change', cancelWhenUnavailable);
+    const timer = window.setTimeout(stopSportMotion, 560);
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', cancelWhenUnavailable);
+      reduced?.removeEventListener?.('change', cancelWhenUnavailable);
+    };
+  }, [sportMotion, stopSportMotion]);
 
   useEffect(() => {
     trackProductEvent(
@@ -118,11 +164,11 @@ export function WorkoutCompletionSummary({
   return (
     <section
       className="workout-completion"
-      id={motion.elementId}
       aria-labelledby="workout-completion-title"
-      data-motion-phase={motion.motionPhase}
-      data-motion-revision={motion.motionRevision}
-      onAnimationEnd={motion.onMotionAnimationEnd}
+      data-motion-phase={sportMotion ? 'enter' : 'idle'}
+      onClickCapture={(event) => {
+        if (sportMotion && event.target !== skipRef.current) stopSportMotion();
+      }}
     >
       <header className="workout-completion__hero">
         <span className="workout-completion__check" aria-hidden="true">
@@ -130,7 +176,9 @@ export function WorkoutCompletionSummary({
         </span>
         <div>
           <Badge tone="success">Результат сохранён</Badge>
-          <h2 id="workout-completion-title">Тренировка завершена</h2>
+          <h2 id="workout-completion-title" ref={titleRef} tabIndex={-1}>
+            Тренировка завершена
+          </h2>
           <p>{workout.title}</p>
         </div>
       </header>
@@ -149,8 +197,19 @@ export function WorkoutCompletionSummary({
         </div>
       </dl>
 
-      <div>
+      <div className="workout-completion__immediate-actions">
         <WorkoutCopyButton workout={workout} />
+        <button
+          ref={skipRef}
+          className="ui-button ui-button--secondary workout-completion__skip"
+          type="button"
+          disabled={!sportMotion}
+          aria-hidden={!sportMotion}
+          tabIndex={sportMotion ? 0 : -1}
+          onClick={stopSportMotion}
+        >
+          Показать сразу
+        </button>
       </div>
 
       {!!summary?.exercises.length && (

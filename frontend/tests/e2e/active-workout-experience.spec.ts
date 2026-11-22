@@ -6302,6 +6302,245 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
   }
 });
 
+test('#985 confirms the last strength set on its visible collapsed exercise', async ({ page }) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done, is_completed: false, version: 1 }],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise
+    .locator('[data-workout-set-id="203"]')
+    .getByRole('button', { name: /^Завершить:/ })
+    .click();
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 confirms the last cardio interval on its visible collapsed exercise', async ({
+  page,
+}) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const cardio = {
+    actual_reps: null,
+    actual_weight: null,
+    duration_minutes: null,
+    distance_km: null,
+    average_heart_rate_bpm: null,
+    heart_rate_zone: null,
+    rir: null,
+    set_kind: null,
+    reached_failure: null,
+    is_completed: false,
+    version: 1,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done }],
+    [204, cardio],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    true,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await exercise.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await server.cardioCompleted;
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 confirms a successful retry once after a failed save', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  server.failSetPatch(true);
+  await row.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+  server.failSetPatch(false);
+  await row.getByRole('button', { name: /^Повторить сохранение:/ }).click();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 double tap completes a strength set only once', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  const done = row.getByRole('button', { name: /^Завершить:/ });
+  await done.scrollIntoViewIfNeeded();
+  const bounds = await done.boundingBox();
+  expect(bounds).not.toBeNull();
+  const release = server.holdNextPatch();
+  await page.mouse.dblclick(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2, {
+    delay: 25,
+  });
+  release();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+});
+
+test('#985 cardio confirms only after save and does not replay on reload', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  const release = server.holdNextPatch();
+  const row = cardio.locator('.active-workout-set--cardio');
+  await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  release();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await page.reload();
+  const entry = page.getByRole('button', { name: 'Клиент' });
+  if (await entry.isVisible()) await entry.click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await cardio.getByRole('button', { name: 'Кардио сохранено' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#985 cardio AFTER ${theme}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: theme });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page, true);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+    await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+    await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+    await server.cardioCompleted;
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    const saved = cardio.getByRole('button', { name: 'Кардио сохранено' });
+    if (await saved.isVisible()) await saved.click();
+    const row = cardio.locator('.active-workout-set--cardio');
+    await expect(row.getByText('Выполнено', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      393,
+    );
+    if (process.env.CAPTURE_985 === '1') {
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux-proposals',
+        'issue-985-after',
+        'screens',
+      );
+      await mkdir(directory, { recursive: true });
+      await row.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: resolve(directory, `${info.project.name}-web-${theme}-393-cardio.png`),
+      });
+    }
+  });
+}
+
 test('mixed workout keeps cardio type-aware, compact and stable during input', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
   await page.setViewportSize({ width: 390, height: 844 });

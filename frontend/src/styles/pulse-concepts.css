@@ -99,16 +99,50 @@
   box-shadow: none;
 }
 
+.workout-completion__immediate-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.workout-completion__immediate-actions > button {
+  min-width: 0;
+}
+
+.workout-completion__skip[aria-hidden='true'] {
+  display: none;
+}
+
+@media (max-width: 400px) {
+  .workout-completion[data-motion-phase='enter'] .workout-completion__immediate-actions > button {
+    padding-inline: 6px;
+    font-size: var(--font-size-caption);
+    white-space: nowrap;
+  }
+}
+
 .workout-completion[data-motion-phase='enter'] {
-  animation: yfc-motion-phase-marker var(--motion-data-total) linear;
+  animation: yfc-motion-phase-marker 560ms linear;
 }
 
-.workout-completion[data-motion-phase='enter'] .workout-completion__hero {
-  animation: pulse-completion-surface var(--motion-data-total) var(--motion-ease) both;
+.workout-completion[data-motion-phase='enter'] > :not(.workout-completion__immediate-actions) {
+  animation: pulse-completion-surface 560ms var(--motion-ease) both;
 }
 
-.workout-completion[data-motion-phase='enter'] .workout-completion__check {
-  animation: pulse-completion-check var(--motion-data-total) var(--motion-ease) both;
+.workout-completion[data-motion-phase='enter'] .workout-completion__facts > div {
+  animation: sport-completion-fact 180ms var(--motion-ease) both;
+}
+
+.workout-completion[data-motion-phase='enter'] .workout-completion__facts > div:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.workout-completion[data-motion-phase='enter'] .workout-completion__facts > div:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+.workout-completion[data-motion-phase='enter'] .workout-completion__records li {
+  animation: sport-completion-fact 360ms var(--motion-ease) both;
 }
 
 @media (max-width: 640px) {
@@ -125,16 +159,17 @@
 
 @keyframes pulse-completion-surface {
   from {
-    transform: translateY(8px);
+    opacity: 0.85;
+    transform: translateY(16px);
   }
   to {
     transform: translateY(0);
   }
 }
 
-@keyframes pulse-completion-check {
+@keyframes sport-completion-fact {
   from {
-    transform: scale(0.82);
+    transform: scale(0.97);
   }
   to {
     transform: scale(1);

@@ -141,7 +141,10 @@ def _personal_records(
         .all()
     )
     previous = {
-        row.exercise_id: (float(row.max_load or 0), float(row.best_set_volume or 0))
+        row.exercise_id: (
+            float(row.max_load) if row.max_load is not None else None,
+            float(row.best_set_volume) if row.best_set_volume is not None else None,
+        )
         for row in previous_rows
     }
 
@@ -180,11 +183,11 @@ def _personal_records(
     for result in current.values():
         max_load = result["max_load"]
         best_volume = result["best_volume"]
-        previous_load, previous_volume = previous.get(result["exercise_id"], (0.0, 0.0))
+        previous_load, previous_volume = previous.get(result["exercise_id"], (None, None))
         kinds = []
-        if max_load > previous_load:
+        if previous_load is not None and max_load > previous_load:
             kinds.append("max_load")
-        if best_volume > previous_volume:
+        if previous_volume is not None and best_volume > previous_volume:
             kinds.append("best_set_volume")
         if not kinds:
             continue

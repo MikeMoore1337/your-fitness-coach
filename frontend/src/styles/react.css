@@ -4619,6 +4619,9 @@ button.today-text-link {
 .active-workout-exercise.is-completed:not(.is-current) {
   background: var(--bg-soft);
 }
+.active-workout-exercise[data-motion-confirm='true'] {
+  animation: active-workout-set-confirm var(--motion-state) var(--motion-ease);
+}
 .active-workout-exercise.is-superset {
   border-left: 4px solid var(--accent);
 }

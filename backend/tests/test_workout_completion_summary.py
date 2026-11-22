@@ -99,7 +99,7 @@ def _add_previous_result(
     workout_id: int,
     *,
     weight: float = 40,
-    reps: int = 8,
+    reps: int | None = 8,
     days_before: int = 7,
     completed_at: datetime | None = None,
 ) -> None:
@@ -153,6 +153,25 @@ def _start_and_log(client, headers: dict[str, str], workout: dict, values: list[
         )
         assert saved.status_code == 200, saved.text
     return started.json()
+
+
+@pytest.mark.parametrize("has_prior_load", [False, True])
+def test_record_requires_prior_measurement_for_each_metric(client, has_prior_load) -> None:
+    headers = _auth(client, 53_200 + int(has_prior_load))
+    workout = _assigned_workout(client, headers, sets=1)
+    if has_prior_load:
+        _add_previous_result(workout["id"], weight=40, reps=None)
+    _start_and_log(client, headers, workout, [(8, 50)])
+
+    finished = client.post(f"/api/v1/workouts/{workout['id']}/finish", headers=headers)
+    assert finished.status_code == 200, finished.text
+    records = finished.json()["completion_summary"]["personal_records"]
+    if not has_prior_load:
+        assert records == []
+    else:
+        assert len(records) == 1
+        assert records[0]["kinds"] == ["max_load"]
+        assert records[0]["best_set_volume_kg"] is None
 
 
 def test_completion_summary_is_factual_stable_and_exposes_feedback_to_trainer(

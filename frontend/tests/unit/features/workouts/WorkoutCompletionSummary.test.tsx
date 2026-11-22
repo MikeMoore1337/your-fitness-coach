@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
@@ -112,7 +112,7 @@ const workout: Workout = {
   },
 };
 
-function renderSummary(onReturnToday = vi.fn(), targetWorkout: Workout = workout) {
+function renderSummary(onReturnToday = vi.fn(), targetWorkout: Workout = workout, play = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -120,7 +120,11 @@ function renderSummary(onReturnToday = vi.fn(), targetWorkout: Workout = workout
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
         <NavigationProvider>
-          <WorkoutCompletionSummary workout={targetWorkout} onReturnToday={onReturnToday} />
+          <WorkoutCompletionSummary
+            workout={targetWorkout}
+            onReturnToday={onReturnToday}
+            playFinishMotion={play}
+          />
         </NavigationProvider>
       </FeedbackProvider>
     </QueryClientProvider>,
@@ -129,7 +133,10 @@ function renderSummary(onReturnToday = vi.fn(), targetWorkout: Workout = workout
 }
 
 describe('WorkoutCompletionSummary', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  });
 
   beforeEach(() => {
     apiMock.mockReset();
@@ -151,7 +158,7 @@ describe('WorkoutCompletionSummary', () => {
     const completion = screen
       .getByRole('heading', { name: 'Тренировка завершена' })
       .closest('.workout-completion');
-    expect(completion).toHaveAttribute('data-motion-phase', expect.stringMatching(/pending|enter/));
+    expect(completion).toHaveAttribute('data-motion-phase', 'idle');
     expect(
       completion?.querySelector('.ui-semantic-artwork--workout-completion'),
     ).not.toBeInTheDocument();
@@ -180,6 +187,19 @@ describe('WorkoutCompletionSummary', () => {
       '/app?section=progress',
     );
     window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('stops new completion motion when the page becomes hidden', () => {
+    renderSummary(vi.fn(), workout, true);
+    const completion = screen
+      .getByRole('heading', { name: 'Тренировка завершена' })
+      .closest('section');
+    expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    fireEvent(document, new Event('visibilitychange'));
+    return waitFor(() => {
+      expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+    });
   });
 
   it('keeps the optional note after a recoverable save error and retries idempotent PUT', async () => {
