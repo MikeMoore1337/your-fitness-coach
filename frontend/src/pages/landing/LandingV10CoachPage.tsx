@@ -6,6 +6,7 @@ import { LandingChapter } from './LandingChapter';
 import { LandingV10CoachJourney } from './LandingV10CoachJourney';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
+import './landing-v14.css';
 export default function LandingV10CoachPage() {
   useLandingHeroMotion();
   return (
@@ -28,13 +29,14 @@ export default function LandingV10CoachPage() {
         </div>
         <ol className="ref-template-path">
           {[
-            ['Приглашение', 'Клиент явно принимает связь с тренером.'],
-            ['Программа и проверка', 'Шаблон получает назначение и версию.'],
+            ['Приглашение', 'Клиент сам принимает связь с тренером.'],
+            ['Программа и версия', 'Выберите программу для подключённого клиента.'],
             ['Факты и обзор', 'Результаты доступны в контексте клиента.'],
-            ['Следующий шаг', 'Изменение или черновик ждёт подтверждения.'],
-          ].map(([title, text], i) => (
+            ['Проверка состояния', 'Сопоставьте ответ клиента с тренировками.'],
+            ['Решение', 'Посмотрите изменения перед применением.'],
+            ['Следующий шаг', 'Редактируйте черновик и отдельно подтвердите отправку.'],
+          ].map(([title, text]) => (
             <li key={title}>
-              <span>0{i + 1}</span>
               <div>
                 <h3>{title}</h3>
                 <p>{text}</p>

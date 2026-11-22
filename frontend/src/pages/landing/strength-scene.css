@@ -31,8 +31,12 @@
   display: flex;
   border-bottom: 1px solid #ccc;
 }
-.strength-scene__steps span {
+.strength-scene__steps span,
+.strength-scene__steps button {
   flex: 1;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
   text-align: center;
   padding: 12px 4px;
   border-bottom: 3px solid transparent;

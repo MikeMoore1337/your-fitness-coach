@@ -1,0 +1,321 @@
+{
+  "commit": "159056b4f56e6168efa861717f646e17d7ae0e28",
+  "base": "d7c04239d3296155092f3ae8169472c090e1b3d1",
+  "prototype_sha256": "4ed8f4bd0d1bd93fc694422aec5be2801dc4c67ddf13be22c3877b33ad421d72",
+  "browser": "151.0.7922.34",
+  "reducedMotion": true,
+  "entries": [
+    {
+      "file": "v10-athlete-light-mobile.png",
+      "reviewFile": "v10-athlete-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4181/",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-athlete-light-mobile.png",
+      "reviewFile": "v4-athlete-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:8766/landing.html?audience=self&theme=light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Для себя — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-athlete-light-mobile.png",
+      "reviewFile": "after-athlete-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4180/",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-athlete-dark-mobile.png",
+      "reviewFile": "v10-athlete-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4181/",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-athlete-dark-mobile.png",
+      "reviewFile": "v4-athlete-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:8766/landing.html?audience=self&theme=dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Для себя — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-athlete-dark-mobile.png",
+      "reviewFile": "after-athlete-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4180/",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-coach-light-mobile.png",
+      "reviewFile": "v10-coach-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4181/for-trainers",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-coach-light-mobile.png",
+      "reviewFile": "v4-coach-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:8766/landing.html?audience=coach&theme=light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Для тренера — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-coach-light-mobile.png",
+      "reviewFile": "after-coach-light-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4180/for-trainers",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-coach-dark-mobile.png",
+      "reviewFile": "v10-coach-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4181/for-trainers",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-coach-dark-mobile.png",
+      "reviewFile": "v4-coach-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:8766/landing.html?audience=coach&theme=dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Для тренера — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-coach-dark-mobile.png",
+      "reviewFile": "after-coach-dark-mobile.jpg",
+      "quality": 45,
+      "source": "http://127.0.0.1:4180/for-trainers",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-athlete-light-desktop.png",
+      "reviewFile": "v10-athlete-light-desktop.jpg",
+      "quality": 40,
+      "source": "http://127.0.0.1:4181/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-athlete-light-desktop.png",
+      "reviewFile": "v4-athlete-light-desktop.jpg",
+      "quality": 40,
+      "source": "http://127.0.0.1:8766/landing.html?audience=self&theme=light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Для себя — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-athlete-light-desktop.png",
+      "reviewFile": "after-athlete-light-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:4180/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-athlete-dark-desktop.png",
+      "reviewFile": "v10-athlete-dark-desktop.jpg",
+      "quality": 40,
+      "source": "http://127.0.0.1:4181/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-athlete-dark-desktop.png",
+      "reviewFile": "v4-athlete-dark-desktop.jpg",
+      "quality": 40,
+      "source": "http://127.0.0.1:8766/landing.html?audience=self&theme=dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Для себя — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-athlete-dark-desktop.png",
+      "reviewFile": "after-athlete-dark-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:4180/",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-coach-light-desktop.png",
+      "reviewFile": "v10-coach-light-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:4181/for-trainers",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-coach-light-desktop.png",
+      "reviewFile": "v4-coach-light-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:8766/landing.html?audience=coach&theme=light",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Для тренера — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-coach-light-desktop.png",
+      "reviewFile": "after-coach-light-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:4180/for-trainers",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v10-coach-dark-desktop.png",
+      "reviewFile": "v10-coach-dark-desktop.jpg",
+      "quality": 35,
+      "source": "http://127.0.0.1:4181/for-trainers",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "v4-coach-dark-desktop.png",
+      "reviewFile": "v4-coach-dark-desktop.jpg",
+      "quality": 30,
+      "source": "http://127.0.0.1:8766/landing.html?audience=coach&theme=dark",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Для тренера — Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    },
+    {
+      "file": "after-coach-dark-desktop.png",
+      "reviewFile": "after-coach-dark-desktop.jpg",
+      "quality": 30,
+      "source": "http://127.0.0.1:4180/for-trainers",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "pageErrors": [],
+      "failedResponses": []
+    }
+  ]
+}

@@ -104,6 +104,7 @@ export function LandingV10CoachJourney() {
               <button
                 key={value}
                 {...glassProps('clear', true)}
+                data-yfc-choice="compact"
                 aria-pressed={version === value}
                 disabled={assigned}
                 onClick={() => setVersion(value)}
@@ -140,26 +141,21 @@ export function LandingV10CoachJourney() {
         </div>
       </LandingChapter>
       <LandingChapter id="coach-facts" className="ref-section ref-coach-facts">
-        <div className="ref-photo-copy">
-          <img
-            src="/assets/marketing/trainer-photo.webp"
-            width="1024"
-            height="1024"
-            alt="Тренер разбирает план со спортсменкой"
-            loading="lazy"
-          />
-          <div>
-            <p className="landing-kicker">03 / ВНИМАНИЕ → КОНТЕКСТ</p>
-            <h2>
+        <SectionTitle
+          index="ВНИМАНИЕ И КОНТЕКСТ"
+          title={
+            <>
               За цифрами —<br />
-              <em>ваш клиент.</em>
-            </h2>
-            <p>
-              Coach Today показывает поводы вернуться к человеку. Обзор клиента связывает программу
-              и выполненные тренировки.
-            </p>
-          </div>
-        </div>
+              ваш клиент.
+            </>
+          }
+        >
+          <p>
+            Coach Today показывает поводы вернуться к человеку. Обзор клиента связывает программу и
+            выполненные тренировки.
+          </p>
+          {example}
+        </SectionTitle>
         <div className="ref-coach-facts-body">
           <div className="ref-product">
             <div className="ref-product-head">
@@ -205,7 +201,6 @@ export function LandingV10CoachJourney() {
                 </button>
               </>
             )}
-            {example}
             <p className="ref-caption">
               Только доступный тренеру контекст связанного клиента. Приватные заметки не
               показываются.
@@ -238,6 +233,7 @@ export function LandingV10CoachJourney() {
           <nav className="ref-tabs" aria-label="Пример проверки клиента">
             <button
               {...glassProps('clear', true)}
+              data-yfc-choice="compact"
               aria-pressed={!review}
               onClick={() => setReview(false)}
             >
@@ -245,6 +241,7 @@ export function LandingV10CoachJourney() {
             </button>
             <button
               {...glassProps('clear', true)}
+              data-yfc-choice="compact"
               aria-pressed={review}
               onClick={() => setReview(true)}
             >

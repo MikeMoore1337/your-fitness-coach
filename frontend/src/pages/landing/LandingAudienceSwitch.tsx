@@ -30,6 +30,7 @@ export function LandingAudienceSwitch({
             {...glassProps('clear', true)}
             data-glass-tone="on-image"
             className="landing-v10-audience-switch__link"
+            data-yfc-choice="compact"
             href={landingAudienceHref(item.id, location)}
             aria-current={item.id === audience ? 'page' : undefined}
             data-audience={item.id}
