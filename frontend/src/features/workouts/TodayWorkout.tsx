@@ -460,6 +460,7 @@ function WorkoutSetRow({
   syncFailed,
   exerciseNote,
   onEditPlan,
+  onConfirmed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -486,6 +487,7 @@ function WorkoutSetRow({
   syncFailed: boolean;
   exerciseNote?: ReactNode;
   onEditPlan?: () => void;
+  onConfirmed: () => void;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -609,6 +611,7 @@ function WorkoutSetRow({
         if (!completionFeedbackPlayed.current) {
           completionFeedbackPlayed.current = true;
           setJustConfirmed(true);
+          onConfirmed();
         }
       }
       if (accepted && immediate && startRest && canStartRest(nextSetKind, nextCompleted)) {
@@ -1224,6 +1227,7 @@ function SideWorkoutSetRow({
   durable,
   syncing,
   exerciseNote,
+  onConfirmed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -1245,6 +1249,7 @@ function SideWorkoutSetRow({
   durable: boolean;
   syncing: boolean;
   exerciseNote?: ReactNode;
+  onConfirmed: () => void;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -1327,6 +1332,7 @@ function SideWorkoutSetRow({
         if (!completionFeedbackPlayed.current) {
           completionFeedbackPlayed.current = true;
           setJustConfirmed(true);
+          onConfirmed();
         }
         if (
           userId &&
@@ -1760,6 +1766,7 @@ function CardioWorkoutRow({
   syncing,
   syncFailed,
   exerciseNote,
+  onConfirmed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -1773,6 +1780,7 @@ function CardioWorkoutRow({
   syncing: boolean;
   syncFailed: boolean;
   exerciseNote?: ReactNode;
+  onConfirmed: () => void;
   enqueue: (
     setId: number,
     serverVersion: number,
@@ -1881,6 +1889,7 @@ function CardioWorkoutRow({
         if (!completionFeedbackPlayed.current) {
           completionFeedbackPlayed.current = true;
           setJustConfirmed(true);
+          onConfirmed();
         }
       }
       return accepted;
@@ -3193,10 +3202,31 @@ export function TodayWorkout({
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
   const [expandedExercises, setExpandedExercises] = useState<Set<number>>(() => new Set());
+  const [completionFeedback, setCompletionFeedback] = useState<{ exerciseId: number } | null>(null);
   const [executionModes, setExecutionModes] = useState<Record<number, 'bilateral' | SideMode>>({});
   const [modeChoicesOpen, setModeChoicesOpen] = useState<Set<number>>(() => new Set());
   const [modeSaving, setModeSaving] = useState<Set<number>>(() => new Set());
   const [planEdit, setPlanEdit] = useState<{ exerciseId: number; setId: number } | null>(null);
+
+  useEffect(() => {
+    if (!completionFeedback) return;
+    const clearWhenHidden = () => {
+      if (
+        document.visibilityState === 'hidden' ||
+        document.documentElement.dataset.yfcViewportActive === 'false'
+      )
+        setCompletionFeedback(null);
+    };
+    const timer = window.setTimeout(() => setCompletionFeedback(null), 450);
+    const observer = new MutationObserver(clearWhenHidden);
+    observer.observe(document.documentElement, { attributeFilter: ['data-yfc-viewport-active'] });
+    document.addEventListener('visibilitychange', clearWhenHidden);
+    return () => {
+      window.clearTimeout(timer);
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', clearWhenHidden);
+    };
+  }, [completionFeedback]);
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -4196,6 +4226,16 @@ export function TodayWorkout({
               <article
                 className={`active-workout-exercise ${isCurrentExercise ? 'is-current' : ''} ${exerciseCompleted === exercise.sets.length ? 'is-completed' : ''} ${groupLabel ? 'is-superset' : ''}`}
                 key={exercise.id}
+                data-motion-confirm={
+                  (!exerciseOpen && completionFeedback?.exerciseId === exercise.id) || undefined
+                }
+                onAnimationEnd={(event) => {
+                  if (
+                    event.target === event.currentTarget &&
+                    event.animationName === 'active-workout-set-confirm'
+                  )
+                    setCompletionFeedback(null);
+                }}
               >
                 <header className="active-workout-exercise__head">
                   <div className="active-workout-exercise__copy">
@@ -4490,6 +4530,18 @@ export function TodayWorkout({
 
                   <div className="active-workout-exercise__sets">
                     {exercise.sets.map((set, setIndex) => {
+                      const onConfirmed = () => {
+                        if (
+                          !expandedExercises.has(exercise.id) &&
+                          exercise.sets.every(
+                            (item) =>
+                              item.id === set.id ||
+                              (activeSync.pendingBySet.get(item.id)?.values.is_completed ??
+                                item.is_completed),
+                          )
+                        )
+                          setCompletionFeedback({ exerciseId: exercise.id });
+                      };
                       const previousStrength =
                         metricType === 'strength'
                           ? previousCompletedSet(exercise.sets, setIndex, activeSync.pendingBySet)
@@ -4556,6 +4608,7 @@ export function TodayWorkout({
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
                           exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          onConfirmed={onConfirmed}
                           enqueue={enqueueSet}
                         />
                       ) : rowMode === 'per_side' || rowMode === 'alternating' ? (
@@ -4587,6 +4640,7 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           exerciseNote={currentSet?.set.id === set.id ? exerciseNote : undefined}
+                          onConfirmed={onConfirmed}
                           enqueue={enqueueSet}
                         />
                       ) : (
@@ -4626,6 +4680,7 @@ export function TodayWorkout({
                               ? () => setPlanEdit({ exerciseId: exercise.id, setId: set.id })
                               : undefined
                           }
+                          onConfirmed={onConfirmed}
                           enqueue={enqueueSet}
                         />
                       );

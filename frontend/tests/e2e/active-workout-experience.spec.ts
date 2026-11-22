@@ -6302,6 +6302,122 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
   }
 });
 
+test('#985 confirms the last strength set on its visible collapsed exercise', async ({ page }) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done, is_completed: false, version: 1 }],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise
+    .locator('[data-workout-set-id="203"]')
+    .getByRole('button', { name: /^Завершить:/ })
+    .click();
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 confirms the last cardio interval on its visible collapsed exercise', async ({
+  page,
+}) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const cardio = {
+    actual_reps: null,
+    actual_weight: null,
+    duration_minutes: null,
+    distance_km: null,
+    average_heart_rate_bpm: null,
+    heart_rate_zone: null,
+    rir: null,
+    set_kind: null,
+    reached_failure: null,
+    is_completed: false,
+    version: 1,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done }],
+    [204, cardio],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    true,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await exercise.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await server.cardioCompleted;
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
 test('#985 confirms a successful retry once after a failed save', async ({ page }) => {
   const server = await mockActiveWorkout(page);
   await page.goto('/app');
