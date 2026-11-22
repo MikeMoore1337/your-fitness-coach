@@ -46,6 +46,8 @@ import { NutritionPeriodReport, type ControlledNutritionPeriod } from './Nutriti
 import { Icon } from '../../shared/ui/Icon';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
+import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
+import { useWeekSwipe } from '../../shared/ui/useWeekSwipe';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadDistribution } from './MuscleWorkload';
@@ -392,6 +394,32 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
 function ProgressCategoryNav({ search, view }: { search: string; view: ProgressView }) {
   const { navigate } = useNavigation();
   const shouldRestoreFocus = useRef(false);
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const categories: Array<{ label: string; value: ProgressView }> = [
+    { label: 'Обзор', value: 'overview' },
+    { label: 'Тело', value: 'body' },
+    { label: 'Тренировки', value: 'training' },
+    { label: 'Питание', value: 'nutrition' },
+    { label: 'Кардио', value: 'cardio' },
+    { label: 'Самочувствие', value: 'wellbeing' },
+    { label: 'История', value: 'history' },
+  ];
+  const index = categories.findIndex((category) => category.value === view);
+  const swipe = useWeekSwipe(
+    tabListRef,
+    {
+      onPrevious: () => selectCategory(categories[index - 1]?.value),
+      onNext: () => selectCategory(categories[index + 1]?.value),
+      previousDisabled: index <= 0,
+      nextDisabled: index >= categories.length - 1,
+    },
+    { durationMs: 180, disableReducedMotionDrag: true, maxOffsetPx: 6 },
+  );
+  function selectCategory(value: ProgressView | undefined) {
+    if (!value) return;
+    shouldRestoreFocus.current = true;
+    navigate(progressViewPath(search, value), false, undefined, { preserveScroll: true });
+  }
   useEffect(() => {
     const selected = document.querySelector<HTMLButtonElement>(
       '.progress-category-nav [role="tab"][aria-selected="true"]',
@@ -425,24 +453,14 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
       observer?.disconnect();
     };
   }, [view]);
-  const categories: Array<{ label: string; value: ProgressView }> = [
-    { label: 'Обзор', value: 'overview' },
-    { label: 'Тело', value: 'body' },
-    { label: 'Тренировки', value: 'training' },
-    { label: 'Питание', value: 'nutrition' },
-    { label: 'Кардио', value: 'cardio' },
-    { label: 'Самочувствие', value: 'wellbeing' },
-    { label: 'История', value: 'history' },
-  ];
   return (
     <nav className="progress-category-nav section-navigation" aria-label="Разделы прогресса">
       <SegmentedControl
         ariaLabel="Разделы прогресса"
-        onChange={(value) => {
-          shouldRestoreFocus.current = true;
-          navigate(progressViewPath(search, value as ProgressView));
-        }}
+        onChange={(value) => selectCategory(value as ProgressView)}
         options={categories}
+        tabListRef={tabListRef}
+        tabListHandlers={swipe}
         value={view}
       />
     </nav>
@@ -965,7 +983,17 @@ function TrainingSection({
           </div>
         }
       />
-      {analytics.isLoading ? (
+      {analytics.isPlaceholderData && analytics.data ? (
+        <>
+          <LoadingState label="Собираем историю тренировок…" />
+          <DataConfidence
+            isStale
+            kind="training"
+            signal={analytics.data.data_sufficiency.working_sets}
+            staleBasis={`Оценка сохранена за ${formatDate(analytics.data.period_start, true)} — ${formatDate(analytics.data.period_end, true)}. Данные выбранного периода ещё загружаются.`}
+          />
+        </>
+      ) : analytics.isLoading ? (
         <LoadingState label="Собираем историю тренировок…" />
       ) : analytics.error ? (
         <ErrorState
@@ -1499,21 +1527,30 @@ function ComplianceRow({ label, component }: { label: string; component: Adheren
 function ProgressPeriodControls({
   onSelectPreset,
   onApplyCustom,
+  initialCustomDraft,
+  onCustomDraftChange,
   selection,
   timeZone,
   today,
 }: {
   onApplyCustom: (selection: Extract<ProgressSelection, { kind: 'custom' }>) => void;
   onSelectPreset: (days: 7 | 30 | 90) => void;
+  initialCustomDraft?: { dateFrom: string; dateTo: string } | null;
+  onCustomDraftChange?: (draft: { dateFrom: string; dateTo: string } | null) => void;
   selection: ProgressSelection;
   timeZone: string;
   today: string;
 }) {
   const initialRange = selectionDateRange(selection, today);
   const [customOpen, setCustomOpen] = useState(false);
-  const [customDateFrom, setCustomDateFrom] = useState(initialRange.dateFrom);
-  const [customDateTo, setCustomDateTo] = useState(initialRange.dateTo);
+  const [customDateFrom, setCustomDateFrom] = useState(
+    initialCustomDraft?.dateFrom ?? initialRange.dateFrom,
+  );
+  const [customDateTo, setCustomDateTo] = useState(
+    initialCustomDraft?.dateTo ?? initialRange.dateTo,
+  );
   const [customError, setCustomError] = useState('');
+  const customDraftEdited = useRef(Boolean(initialCustomDraft));
   const selectionKey = progressSelectionKey(selection);
   const [draftSelectionKey, setDraftSelectionKey] = useState(selectionKey);
   if (draftSelectionKey !== selectionKey) {
@@ -1526,9 +1563,11 @@ function ProgressPeriodControls({
     customOpen || selection.kind === 'custom' ? 'custom' : String(selection.days);
   const onTabChange = (value: string) => {
     if (value === 'custom') {
-      const nextRange = selectionDateRange(selection, today);
-      setCustomDateFrom(nextRange.dateFrom);
-      setCustomDateTo(nextRange.dateTo);
+      if (!customDraftEdited.current) {
+        const nextRange = selectionDateRange(selection, today);
+        setCustomDateFrom(nextRange.dateFrom);
+        setCustomDateTo(nextRange.dateTo);
+      }
       setCustomError('');
       setCustomOpen(true);
       return;
@@ -1545,12 +1584,16 @@ function ProgressPeriodControls({
       return;
     }
     setCustomError('');
+    customDraftEdited.current = false;
+    onCustomDraftChange?.(null);
     setCustomOpen(false);
     onApplyCustom({ kind: 'custom', dateFrom: customDateFrom, dateTo: customDateTo });
   }
 
   function cancelCustom(): void {
     setCustomError('');
+    customDraftEdited.current = false;
+    onCustomDraftChange?.(null);
     setCustomOpen(false);
     setCustomDateFrom(range.dateFrom);
     setCustomDateTo(range.dateTo);
@@ -1585,7 +1628,11 @@ function ProgressPeriodControls({
               className="ui-input"
               id="progress-period-from"
               max={customDateTo || today}
-              onChange={(event) => setCustomDateFrom(event.target.value)}
+              onChange={(event) => {
+                customDraftEdited.current = true;
+                setCustomDateFrom(event.target.value);
+                onCustomDraftChange?.({ dateFrom: event.target.value, dateTo: customDateTo });
+              }}
 
               value={customDateFrom}
             />
@@ -1597,7 +1644,11 @@ function ProgressPeriodControls({
               id="progress-period-to"
               max={today}
               min={customDateFrom}
-              onChange={(event) => setCustomDateTo(event.target.value)}
+              onChange={(event) => {
+                customDraftEdited.current = true;
+                setCustomDateTo(event.target.value);
+                onCustomDraftChange?.({ dateFrom: customDateFrom, dateTo: event.target.value });
+              }}
 
               value={customDateTo}
             />
@@ -1640,7 +1691,11 @@ function ProgressDetailHeader({
     <header
       className={`progress-detail-header${view === 'training' ? ' progress-detail-header--training' : ''}`}
     >
-      <AppLink className="progress-detail-header__back" to={progressViewPath(search, 'overview')}>
+      <AppLink
+        className="progress-detail-header__back"
+        to={progressViewPath(search, 'overview')}
+        preserveScroll
+      >
         <Icon name="arrow-left" size={16} /> Обзор
       </AppLink>
       <div>
@@ -1668,14 +1723,18 @@ export function ProgressExperience({
   canExport = true,
   detailContent,
   focusMeasurements = false,
+  initialCustomDraft,
   measurementDiary,
+  onCustomDraftChange,
   progressView,
   timeZone,
 }: {
   detailContent?: ReactNode;
   canExport?: boolean;
   focusMeasurements?: boolean;
+  initialCustomDraft?: { dateFrom: string; dateTo: string } | null;
   measurementDiary?: ReactNode;
+  onCustomDraftChange?: (draft: { dateFrom: string; dateTo: string } | null) => void;
   progressView?: ProgressView;
   timeZone?: string | null;
 } = {}) {
@@ -1721,8 +1780,17 @@ export function ProgressExperience({
   const selectionKey = progressSelectionKey(selection);
   const summary = useQuery({
     queryKey: queryKeys.progress.summary(selectionKey),
-    queryFn: () =>
-      api<ProgressSummary>(`/api/v1/workouts/progress/summary${progressApiQuery(selection)}`),
+    queryFn: async () => {
+      const result = await api<ProgressSummary>(
+        `/api/v1/workouts/progress/summary${progressApiQuery(selection)}`,
+      );
+      const matches =
+        selection.kind === 'custom'
+          ? result.period_start === selection.dateFrom && result.period_end === selection.dateTo
+          : result.period_days === selection.days;
+      if (!matches) throw new Error('Не удалось загрузить данные за выбранный период.');
+      return result;
+    },
     placeholderData: keepPreviousData,
   });
   const weeklyReview = useQuery({
@@ -1752,10 +1820,7 @@ export function ProgressExperience({
   );
 
   function navigateWithinProgress(to: string): void {
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    navigate(to);
-    window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+    navigate(to, false, undefined, { preserveScroll: true });
   }
 
   function selectPreset(days: 7 | 30 | 90): void {
@@ -1773,6 +1838,10 @@ export function ProgressExperience({
       : summary.data.period_days === selection.days
     : false;
   const isSummaryUpdating = Boolean(summary.data && !summaryMatchesSelection);
+  const contentMotion = useSemanticMotion<HTMLDivElement>(
+    `${view}|${isSummaryUpdating ? 'pending' : selectionKey}`,
+    { animateInitial: false },
+  );
 
   useLayoutEffect(() => {
     const hero = heroRef.current;
@@ -1847,6 +1916,8 @@ export function ProgressExperience({
         {desktopReport && <div className="progress-hero__download" ref={desktopReportSlot} />}
         <div className="progress-hero__period">
           <ProgressPeriodControls
+            initialCustomDraft={initialCustomDraft}
+            onCustomDraftChange={onCustomDraftChange}
             onApplyCustom={applyCustom}
             onSelectPreset={selectPreset}
             selection={selection}
@@ -1886,77 +1957,94 @@ export function ProgressExperience({
             </p>
           )}
           <ProgressCategoryNav search={search} view={view} />
-          {view === 'overview' ? (
-            <>
-              <SummaryOverview current={weeklyReview.data} search={search} summary={summary.data} />
-            </>
-          ) : (
-            <>
-              <ProgressDetailHeader search={search} view={view} />
-              <div className="progress-details" aria-label="Подробности прогресса">
-                {view === 'training' && (
-                  <>
-                    {activity.isLoading ? (
-                      <LoadingState label="Загружаем календарь активности…" />
-                    ) : activity.error ? (
-                      <ErrorState
-                        message={(activity.error as Error).message}
-                        retry={() => void activity.refetch()}
+          <div
+            className="progress-local-context"
+            id={contentMotion.elementId}
+            data-motion-phase={contentMotion.motionPhase}
+            data-motion-revision={contentMotion.motionRevision}
+            aria-hidden={isSummaryUpdating || undefined}
+            inert={isSummaryUpdating || undefined}
+            onAnimationEnd={contentMotion.onMotionAnimationEnd}
+          >
+            {view === 'overview' ? (
+              <>
+                <SummaryOverview
+                  current={weeklyReview.data}
+                  search={search}
+                  summary={summary.data}
+                />
+              </>
+            ) : (
+              <>
+                <ProgressDetailHeader search={search} view={view} />
+                <div className="progress-details" aria-label="Подробности прогресса">
+                  {view === 'training' && (
+                    <>
+                      {activity.isLoading ? (
+                        <LoadingState label="Загружаем календарь активности…" />
+                      ) : activity.error ? (
+                        <ErrorState
+                          message={(activity.error as Error).message}
+                          retry={() => void activity.refetch()}
+                        />
+                      ) : activity.data ? (
+                        <ActivityHeatmap
+                          key={activityYear}
+                          data={activity.data}
+                          year={activityYear}
+                          onYearChange={setActivityYear}
+                        />
+                      ) : null}
+                      <TrainingSection
+                        analytics={analytics}
+                        selection={selection}
+                        summary={summary.data}
                       />
-                    ) : activity.data ? (
-                      <ActivityHeatmap
-                        key={activityYear}
-                        data={activity.data}
-                        year={activityYear}
-                        onYearChange={setActivityYear}
-                      />
-                    ) : null}
-                    <TrainingSection
-                      analytics={analytics}
-                      selection={selection}
-                      summary={summary.data}
-                    />
-                  </>
-                )}
-                {view === 'cardio' && (
-                  <CardioHistory
-                    dateFrom={summary.data.period_start}
-                    dateTo={summary.data.period_end}
-                    summary={summary.data.cardio}
-                    timeZone={resolvedTimeZone}
-                  />
-                )}
-                {view === 'body' && (
-                  <BodySection measurementDiary={measurementDiary} summary={summary.data} />
-                )}
-                {view === 'nutrition' && (
-                  <>
-                    <NutritionSection isStale={summary.isPlaceholderData} summary={summary.data} />
-                    <div id="progress-reports">
-                      <NutritionPeriodReport
-                        canExport={canExport}
-                        controlledPeriod={controlledNutritionPeriod}
-                        showSelector={false}
-                      />
-                    </div>
-                  </>
-                )}
-                {(view === wellbeingProgressView || view === historyProgressView) &&
-                  detailContent && (
-                    <div className={`progress-external-detail progress-external-detail--${view}`}>
-                      {detailContent}
-                    </div>
+                    </>
                   )}
-                {(view === wellbeingProgressView || view === historyProgressView) &&
-                  !detailContent && (
-                    <EmptyState
-                      title="Раздел пока недоступен"
-                      text="Попробуйте открыть его ещё раз."
+                  {view === 'cardio' && (
+                    <CardioHistory
+                      dateFrom={summary.data.period_start}
+                      dateTo={summary.data.period_end}
+                      summary={summary.data.cardio}
+                      timeZone={resolvedTimeZone}
                     />
                   )}
-              </div>
-            </>
-          )}
+                  {view === 'body' && (
+                    <BodySection measurementDiary={measurementDiary} summary={summary.data} />
+                  )}
+                  {view === 'nutrition' && (
+                    <>
+                      <NutritionSection
+                        isStale={summary.isPlaceholderData}
+                        summary={summary.data}
+                      />
+                      <div id="progress-reports">
+                        <NutritionPeriodReport
+                          canExport={canExport}
+                          controlledPeriod={controlledNutritionPeriod}
+                          showSelector={false}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {(view === wellbeingProgressView || view === historyProgressView) &&
+                    detailContent && (
+                      <div className={`progress-external-detail progress-external-detail--${view}`}>
+                        {detailContent}
+                      </div>
+                    )}
+                  {(view === wellbeingProgressView || view === historyProgressView) &&
+                    !detailContent && (
+                      <EmptyState
+                        title="Раздел пока недоступен"
+                        text="Попробуйте открыть его ещё раз."
+                      />
+                    )}
+                </div>
+              </>
+            )}
+          </div>
         </>
       ) : null}
 

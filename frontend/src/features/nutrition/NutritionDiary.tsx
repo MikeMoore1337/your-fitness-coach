@@ -905,6 +905,8 @@ export function NutritionDiary({
   onOpenSettings,
   onOverride,
   onDateChange,
+  initialMealExpansion,
+  onMealExpansionChange,
   selectedDate: controlledDate,
 }: {
   timeZone?: string | null;
@@ -922,6 +924,8 @@ export function NutritionDiary({
     dayType: components['schemas']['NutritionResolvedTargetResponse']['day_type'],
   ) => void;
   onDateChange?: (date: string) => void;
+  initialMealExpansion?: Partial<Record<MealType, boolean>>;
+  onMealExpansionChange?: (value: Partial<Record<MealType, boolean>>) => void;
   selectedDate?: string;
 }) {
   const today = dateInputValue(new Date(), timeZone || undefined);
@@ -973,7 +977,9 @@ export function NutritionDiary({
   const [copySubject, setCopySubject] = useState<CopySubject | null>(null);
   const [hydrationQuickAddRequest, setHydrationQuickAddRequest] = useState(0);
   const [lastAddedEntryId, setLastAddedEntryId] = useState<number | null>(null);
-  const [mealExpansion, setMealExpansion] = useState<Partial<Record<MealType, boolean>>>({});
+  const [mealExpansion, setMealExpansion] = useState<Partial<Record<MealType, boolean>>>(
+    initialMealExpansion ?? {},
+  );
   const [pendingRepeats, setPendingRepeats] = useState<Record<string, RepeatRequest>>({});
   const [repeatUndo, setRepeatUndo] = useState<RepeatUndo | null>(null);
   const [repeatNotice, setRepeatNotice] = useState<RepeatNotice | null>(null);
@@ -1337,12 +1343,11 @@ export function NutritionDiary({
                     ) : null
                   }
                   expanded={mealExpansion[meal.meal_type as MealType] ?? false}
-                  onExpandedChange={(expanded) =>
-                    setMealExpansion((current) => ({
-                      ...current,
-                      [meal.meal_type]: expanded,
-                    }))
-                  }
+                  onExpandedChange={(expanded) => {
+                    const next = { ...mealExpansion, [meal.meal_type]: expanded };
+                    setMealExpansion(next);
+                    onMealExpansionChange?.(next);
+                  }}
                   onAdd={() =>
                     setAddingTo({ mealType: meal.meal_type as MealType, initialView: 'browse' })
                   }

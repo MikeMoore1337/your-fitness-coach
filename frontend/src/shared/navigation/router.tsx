@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type AnchorHTMLAttributes,
 } from 'react';
@@ -15,7 +16,13 @@ interface NavigationContextValue {
   path: string;
   search: string;
   hash: string;
-  navigate(to: string, replace?: boolean, historyState?: unknown): void;
+  beforeNavigate(listener: (destination: string) => void): () => void;
+  navigate(
+    to: string,
+    replace?: boolean,
+    historyState?: unknown,
+    options?: { preserveScroll?: boolean },
+  ): void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
@@ -44,6 +51,13 @@ export function focusedContextReturn(search: string): string | null {
 }
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
+  const navigationListeners = useRef(new Set<(destination: string) => void>());
+  const beforeNavigate = useCallback((listener: (destination: string) => void) => {
+    navigationListeners.current.add(listener);
+    return () => {
+      navigationListeners.current.delete(listener);
+    };
+  }, []);
   const [location, setLocation] = useState(() => ({
     path: window.location.pathname,
     search: window.location.search,
@@ -65,18 +79,27 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-  const navigate = useCallback((to: string, replace = false, historyState?: unknown) => {
-    const destination = resolveNavigationPath(to);
-    const nextHistoryState = historyState === undefined ? {} : historyState;
-    if (replace) window.history.replaceState(nextHistoryState, '', destination);
-    else window.history.pushState(nextHistoryState, '', destination);
-    setLocation({
-      path: window.location.pathname,
-      search: window.location.search,
-      hash: window.location.hash,
-    });
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, []);
+  const navigate = useCallback(
+    (
+      to: string,
+      replace = false,
+      historyState?: unknown,
+      options?: { preserveScroll?: boolean },
+    ) => {
+      const destination = resolveNavigationPath(to);
+      navigationListeners.current.forEach((listener) => listener(destination));
+      const nextHistoryState = historyState === undefined ? {} : historyState;
+      if (replace) window.history.replaceState(nextHistoryState, '', destination);
+      else window.history.pushState(nextHistoryState, '', destination);
+      setLocation({
+        path: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      });
+      if (!options?.preserveScroll) window.scrollTo({ top: 0, behavior: 'instant' });
+    },
+    [],
+  );
 
   useEffect(() => {
     const telegram = window.Telegram?.WebApp;
@@ -107,8 +130,14 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   }, [navigate, location.path, location.search]);
 
   const value = useMemo(
-    () => ({ path: location.path, search: location.search, hash: location.hash, navigate }),
-    [location.path, location.search, location.hash, navigate],
+    () => ({
+      path: location.path,
+      search: location.search,
+      hash: location.hash,
+      navigate,
+      beforeNavigate,
+    }),
+    [location.path, location.search, location.hash, navigate, beforeNavigate],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }
@@ -124,10 +153,12 @@ export function AppLink({
   className,
   children,
   onClick,
+  preserveScroll = false,
   ...anchorAttributes
 }: {
   to: string;
   children: React.ReactNode;
+  preserveScroll?: boolean;
 } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
   const { navigate } = useNavigation();
   const runtime = useRuntime();
@@ -144,7 +175,7 @@ export function AppLink({
           return;
         event.preventDefault();
         if (runtime.kind === 'demo') runtime.onNavigate?.(to);
-        navigate(to);
+        navigate(to, false, undefined, { preserveScroll });
       }}
     >
       {children}

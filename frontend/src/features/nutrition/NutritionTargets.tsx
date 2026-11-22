@@ -18,6 +18,18 @@ type Values = Pick<
   Schemas['NutritionScheduleRuleSave'],
   'calories' | 'protein_g' | 'fat_g' | 'carbs_g'
 >;
+export interface NutritionTargetsDraft {
+  mode: 'settings' | 'override';
+  contextDate: string;
+  selectedDate: string;
+  dayType: DayType | '';
+  weekDay: DayType;
+  scope: 'date' | 'future';
+  editing: { day: DayType; week: WeekType | null } | null;
+  editBase: boolean;
+  values: Values;
+  confirmMismatch: boolean;
+}
 type Rule = Schemas['NutritionScheduleRuleSave'];
 type Change = Schemas['NutritionSchedulePreviewChange'];
 type Preview = {
@@ -81,6 +93,8 @@ export function NutritionTargets({
   readOnly,
   onClose,
   onSaved,
+  initialDraft,
+  onDraftChange,
 }: {
   mode: 'settings' | 'override';
   date: string;
@@ -91,18 +105,70 @@ export function NutritionTargets({
   readOnly: boolean;
   onClose: (savedDate?: string) => void;
   onSaved?: () => void | Promise<void>;
+  initialDraft?: NutritionTargetsDraft | null;
+  onDraftChange?: (draft: NutritionTargetsDraft) => void;
 }) {
   const queryClient = useQueryClient();
   const today = dateInputValue(new Date(), timeZone || undefined);
   const tomorrow = addCalendarDays(today, 1);
-  const [selectedDate, setSelectedDate] = useState(date);
-  const [dayType, setDayType] = useState<DayType | ''>(initialDayType ?? '');
-  const [weekDay, setWeekDay] = useState<DayType>('training');
-  const [scope, setScope] = useState<'date' | 'future'>('date');
-  const [editing, setEditing] = useState<{ day: DayType; week: WeekType | null } | null>(null);
-  const [editBase, setEditBase] = useState(false);
-  const [values, setValues] = useState<Values>(() => targetValues(dateTarget ?? initial));
-  const [confirmMismatch, setConfirmMismatch] = useState(false);
+  const resume =
+    initialDraft?.mode === mode && initialDraft.contextDate === date ? initialDraft : null;
+  const [selectedDate, setSelectedDate] = useState(resume?.selectedDate ?? date);
+  const [dayType, setDayType] = useState<DayType | ''>(resume?.dayType ?? initialDayType ?? '');
+  const [weekDay, setWeekDay] = useState<DayType>(resume?.weekDay ?? 'training');
+  const [scope, setScope] = useState<'date' | 'future'>(resume?.scope ?? 'date');
+  const [editing, setEditing] = useState<{ day: DayType; week: WeekType | null } | null>(
+    resume?.editing ?? null,
+  );
+  const [editBase, setEditBase] = useState(resume?.editBase ?? false);
+  const [values, setValues] = useState<Values>(
+    () => resume?.values ?? targetValues(dateTarget ?? initial),
+  );
+  const [confirmMismatch, setConfirmMismatch] = useState(resume?.confirmMismatch ?? false);
+  const draftBaseline = useRef(
+    JSON.stringify({
+      mode,
+      contextDate: date,
+      selectedDate,
+      dayType,
+      weekDay,
+      scope,
+      editing,
+      editBase,
+      values,
+      confirmMismatch,
+    }),
+  );
+  const draftWasEdited = useRef(Boolean(resume));
+  useEffect(() => {
+    const draft = {
+      mode,
+      contextDate: date,
+      selectedDate,
+      dayType,
+      weekDay,
+      scope,
+      editing,
+      editBase,
+      values,
+      confirmMismatch,
+    };
+    if (!draftWasEdited.current && JSON.stringify(draft) === draftBaseline.current) return;
+    draftWasEdited.current = true;
+    onDraftChange?.(draft);
+  }, [
+    onDraftChange,
+    mode,
+    date,
+    selectedDate,
+    dayType,
+    weekDay,
+    scope,
+    editing,
+    editBase,
+    values,
+    confirmMismatch,
+  ]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

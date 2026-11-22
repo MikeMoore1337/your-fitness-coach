@@ -225,11 +225,13 @@ export function AppShell({
   demo,
   narrow = false,
   section,
+  progressDestination,
 }: {
   children: React.ReactNode;
   demo?: DemoAppShellConfig;
   narrow?: boolean;
   section?: AppSection;
+  progressDestination?: string;
 }) {
   const auth = useOptionalAuth();
   const user = auth?.user ?? null;
@@ -762,7 +764,11 @@ export function AppShell({
                   const destinationKey =
                     'section' in destination ? destination.section : destination.key;
                   const rawDestinationTo =
-                    'to' in destination ? destination.to : `/app?section=${destination.section}`;
+                    'to' in destination
+                      ? destination.to
+                      : destination.section === 'progress' && progressDestination
+                        ? progressDestination
+                        : `/app?section=${destination.section}`;
                   const destinationTo = demo
                     ? rawDestinationTo
                     : personalDestinationWithTrainerReturn(rawDestinationTo, personalSearch);

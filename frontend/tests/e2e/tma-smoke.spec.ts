@@ -1621,6 +1621,9 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   const stale = training.getByLabel('Достаточно ли данных: Показана сохранённая оценка');
   await expect(stale).toBeVisible();
   await expect(stale).toContainText('Новые данные загружаются');
+  await expect(stale).toContainText('Оценка сохранена за');
+  await expect(stale).not.toContainText('1 рабочий подход в 1 тренировке');
+  await expect(training.getByText('Собираем историю тренировок…')).toBeVisible();
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
   await expectNeutralStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);

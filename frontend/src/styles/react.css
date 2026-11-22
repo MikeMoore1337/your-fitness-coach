@@ -6326,6 +6326,29 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
 }
 
 /* App shell: shared mobile composition and a purpose-built desktop sidebar. */
+.progress-local-context {
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+}
+.progress-local-context[inert] {
+  visibility: hidden;
+}
+.progress-category-nav .ui-tabs {
+  touch-action: pan-y pinch-zoom;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .progress-local-context[data-motion-phase='update']:not([inert]) {
+    animation: app-section-context-enter var(--motion-state) var(--motion-ease);
+  }
+  .nutrition-experience[data-motion-phase='update'] {
+    animation: yfc-motion-phase-marker var(--motion-state) linear;
+  }
+  .nutrition-experience[data-motion-phase='update']
+    > :is(.nutrition-day-content:not([hidden]), .nutrition-local-context) {
+    animation: app-section-context-enter var(--motion-state) var(--motion-ease);
+  }
+}
 .app-shell {
   min-height: 100dvh;
 }
@@ -9643,6 +9666,11 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 }
 .nutrition-targets__macros {
   display: contents;
+}
+@media (max-width: 240px) {
+  .nutrition-targets {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (min-width: 768px) {
   .nutrition-targets:not(.nutrition-targets--unset) {
