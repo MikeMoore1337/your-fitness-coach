@@ -6302,6 +6302,32 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
   }
 });
 
+test('#985 confirms a successful retry once after a failed save', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  server.failSetPatch(true);
+  await row.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+  server.failSetPatch(false);
+  await row.getByRole('button', { name: /^Повторить сохранение:/ }).click();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
 test('#985 double tap completes a strength set only once', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 });
   const server = await mockActiveWorkout(page);

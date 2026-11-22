@@ -6,13 +6,25 @@ import { installPlatformApi } from './fixtures/platform-api';
 
 test.use({ serviceWorkers: 'block' });
 
-for (const surface of ['web', 'tma'] as const) {
+for (const surface of ['web', 'pwa', 'tma'] as const) {
   for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430]) {
       test(`#985 ${surface} ${theme} ${width}`, async ({ page }, info) => {
         await page.setViewportSize({ width, height: 852 });
         await page.emulateMedia({ colorScheme: theme });
         await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        if (surface === 'pwa') {
+          await page.addInitScript(() => {
+            const nativeMatchMedia = window.matchMedia.bind(window);
+            window.matchMedia = (query) => {
+              const result = nativeMatchMedia(query);
+              if (query === '(display-mode: standalone)')
+                Object.defineProperty(result, 'matches', { configurable: true, value: true });
+              return result;
+            };
+            Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+          });
+        }
         if (surface === 'tma') {
           await installTelegramHarness(page, {
             colorScheme: theme,
@@ -49,6 +61,11 @@ for (const surface of ['web', 'tma'] as const) {
           surface === 'tma' ? 'telegram' : 'browser',
         );
         await page.getByRole('button', { name: 'Начать тренировку' }).click();
+        if (surface === 'pwa')
+          await expect(page.locator('html')).toHaveAttribute(
+            'data-yfc-pwa-focus-placement',
+            'true',
+          );
         await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
         await page.getByLabel('Вес, Приседания, подход 1').fill('40');
         await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();

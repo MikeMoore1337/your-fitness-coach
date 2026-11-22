@@ -513,6 +513,7 @@ function WorkoutSetRow({
   const editingCompletedSnapshot = useRef<CompletedStrengthDraft | null>(null);
   const [completing, setCompleting] = useState(false);
   const completionInFlight = useRef(false);
+  const completionFeedbackPlayed = useRef(completed);
   const reopenInFlight = useRef(false);
   const retryCompletion = syncFailed && pending?.values.is_completed;
   const [justConfirmed, setJustConfirmed] = useState(false);
@@ -602,9 +603,13 @@ function WorkoutSetRow({
         immediate,
         immediate && startRest && nextCompleted,
       );
+      if (accepted && immediate && !nextCompleted) completionFeedbackPlayed.current = false;
       if (accepted && immediate && startRest && nextCompleted) {
         haptic('success');
-        if (!completed) setJustConfirmed(true);
+        if (!completionFeedbackPlayed.current) {
+          completionFeedbackPlayed.current = true;
+          setJustConfirmed(true);
+        }
       }
       if (accepted && immediate && startRest && canStartRest(nextSetKind, nextCompleted)) {
         // Persist measured rest before the UI event so freeze/resume cannot leave a bare deadline.
@@ -1263,6 +1268,7 @@ function SideWorkoutSetRow({
   const activeInput = useRef(false);
   const inFlight = useRef(false);
   const completed = pending?.values.is_completed ?? set.is_completed;
+  const completionFeedbackPlayed = useRef(completed);
   const split = splitRequested || JSON.stringify(draft.left) !== JSON.stringify(draft.right);
   const setKind = pending?.values.set_kind ?? set.set_kind ?? 'working';
   const past =
@@ -1315,9 +1321,13 @@ function SideWorkoutSetRow({
         immediate,
         startRest && parentCompleted,
       );
+      if (accepted && immediate && !parentCompleted) completionFeedbackPlayed.current = false;
       if (accepted && startRest && parentCompleted) {
         haptic('success');
-        if (!completed) setJustConfirmed(true);
+        if (!completionFeedbackPlayed.current) {
+          completionFeedbackPlayed.current = true;
+          setJustConfirmed(true);
+        }
         if (
           userId &&
           setKind === 'working' &&
@@ -1791,6 +1801,7 @@ function CardioWorkoutRow({
   const editingCompletedSnapshot = useRef<CompletedCardioDraft | null>(null);
   const [completing, setCompleting] = useState(false);
   const completionInFlight = useRef(false);
+  const completionFeedbackPlayed = useRef(completed);
   const reopenInFlight = useRef(false);
   const retryCompletion = syncFailed && pending?.values.is_completed;
   const [justConfirmed, setJustConfirmed] = useState(false);
@@ -1864,9 +1875,13 @@ function CardioWorkoutRow({
         immediate,
         immediate && startRest && nextCompleted,
       );
+      if (accepted && immediate && !nextCompleted) completionFeedbackPlayed.current = false;
       if (accepted && immediate && startRest && nextCompleted) {
         haptic('success');
-        if (!completed) setJustConfirmed(true);
+        if (!completionFeedbackPlayed.current) {
+          completionFeedbackPlayed.current = true;
+          setJustConfirmed(true);
+        }
       }
       return accepted;
     } finally {
