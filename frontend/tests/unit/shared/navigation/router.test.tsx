@@ -1,4 +1,5 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   coachPathForTab,
@@ -6,6 +7,7 @@ import {
   demoReturnPathFromLogin,
   focusedContextReturn,
   NavigationProvider,
+  useNavigation,
   safeTrainerReturnPath,
   progressReportReturn,
 } from '../../../../src/shared/navigation/router';
@@ -100,6 +102,29 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(
       focusedContextReturn('?section=progress&progress_period=days_90&progress_view=nutrition'),
     ).toBe('/app?section=progress&progress_period=days_90');
+  });
+
+  it('notifies a navigation subscriber before changing location', () => {
+    const seen: string[] = [];
+    function Subscriber() {
+      const { beforeNavigate, navigate } = useNavigation();
+      useEffect(
+        () =>
+          beforeNavigate((destination) => seen.push(`${window.location.search}|${destination}`)),
+        [beforeNavigate],
+      );
+      return <button onClick={() => navigate('/app?section=nutrition')}>Открыть</button>;
+    }
+    const view = render(
+      <NavigationProvider>
+        <Subscriber />
+      </NavigationProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть' }));
+    expect(seen).toEqual([
+      '?workout_id=43&comment_id=7&workout_exercise_id=55|/app?section=nutrition',
+    ]);
+    view.unmount();
   });
 
   it('сохраняет раздел и период при возврате из личного отчёта без внешнего перехода', () => {

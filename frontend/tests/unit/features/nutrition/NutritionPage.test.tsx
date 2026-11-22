@@ -14,6 +14,10 @@ vi.mock('../../../../src/features/ai/AiCoachContextualEntry', () => ({
 vi.mock('../../../../src/features/nutrition/NutritionDiary', () => ({
   NutritionDiary: () => (
     <div data-testid="nutrition-diary-stub">
+      <label>
+        Черновик
+        <input />
+      </label>
       <section id="hydration-history-section">
         <h3 tabIndex={-1}>История за день</h3>
       </section>
@@ -88,5 +92,19 @@ describe('NutritionPage - secondary actions (#1442)', () => {
     fireEvent.click(settingsButton);
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть настройки' }));
     await waitFor(() => expect(settingsButton).toHaveFocus());
+  });
+
+  it('keeps the mounted diary draft and disclosures when opening and closing settings', async () => {
+    render(<NutritionPage />);
+    const draft = screen.getByRole('textbox', { name: 'Черновик' });
+    fireEvent.change(draft, { target: { value: 'Запись' } });
+    fireEvent.click(screen.getByText('Мои ёмкости'));
+    const disclosure = document.getElementById('hydration-presets-details') as HTMLDetailsElement;
+    fireEvent.click(screen.getByRole('button', { name: /Настройки КБЖУ/ }));
+    expect(draft).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть настройки' }));
+    expect(draft).toBeVisible();
+    expect(draft).toHaveValue('Запись');
+    expect(disclosure.open).toBe(true);
   });
 });

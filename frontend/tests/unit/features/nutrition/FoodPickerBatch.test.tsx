@@ -7,6 +7,7 @@ import type { Food } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 
 const apiMock = vi.hoisted(() => vi.fn());
+const mockUser = vi.hoisted(() => ({ id: 10 }));
 vi.mock('../../../../src/shared/api/client', () => ({
   api: apiMock,
   ApiError: class ApiError extends Error {
@@ -18,7 +19,9 @@ vi.mock('../../../../src/shared/api/client', () => ({
     }
   },
 }));
-vi.mock('../../../../src/app/AuthProvider', () => ({ useAuth: () => ({ user: { id: 10 } }) }));
+vi.mock('../../../../src/app/AuthProvider', () => ({
+  useAuth: () => ({ user: { id: mockUser.id } }),
+}));
 
 const baseFood: Food = {
   id: 1,
@@ -76,9 +79,42 @@ function renderPicker(onClose = vi.fn(), demoSafeMode = false) {
 describe('FoodPicker batch selection', () => {
   beforeEach(() => {
     localStorage.clear();
+    mockUser.id = 10;
     apiMock.mockReset();
   });
   afterEach(() => cleanup());
+
+  it('restores an unfinished recipe portion for the same user without submitting it', async () => {
+    apiMock.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0 });
+    localStorage.setItem(
+      'fit_food_draft_10_2026-08-19_breakfast',
+      JSON.stringify({
+        food: null,
+        amount: '100',
+        amountUnit: 'g',
+        recipe: {
+          id: 25,
+          name: 'Овсяная каша',
+          ingredients: [],
+          effective_weight_g: '300',
+          nutrients_per_100g: { energy_kcal_per_100g: '100' },
+        },
+        recipeAmount: '175',
+      }),
+    );
+    const first = renderPicker();
+    const amount = await screen.findByLabelText('Порция готового блюда, г');
+    expect(amount).toHaveValue(175);
+    fireEvent.change(amount, { target: { value: '220' } });
+    first.unmount();
+    const second = renderPicker();
+    expect(await screen.findByLabelText('Порция готового блюда, г')).toHaveValue(220);
+    expect(apiMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+    second.unmount();
+    mockUser.id = 11;
+    renderPicker();
+    expect(screen.queryByLabelText('Порция готового блюда, г')).not.toBeInTheDocument();
+  });
 
   it('keeps distinct brands and retries the same confirmed payload after a lost response', async () => {
     let rejectFirst: ((error: Error) => void) | undefined;
@@ -440,7 +476,7 @@ describe('FoodPicker batch selection', () => {
     );
   });
 
-  it('discards an unconfirmed selection on close and reopens without diary writes', async () => {
+  it('preserves an unconfirmed selection on close and reopens without diary writes', async () => {
     apiMock.mockImplementation((path: string) =>
       Promise.resolve(
         path.endsWith('/batch/preview')
@@ -454,6 +490,29 @@ describe('FoodPicker batch selection', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть добавление' }));
     first.unmount();
+    renderPicker();
+    expect(await screen.findByText('Подборка · 1')).toBeVisible();
+    expect(
+      await screen.findByRole('button', { name: 'Убрать Йогурт натуральный, Марка А из подборки' }),
+    ).toBeVisible();
+    expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);
+  });
+
+  it('does not restore another account’s unconfirmed selection', async () => {
+    apiMock.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.endsWith('/batch/preview')
+          ? preview
+          : { items: foods, total: foods.length, limit: 20, offset: 0 },
+      ),
+    );
+    const first = renderPicker();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Выбрать Йогурт натуральный, Марка А в подборку' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть добавление' }));
+    first.unmount();
+    mockUser.id = 20;
     renderPicker();
     expect(await screen.findByText('Подборка · 0')).toBeVisible();
     expect(apiMock.mock.calls.some(([path]) => path.endsWith('/commit'))).toBe(false);

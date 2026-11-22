@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppShell, type AppSection, type DemoAppShellConfig } from '../../app/AppShell';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
@@ -22,7 +22,9 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { programProfileReadiness } from '../../features/profile/programReadiness';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { parseProgressView } from '../../features/workouts/progressPeriods';
+import { parseProgressSelection, parseProgressView } from '../../features/workouts/progressPeriods';
+import type { NutritionTargetsDraft } from '../../features/nutrition/NutritionTargets';
+import type { MealType } from '../../features/nutrition/FoodPickerDialog';
 import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
@@ -266,7 +268,7 @@ export default function MiniAppPage({
   const runtime = useRuntime();
   useExerciseNoteSync(user?.id, runtime.kind === 'production');
   const capabilities = useRuntimeCapabilities();
-  const { hash, navigate, search } = useNavigation();
+  const { hash, navigate, search, beforeNavigate } = useNavigation();
   const { toast } = useFeedback();
   const [initialInviteToken] = useState(launchInviteToken);
   const [fallbackSection] = useState<AppSection>(() => {
@@ -288,6 +290,89 @@ export default function MiniAppPage({
   const nutritionMeal = requestedNutritionMeal(search);
   const nutritionQuickAdd = requestedNutritionQuickAdd(search);
   const nutritionHydrationOpen = requestedHydrationQuick(search);
+  const userContextKey = `${runtime.kind}:${user?.id ?? ''}`;
+  const scrollMemory = useRef<{
+    owner: string;
+    positions: Partial<Record<'progress' | 'nutrition', number>>;
+  }>({ owner: userContextKey, positions: {} });
+  const pendingScroll = useRef<{
+    owner: string;
+    section: 'progress' | 'nutrition';
+    top: number;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const pending = pendingScroll.current;
+    if (!pending || pending.owner !== userContextKey || pending.section !== section) return;
+    const targetTop = pending.top;
+    pendingScroll.current = null;
+    let finished = false;
+    let frame = 0;
+    let timer = 0;
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => restore());
+    function stop() {
+      if (finished) return;
+      finished = true;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      observer?.disconnect();
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchstart', stop);
+      window.removeEventListener('pointerdown', stop);
+      window.removeEventListener('keydown', stop);
+    }
+    function restore(force = false) {
+      if (finished) return;
+      const available = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      if (!force && available < targetTop) return;
+      window.scrollTo({ top: targetTop, behavior: 'instant' });
+      stop();
+    }
+    observer?.observe(document.documentElement);
+    window.addEventListener('wheel', stop, { passive: true });
+    window.addEventListener('touchstart', stop, { passive: true });
+    window.addEventListener('pointerdown', stop, { passive: true });
+    window.addEventListener('keydown', stop);
+    frame = window.requestAnimationFrame(() => restore());
+    timer = window.setTimeout(() => restore(true), 2500);
+    return stop;
+  }, [section, userContextKey]);
+  const [nutritionDateCache, setNutritionDateCache] = useState<{
+    owner: string;
+    date: string;
+  } | null>(null);
+  const rememberNutritionDate = useCallback(
+    (date: string) => {
+      setNutritionDateCache((current) =>
+        current?.owner === userContextKey && current.date === date
+          ? current
+          : { owner: userContextKey, date },
+      );
+    },
+    [userContextKey],
+  );
+  const restoredNutritionDate =
+    nutritionDateCache?.owner === userContextKey ? nutritionDateCache.date : undefined;
+  const [nutritionMealExpansion, setNutritionMealExpansion] = useState<{
+    owner: string;
+    value: Partial<Record<MealType, boolean>>;
+  } | null>(null);
+  const [targetsDraftCache, setTargetsDraftCache] = useState<{
+    owner: string;
+    drafts: Record<string, NutritionTargetsDraft | undefined>;
+  } | null>(null);
+  const rememberTargetsDraft = useCallback(
+    (mode: 'settings' | 'override', date: string, draft: NutritionTargetsDraft | null) => {
+      setTargetsDraftCache((current) => ({
+        owner: userContextKey,
+        drafts: {
+          ...(current?.owner === userContextKey ? current.drafts : {}),
+          [`${mode}:${date}`]: draft ?? undefined,
+        },
+      }));
+    },
+    [userContextKey],
+  );
   const reportHandoffId =
     section === 'progress'
       ? positiveIntegerParam(new URLSearchParams(search), 'report_handoff_id')
@@ -306,6 +391,62 @@ export default function MiniAppPage({
   const exitQuickMeasurement = useQuickAddReturn('/app?section=progress');
   const exitQuickWellbeing = useQuickAddReturn('/app?section=today');
   const progressView = parseProgressView(search, window.location.hash);
+  const [progressContext, setProgressContext] = useState<{
+    owner: string;
+    destination: string;
+  } | null>(null);
+  const [progressDraft, setProgressDraft] = useState<{
+    owner: string;
+    dateFrom: string;
+    dateTo: string;
+  } | null>(null);
+  const currentProgressDestination = (() => {
+    if (section !== 'progress') return undefined;
+    const selection = parseProgressSelection(search);
+    const params = new URLSearchParams({ section: 'progress' });
+    params.set(
+      'progress_period',
+      selection.kind === 'preset' ? `days_${selection.days}` : 'custom',
+    );
+    if (selection.kind === 'custom') {
+      params.set('progress_from', selection.dateFrom);
+      params.set('progress_to', selection.dateTo);
+    }
+    if (progressView !== 'overview') params.set('progress_view', progressView);
+    return `/app?${params.toString()}`;
+  })();
+  useEffect(
+    () =>
+      beforeNavigate((to) => {
+        const url = new URL(to, window.location.origin);
+        const destination = url.pathname === '/app' ? requestedSection(url.search) : null;
+        if (destination === section) return;
+        if (scrollMemory.current.owner !== userContextKey)
+          scrollMemory.current = { owner: userContextKey, positions: {} };
+        if (section === 'progress' || section === 'nutrition')
+          scrollMemory.current.positions[section] = window.scrollY;
+        const ordinaryKeys =
+          destination === 'progress'
+            ? new Set([
+                'section',
+                'progress_period',
+                'progress_from',
+                'progress_to',
+                'progress_view',
+              ])
+            : new Set(['section']);
+        const ordinaryDestination =
+          !url.hash && [...url.searchParams.keys()].every((key) => ordinaryKeys.has(key));
+        if ((destination === 'progress' || destination === 'nutrition') && ordinaryDestination) {
+          const top = scrollMemory.current.positions[destination];
+          pendingScroll.current =
+            top === undefined ? null : { owner: userContextKey, section: destination, top };
+        } else pendingScroll.current = null;
+        if (currentProgressDestination)
+          setProgressContext({ owner: userContextKey, destination: currentProgressDestination });
+      }),
+    [beforeNavigate, currentProgressDestination, section, userContextKey],
+  );
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
     id: number;
@@ -480,6 +621,13 @@ export default function MiniAppPage({
               )}
               <div className="stack progress-workout-stack">
                 <ProgressExperience
+                  key={userContextKey}
+                  initialCustomDraft={
+                    progressDraft?.owner === userContextKey ? progressDraft : null
+                  }
+                  onCustomDraftChange={(draft) =>
+                    setProgressDraft(draft ? { owner: userContextKey, ...draft } : null)
+                  }
                   canExport={capabilities.canExport}
                   focusMeasurements={focusMeasurements}
                   progressView={progressView}
@@ -581,9 +729,27 @@ export default function MiniAppPage({
           )}
           {section === 'nutrition' && (
             <NutritionPage
-              key={JSON.stringify([nutritionDate, nutritionMeal, nutritionQuickAdd])}
+              key={JSON.stringify([
+                userContextKey,
+                nutritionDate,
+                nutritionMeal,
+                nutritionQuickAdd,
+              ])}
               initial={user?.profile?.kbju}
-              initialDate={nutritionDate}
+              initialDate={nutritionDate ?? restoredNutritionDate}
+              onSelectedDateChange={rememberNutritionDate}
+              initialMealExpansion={
+                nutritionMealExpansion?.owner === userContextKey
+                  ? nutritionMealExpansion.value
+                  : undefined
+              }
+              onMealExpansionChange={(value) =>
+                setNutritionMealExpansion({ owner: userContextKey, value })
+              }
+              initialTargetsDraft={
+                targetsDraftCache?.owner === userContextKey ? targetsDraftCache.drafts : undefined
+              }
+              onTargetsDraftChange={rememberTargetsDraft}
               initialFoodQuickAdd={nutritionQuickAdd}
               initialMealType={nutritionMeal}
               initialHydrationOpen={nutritionHydrationOpen}
@@ -696,7 +862,14 @@ export default function MiniAppPage({
   return (
     <ActiveWorkoutSyncProvider userId={user?.id} enabled={runtime.kind === 'production'}>
       {renderShell ? (
-        <AppShell demo={demo} section={section}>
+        <AppShell
+          demo={demo}
+          section={section}
+          progressDestination={
+            currentProgressDestination ??
+            (progressContext?.owner === userContextKey ? progressContext.destination : undefined)
+          }
+        >
           {content}
         </AppShell>
       ) : (

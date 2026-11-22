@@ -128,6 +128,8 @@ type FoodAmountUnit = FoodDiaryEntry['amount_unit'];
 
 interface AddDraft {
   food: FoodDraftSelection | null;
+  recipe?: Recipe | null;
+  recipeAmount?: string;
   amount: string;
   amountUnit: FoodAmountUnit;
   quick?: QuickAddDraft;
@@ -604,8 +606,6 @@ export function FoodPickerDialog({
   const [editorBarcode, setEditorBarcode] = useState('');
   const [scanBarcode, setScanBarcode] = useState('');
   const [flowStartedAt, setFlowStartedAt] = useState(() => Date.now());
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [recipeAmount, setRecipeAmount] = useState('100');
   const [draft, setDraft, clearDraft] = usePersistentState<AddDraft>(
     foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType),
     {
@@ -616,6 +616,8 @@ export function FoodPickerDialog({
       requestId: newEntryRequestId(),
     },
   );
+  const selectedRecipe = draft.recipe ?? null;
+  const recipeAmount = draft.recipeAmount ?? '100';
   const batchStorageKey = `${foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType)}_batch`;
   const [batch, setBatch, clearBatch] = usePersistentState<BatchDraft>(batchStorageKey, {
     items: [],
@@ -627,7 +629,6 @@ export function FoodPickerDialog({
   const [importedExternal, setImportedExternal] = useState<Record<string, Food>>({});
   const handleClose = () => {
     if (batchInFlight.current) return;
-    if (!batch.pending) clearBatch();
     onClose();
   };
   const panelRef = useModalA11y<HTMLDivElement>(
@@ -959,7 +960,6 @@ export function FoodPickerDialog({
       toast(`Добавлено в ${mealLabels[mealType]}`);
       if (variables.closeAfter) onClose();
       else {
-        setSelectedRecipe(null);
         setEntryMethod(initialView === 'quick-add' ? 'quick_add' : 'recent');
         setFlowStartedAt(Date.now());
         setView(initialView);
@@ -1103,10 +1103,10 @@ export function FoodPickerDialog({
       surface: productEventSurface(),
       entry_method: entryMethod,
     });
-    setSelectedRecipe(null);
     const amountUnit = foodAmountUnit(food);
     updateDraft({
       food: foodDraftSelection(food),
+      recipe: null,
       amount: amountUnit === 'serving' ? '1' : '100',
       amountUnit,
     });
@@ -1150,9 +1150,7 @@ export function FoodPickerDialog({
       surface: productEventSurface(),
       entry_method: 'recipe',
     });
-    updateDraft({ food: null });
-    setSelectedRecipe(recipe);
-    setRecipeAmount('100');
+    updateDraft({ food: null, recipe, recipeAmount: '100' });
   };
   const title =
     draft.food?.name ||
@@ -1218,8 +1216,7 @@ export function FoodPickerDialog({
               type="button"
               onClick={() => {
                 addEntry.reset();
-                setSelectedRecipe(null);
-                updateDraft({ food: null });
+                updateDraft({ food: null, recipe: null });
               }}
             >
               <Icon name="arrow-left" size={16} /> Выбрать другое
@@ -1300,7 +1297,7 @@ export function FoodPickerDialog({
                       step="any"
                       required
                       value={recipeAmount}
-                      onChange={(event) => setRecipeAmount(event.target.value)}
+                      onChange={(event) => updateDraft({ recipeAmount: event.target.value })}
                     />
                   </Field>
                 </>

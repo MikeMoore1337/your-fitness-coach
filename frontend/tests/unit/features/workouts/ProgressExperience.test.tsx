@@ -748,6 +748,92 @@ describe('ProgressExperience', () => {
     expect(sevenDays).toHaveFocus();
   });
 
+  it('does not reset scroll when changing period or local Progress view', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    installApi();
+    renderExperience('?section=progress');
+    await screen.findByRole('heading', { name: 'Прогресс' });
+    await screen.findByRole('tab', { name: 'Тело' });
+
+    fireEvent.click(screen.getByRole('tab', { name: '7 дней' }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Тело' }));
+    expect(scrollTo).not.toHaveBeenCalled();
+    await screen.findByRole('link', { name: /Обзор/ });
+    fireEvent.click(screen.getByRole('link', { name: /Обзор/ }));
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unfinished custom period when another preset is selected', async () => {
+    installApi();
+    renderExperience('?section=progress');
+    await screen.findByRole('tab', { name: 'Свой период' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Свой период' }));
+    fireEvent.change(screen.getByLabelText('Начало периода'), { target: { value: '2025-01-02' } });
+    fireEvent.change(screen.getByLabelText('Конец периода'), { target: { value: '2025-01-31' } });
+    fireEvent.click(screen.getByRole('tab', { name: '7 дней' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Свой период' }));
+    expect(screen.getByLabelText('Начало периода')).toHaveValue('2025-01-02');
+    expect(screen.getByLabelText('Конец периода')).toHaveValue('2025-01-31');
+  });
+
+  it('hides the previous period while loading and ignores a late earlier response', async () => {
+    installApi();
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const baseFetch = fetchMock.getMockImplementation()!;
+    const pending = new Map<number, (response: Response) => void>();
+    fetchMock.mockImplementation((input, init) => {
+      const path = String(input);
+      const days = Number(new URL(path, 'http://test.local').searchParams.get('period_days'));
+      if (path.startsWith('/api/v1/workouts/progress/summary') && [7, 90].includes(days)) {
+        return new Promise<Response>((resolve) => pending.set(days, resolve));
+      }
+      return baseFetch(input, init);
+    });
+    const { container } = renderExperience('?section=progress');
+    await screen.findByRole('tab', { name: '7 дней' });
+    await waitFor(() =>
+      expect(container.querySelector('.progress-local-context')).not.toHaveAttribute('inert'),
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: '7 дней' }));
+    await waitFor(() => expect(pending.has(7)).toBe(true));
+    expect(container.querySelector('.progress-local-context')).toHaveAttribute('inert');
+    expect(container.querySelector('.progress-local-context')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: '90 дней' }));
+    await waitFor(() => expect(pending.has(90)).toBe(true));
+    pending.get(90)!(new Response(JSON.stringify({ ...makeSummary(), period_days: 90 })));
+    await waitFor(() =>
+      expect(container.querySelector('.progress-local-context')).not.toHaveAttribute('inert'),
+    );
+    pending.get(7)!(new Response(JSON.stringify({ ...makeSummary(), period_days: 7 })));
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: '90 дней' })).toHaveAttribute('aria-selected', 'true'),
+    );
+    expect(container.querySelector('.progress-local-context')).not.toHaveAttribute('inert');
+  });
+
+  it('reports a response for a different period instead of showing it', async () => {
+    installApi();
+    const fetchMock = vi.mocked(globalThis.fetch);
+    const baseFetch = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((input, init) => {
+      if (String(input).includes('/progress/summary?period_days=7')) {
+        return Promise.resolve(new Response(JSON.stringify(makeSummary())));
+      }
+      return baseFetch(input, init);
+    });
+    renderExperience('?section=progress');
+    await screen.findByRole('tab', { name: '7 дней' });
+    fireEvent.click(screen.getByRole('tab', { name: '7 дней' }));
+    expect(
+      await screen.findByText('Не удалось загрузить данные за выбранный период.'),
+    ).toBeVisible();
+  });
+
   it('does not auto-select a custom metric when no canonical trend exists', async () => {
     const summary = makeSummary();
     const customTrend = summary.body.trends.find((trend) => trend.metric === 'custom:17');

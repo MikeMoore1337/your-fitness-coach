@@ -5,10 +5,11 @@ import { dateInputValue } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
 import { Button } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { ClientNutritionProposals } from './CoachNutritionProposals';
 import { NutritionDiary } from './NutritionDiary';
-import { NutritionTargets } from './NutritionTargets';
+import { NutritionTargets, type NutritionTargetsDraft } from './NutritionTargets';
 import type { MealType } from './FoodPickerDialog';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MealPlanner } from './MealPlanner';
@@ -21,6 +22,11 @@ export function NutritionPage({
   initialMealType,
   initialFoodQuickAdd = false,
   initialHydrationOpen = false,
+  onSelectedDateChange,
+  initialTargetsDraft,
+  onTargetsDraftChange,
+  initialMealExpansion,
+  onMealExpansionChange,
   onSaved,
   demoSafeMode = false,
   readOnlyEntries = false,
@@ -33,6 +39,15 @@ export function NutritionPage({
   initialMealType?: MealType;
   initialFoodQuickAdd?: boolean;
   initialHydrationOpen?: boolean;
+  onSelectedDateChange?: (date: string) => void;
+  initialMealExpansion?: Partial<Record<MealType, boolean>>;
+  onMealExpansionChange?: (value: Partial<Record<MealType, boolean>>) => void;
+  initialTargetsDraft?: Record<string, NutritionTargetsDraft | undefined>;
+  onTargetsDraftChange?: (
+    mode: 'settings' | 'override',
+    date: string,
+    draft: NutritionTargetsDraft | null,
+  ) => void;
   onSaved?: () => void | Promise<void>;
   demoSafeMode?: boolean;
   readOnlyEntries?: boolean;
@@ -41,33 +56,76 @@ export function NutritionPage({
   timeZone?: string | null;
 }) {
   const [view, setView] = useState<'day' | 'settings' | 'override' | 'proposal' | 'import'>('day');
+  const viewMotion = useSemanticMotion<HTMLDivElement>(view, { animateInitial: false });
+  const rememberTargetsDraft = useCallback(
+    (draft: NutritionTargetsDraft) => {
+      onTargetsDraftChange?.(draft.mode, draft.contextDate, draft);
+    },
+    [onTargetsDraftChange],
+  );
   const root = useRef<HTMLDivElement>(null);
-  const closeProposal = useCallback(() => {
-    setView('day');
-    requestAnimationFrame(() =>
-      root.current?.querySelector<HTMLButtonElement>('.coach-nutrition-entry button')?.focus(),
-    );
+  const dayScroll = useRef<number | null>(null);
+  const restoreFrame = useRef<number | null>(null);
+  const openLocal = useCallback((next: 'settings' | 'override' | 'proposal' | 'import') => {
+    if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current);
+    restoreFrame.current = null;
+    dayScroll.current = window.scrollY;
+    setView(next);
   }, []);
+  const restoreDay = useCallback((after?: () => void) => {
+    if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current);
+    setView('day');
+    restoreFrame.current = window.requestAnimationFrame(() => {
+      if (dayScroll.current !== null)
+        window.scrollTo({ top: dayScroll.current, behavior: 'instant' });
+      dayScroll.current = null;
+      restoreFrame.current = null;
+      after?.();
+    });
+  }, []);
+  useEffect(
+    () => () => {
+      if (restoreFrame.current !== null) window.cancelAnimationFrame(restoreFrame.current);
+    },
+    [],
+  );
+  const closeProposal = useCallback(() => {
+    restoreDay(() =>
+      root.current
+        ?.querySelector<HTMLButtonElement>('.coach-nutrition-entry button')
+        ?.focus({ preventScroll: true }),
+    );
+  }, [restoreDay]);
   useTelegramOverlayBackButton(view === 'proposal', closeProposal);
   const dayView = useRef<HTMLDivElement>(null);
   const extrasSettingsFocus = useRef(false);
   const [selectedDate, setSelectedDate] = useState(
     initialDate || dateInputValue(new Date(), timeZone || undefined),
   );
+  useEffect(() => {
+    onSelectedDateChange?.(selectedDate);
+  }, [onSelectedDateChange, selectedDate]);
   const [dateTarget, setDateTarget] = useState<NutritionTarget | null>(null);
   const [dateDayType, setDateDayType] =
     useState<components['schemas']['NutritionResolvedTargetResponse']['day_type']>(null);
   useEffect(() => {
     const openFromHash = () => {
-      if (window.location.hash === '#nutrition-target-settings') setView('settings');
+      if (window.location.hash === '#nutrition-target-settings') openLocal('settings');
     };
     openFromHash();
     window.addEventListener('hashchange', openFromHash);
     return () => window.removeEventListener('hashchange', openFromHash);
-  }, []);
+  }, [openLocal]);
 
   return (
-    <div className="nutrition-experience" ref={root}>
+    <div
+      className="nutrition-experience"
+      ref={root}
+      id={viewMotion.elementId}
+      data-motion-phase={viewMotion.motionPhase}
+      data-motion-revision={viewMotion.motionRevision}
+      onAnimationEnd={viewMotion.onMotionAnimationEnd}
+    >
       {returnPath && (
         <nav aria-label="Возврат к отчёту по питанию" className="nutrition-report-return">
           <AppLink className="button-link secondary-link" to={returnPath}>
@@ -78,7 +136,7 @@ export function NutritionPage({
       {!demoSafeMode && (view === 'day' || view === 'proposal') && (
         <ClientNutritionProposals
           focused={view === 'proposal'}
-          onOpen={() => setView('proposal')}
+          onOpen={() => openLocal('proposal')}
           onClose={closeProposal}
         />
       )}
@@ -88,17 +146,19 @@ export function NutritionPage({
           selectedDate={selectedDate}
           initialFoodQuickAdd={initialFoodQuickAdd}
           initialMealType={initialMealType}
+          initialMealExpansion={initialMealExpansion}
+          onMealExpansionChange={onMealExpansionChange}
           initialHydrationOpen={initialHydrationOpen}
           demoSafeMode={demoSafeMode}
           readOnlyEntries={readOnlyEntries}
           readOnlyTargets={readOnlyTargets}
-          onOpenSettings={() => setView('settings')}
+          onOpenSettings={() => openLocal('settings')}
           onDateChange={setSelectedDate}
           onOverride={(date, target, dayType) => {
             setSelectedDate(date);
             setDateTarget(target);
             setDateDayType(dayType);
-            setView('override');
+            openLocal('override');
           }}
           timeZone={timeZone}
         />
@@ -119,7 +179,7 @@ export function NutritionPage({
               variant="secondary"
               onClick={() => {
                 extrasSettingsFocus.current = true;
-                setView('settings');
+                openLocal('settings');
               }}
             >
               <span>
@@ -133,7 +193,7 @@ export function NutritionPage({
                 className="nutrition-extras__setting"
                 type="button"
                 variant="secondary"
-                onClick={() => setView('import')}
+                onClick={() => openLocal('import')}
               >
                 <span>
                   <strong>Импорт питания</strong>
@@ -164,32 +224,42 @@ export function NutritionPage({
         />
       </div>
       {view === 'import' && (
-        <NutritionImport diaryDate={selectedDate} onClose={() => setView('day')} />
+        <div className="nutrition-local-context">
+          <NutritionImport diaryDate={selectedDate} onClose={() => restoreDay()} />
+        </div>
       )}
       {view !== 'day' && view !== 'proposal' && view !== 'import' && (
-        <NutritionTargets
-          mode={view}
-          date={selectedDate}
-          initial={initial}
-          dateTarget={dateTarget}
-          initialDayType={dateDayType}
-          timeZone={timeZone}
-          readOnly={readOnlyTargets}
-          onClose={(savedDate) => {
-            const returnTo = view;
-            if (savedDate) setSelectedDate(savedDate);
-            setView('day');
-            requestAnimationFrame(() => {
-              const focusSelector =
-                returnTo === 'settings' && extrasSettingsFocus.current
-                  ? '[data-nutrition-focus="extras-settings"]'
-                  : `[data-nutrition-focus="${returnTo}"]`;
-              dayView.current?.querySelector<HTMLButtonElement>(focusSelector)?.focus();
-              extrasSettingsFocus.current = false;
-            });
-          }}
-          onSaved={onSaved}
-        />
+        <div className="nutrition-local-context">
+          <NutritionTargets
+            mode={view}
+            date={selectedDate}
+            initial={initial}
+            dateTarget={dateTarget}
+            initialDayType={dateDayType}
+            timeZone={timeZone}
+            readOnly={readOnlyTargets}
+            initialDraft={initialTargetsDraft?.[`${view}:${selectedDate}`]}
+            onDraftChange={rememberTargetsDraft}
+            onClose={(savedDate) => {
+              const returnTo = view;
+              if (savedDate) setSelectedDate(savedDate);
+              restoreDay(() => {
+                const focusSelector =
+                  returnTo === 'settings' && extrasSettingsFocus.current
+                    ? '[data-nutrition-focus="extras-settings"]'
+                    : `[data-nutrition-focus="${returnTo}"]`;
+                dayView.current
+                  ?.querySelector<HTMLButtonElement>(focusSelector)
+                  ?.focus({ preventScroll: true });
+                extrasSettingsFocus.current = false;
+              });
+            }}
+            onSaved={async () => {
+              onTargetsDraftChange?.(view, selectedDate, null);
+              await onSaved?.();
+            }}
+          />
+        </div>
       )}
     </div>
   );
