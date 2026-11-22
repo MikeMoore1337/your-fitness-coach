@@ -1143,6 +1143,40 @@ async function installDemoTransport(page: Page) {
   });
 }
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`demo scenario control stays usable at very narrow and ordinary widths in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 196, height: 852 });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const header = page.locator('.app-mobile-header');
+    const scenarios = header.getByRole('button', { name: 'Сценарии' });
+    await expect(scenarios).toBeVisible();
+    await expect(header.locator('.app-mobile-header__brand')).toBeHidden();
+    for (const width of [196, 393]) {
+      await page.setViewportSize({ width, height: 852 });
+      const box = (await scenarios.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      if (process.env.YFC_994_EVIDENCE_DIR) {
+        mkdirSync(process.env.YFC_994_EVIDENCE_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(
+            process.env.YFC_994_EVIDENCE_DIR,
+            `${info.project.name}-${width}-${theme}-demo.png`,
+          ),
+        });
+      }
+    }
+    await scenarios.click();
+    await expect(scenarios).toHaveAttribute('aria-expanded', 'true');
+  });
+}
+
 test.use({ video: process.env.ISSUE_983_EVIDENCE_DIR ? 'on' : 'off' });
 
 test('#1500 desktop Quick Add restores focus and can reopen during exit', async ({ page }) => {
