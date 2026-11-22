@@ -1893,27 +1893,6 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     }
   }
 
-  @media (max-width: 240px) {
-    html:has(.app-bottom-nav[data-dock-reflow='true'])
-      .app-shell--design-v2:has(.app-section--today)
-      .app-mobile-header {
-      flex-wrap: wrap;
-      gap: 2px;
-    }
-
-    html:has(.app-bottom-nav[data-dock-reflow='true'])
-      .app-shell--design-v2:has(.app-section--today)
-      .app-mobile-header__brand {
-      flex: 1 0 100%;
-    }
-
-    html:has(.app-bottom-nav[data-dock-reflow='true'])
-      .app-shell--design-v2:has(.app-section--today)
-      .app-mobile-header__profile {
-      margin-left: auto;
-    }
-  }
-
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
     .app-bottom-nav__primary
     .app-bottom-nav__btn:not([data-yfc-choice]) {

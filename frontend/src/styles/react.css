@@ -6409,6 +6409,20 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .app-mobile-header__profile.is-active {
   background: var(--surface-active);
 }
+@media (max-width: 240px) {
+  .app-shell--design-v2 .app-mobile-header {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .app-shell--design-v2 .app-mobile-header__brand {
+    flex: 1 0 100%;
+  }
+
+  .app-shell--design-v2 .app-mobile-header__profile {
+    margin-left: auto;
+  }
+}
 .app-bottom-nav {
   position: fixed;
   inset: auto 0 0;
