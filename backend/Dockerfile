@@ -16,8 +16,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c /uv /uvx /bin/
-# OS security updates arrive through the reviewed base-image digest refresh; do not add a
-# mutable apt-get upgrade here because it breaks source-to-image reproducibility.
+# OS security updates use a reviewed base-image digest or explicitly pinned package versions;
+# do not add a mutable apt-get upgrade because it breaks source-to-image reproducibility.
 # shortcut: apt package versions remain repository-resolved; use a dated Debian snapshot only
 # if byte-for-byte replay of OS package installation becomes a requirement.
 RUN apt-get update \
@@ -25,6 +25,10 @@ RUN apt-get update \
         fonts-dejavu-core \
         libbrotli1=1.1.0-2+deb13u1 \
         libexpat1 \
+        libgssapi-krb5-2=1.21.3-5+deb13u2 \
+        libk5crypto3=1.21.3-5+deb13u2 \
+        libkrb5-3=1.21.3-5+deb13u2 \
+        libkrb5support0=1.21.3-5+deb13u2 \
         libseccomp2 \
         libgl1 \
         tesseract-ocr \
