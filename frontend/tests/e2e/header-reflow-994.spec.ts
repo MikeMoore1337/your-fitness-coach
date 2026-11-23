@@ -160,6 +160,31 @@ for (const theme of ['light', 'dark'] as const) {
         await page.goto(new URL(route, baseURL!).toString());
         await expectRouteLoaded(page, route);
         await expectHeaderGeometry(page, true);
+        if (route === '/coach') {
+          const links = page.locator('#appBottomNav .app-bottom-nav__primary a');
+          await expect(links).toHaveCount(4);
+          await expect
+            .poll(() =>
+              links.evaluateAll((elements) =>
+                elements.map((element) => {
+                  const label = element.querySelector<HTMLElement>('.app-bottom-nav__label')!;
+                  const box = element.getBoundingClientRect();
+                  return {
+                    text: label.textContent?.trim(),
+                    fits: label.scrollWidth <= label.clientWidth + 1,
+                    target: box.width >= 44 && box.height >= 44,
+                  };
+                }),
+              ),
+            )
+            .toEqual(
+              ['Сегодня', 'Клиенты', 'Программы', 'Ещё'].map((text) => ({
+                text,
+                fits: true,
+                target: true,
+              })),
+            );
+        }
         const name =
           route === '/coach' ? 'coach' : new URL(route, baseURL!).searchParams.get('section');
         const evidence = process.env.YFC_994_EVIDENCE_DIR;
@@ -169,6 +194,18 @@ for (const theme of ['light', 'dark'] as const) {
             ? resolve(evidence, `chromium-zoom200-${theme}-${name}.png`)
             : info.outputPath(`header-zoom-${name}-${theme}.png`),
         });
+        if (route === '/coach') {
+          const workspaceLink = page
+            .getByRole('navigation', { name: 'Режим работы' })
+            .getByRole('link', { name: 'Для себя' });
+          await workspaceLink.evaluate((element) =>
+            element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+          );
+          const workspaceBox = (await workspaceLink.boundingBox())!;
+          const dockBox = (await page.locator('#appBottomNav').boundingBox())!;
+          expect(workspaceBox.y).toBeGreaterThanOrEqual(0);
+          expect(workspaceBox.y + workspaceBox.height).toBeLessThanOrEqual(dockBox.y);
+        }
       }
     } finally {
       await context.close();

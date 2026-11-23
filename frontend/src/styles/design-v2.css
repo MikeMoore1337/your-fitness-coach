@@ -5236,6 +5236,20 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
       var(--glass-shadow);
   }
 
+  .app-shell--design-v2 .app-bottom-nav[data-workspace='coach'][data-dock-columns='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell--design-v2 .app-bottom-nav[data-workspace='coach'][data-dock-columns='1'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-bottom-nav[data-workspace='coach'][data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__label {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
   html:has(.app-shell--design-v2 #appBottomNav) {
     scroll-padding-bottom: var(--yfc-mobile-dock-clearance);
   }

@@ -555,12 +555,15 @@ describe('AppShell', () => {
     expect(within(dialog).getByText('Отдельная сессия')).toBeInTheDocument();
   });
 
-  it('does not apply personal dock layout to mobile Coach OS or Demo', () => {
+  it('keeps Coach OS reflow separate from the personal quick-add dock and Demo', () => {
     stubViewport(390);
     const coach = render(<AppShell>Кабинет тренера</AppShell>);
-    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
-      'data-dock-columns',
-    );
+    const coachNav = screen.getByRole('navigation', { name: 'Основная навигация' });
+    expect(coachNav).toHaveAttribute('data-workspace', 'coach');
+    expect(coachNav).toHaveAttribute('data-dock-columns');
+    expect(
+      within(coachNav).queryByRole('button', { name: 'Быстро добавить' }),
+    ).not.toBeInTheDocument();
     coach.unmount();
     authState.missing = true;
     render(
@@ -580,6 +583,9 @@ describe('AppShell', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
       'data-dock-columns',
+    );
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
+      'data-workspace',
     );
   });
 
