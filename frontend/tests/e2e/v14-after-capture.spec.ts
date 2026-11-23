@@ -49,7 +49,7 @@ if (evidenceDir) {
         }
         await writeFile(
           resolve(evidenceDir, `${info.project.name}-${theme}-${width}.json`),
-          JSON.stringify({ measurements, pageErrors }, null, 2),
+          `${JSON.stringify({ measurements, pageErrors }, null, 2)}\n`,
         );
         expect(pageErrors).toEqual([]);
         expect(
