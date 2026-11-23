@@ -1,0 +1,35 @@
+{
+  "measurements": [
+    {
+      "route": "today",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "route": "plan",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "route": "nutrition",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "route": "progress",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "route": "profile",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    },
+    {
+      "route": "coach",
+      "clientWidth": 1440,
+      "scrollWidth": 1440
+    }
+  ],
+  "pageErrors": []
+}
