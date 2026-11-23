@@ -476,15 +476,17 @@ export function AppShell({
     let disposed = false;
     let rootFontSize = getComputedStyle(root).fontSize;
     const syncDockLayout = () => {
-      if (disposed || !embeddedQuickAddVisible) return;
+      const coachDock = trainerWorkspace && mobileNavigation;
+      if (disposed || (!embeddedQuickAddVisible && !coachDock)) return;
       const labels = Array.from(
         navigation.querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label'),
       );
       const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
       if (!primary || labels.length !== 4) return;
-      const navStyle = getComputedStyle(primary);
+      const layout = coachDock ? navigation : primary;
+      const navStyle = getComputedStyle(layout);
       const width =
-        primary.clientWidth - parseFloat(navStyle.paddingLeft) - parseFloat(navStyle.paddingRight);
+        layout.clientWidth - parseFloat(navStyle.paddingLeft) - parseFloat(navStyle.paddingRight);
       const gap = parseFloat(navStyle.columnGap) || 0;
       const need = Math.max(
         44,
@@ -501,9 +503,9 @@ export function AppShell({
         }),
       );
       const largeText = parseFloat(getComputedStyle(labels[0]!).fontSize) >= 20;
-      const horizontal = largeText && (width - gap) / 2 >= need + 25;
+      const horizontal = !coachDock && largeText && (width - gap) / 2 >= need + 25;
       const standardText =
-        parseFloat(getComputedStyle(root).fontSize) <= 16 && window.innerWidth >= 320;
+        !coachDock && parseFloat(getComputedStyle(root).fontSize) <= 16 && window.innerWidth >= 320;
       const availableColumns = window.innerWidth < 320 ? [2, 1] : [4, 2, 1];
       const columns = standardText
         ? 4
@@ -569,7 +571,7 @@ export function AppShell({
       delete navigation.dataset.dockReflow;
       root.style.removeProperty('--app-bottom-nav-height');
     };
-  }, [mobileNavigation, shellVisible, embeddedQuickAddVisible]);
+  }, [mobileNavigation, shellVisible, embeddedQuickAddVisible, trainerWorkspace]);
 
   useEffect(() => {
     if (moreOpen) {
@@ -701,6 +703,7 @@ export function AppShell({
               {...(embeddedQuickAddVisible ? {} : glassProps('regular', true))}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
+              data-workspace={trainerWorkspace && mobileNavigation ? 'coach' : undefined}
             >
               <AppLink
                 className="app-bottom-nav__brand"
