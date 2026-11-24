@@ -20,6 +20,7 @@ from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
 from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
+from fitminiapp_api.schemas.nutrition import NutritionResolvedTargetResponse
 from fitminiapp_api.schemas.program import (
     ClientResponse,
     CoachAssignedProgramResponse,
@@ -29,6 +30,7 @@ from fitminiapp_api.schemas.progress import NutritionReportResponse, ProgressSum
 from fitminiapp_api.schemas.user import UserResponse
 from fitminiapp_api.schemas.workout import (
     ExerciseHistoryResponse,
+    SessionRotationStateResponse,
     TrainingAnalyticsResponse,
     WorkoutScheduleItem,
     WorkoutStatusResponse,
@@ -345,6 +347,33 @@ def test_demo_transport_returns_production_dtos_and_keeps_set_updates_independen
         _transport(client, token, "/api/v1/workouts/today").json()
     )
     assert [item.is_completed for item in refreshed.exercises[0].sets] == [True, True, True]
+
+
+@pytest.mark.parametrize("scenario", ["self_training", "nutrition", "trainer"])
+def test_demo_transport_serves_calendar_and_date_target_without_account_access(
+    client, scenario
+) -> None:
+    token, _ = _create_session(client, scenario)
+
+    rotation = _transport(client, token, "/api/v1/workouts/session-rotation")
+    assert rotation.status_code == 200
+    state = SessionRotationStateResponse.model_validate(rotation.json())
+    assert (state.mode, state.status) == ("calendar", "disabled")
+
+    target = _transport(client, token, "/api/v1/nutrition/targets/for-date?target_date=2026-11-24")
+    assert target.status_code == 200
+    resolved = NutritionResolvedTargetResponse.model_validate(target.json())
+    assert resolved.date.isoformat() == "2026-11-24"
+    assert resolved.origin == "base"
+    assert resolved.target is not None and resolved.target.calories == 2150
+
+    for path in (
+        "/api/v1/nutrition/targets/for-date",
+        "/api/v1/nutrition/targets/for-date?target_date=invalid",
+        "/api/v1/nutrition/targets/for-date?target_date=2026-11-24&target_telegram_user_id=123",
+        "/api/v1/workouts/session-rotation/unknown",
+    ):
+        assert _transport(client, token, path).status_code == 403
 
 
 def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
