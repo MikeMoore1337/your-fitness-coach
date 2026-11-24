@@ -22,7 +22,16 @@ testWithoutServiceWorker(
     await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
     await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
     await expect(page.getByText('Не удалось проверить порядок тренировок')).toHaveCount(0);
+    const historyResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport' &&
+        request.postDataJSON()?.path === '/api/v1/workouts/50001/set-history'
+      );
+    });
     await page.getByRole('button', { name: 'Начать тренировку' }).click();
+    expect((await historyResponse).status()).toBe(200);
     await expect(
       page.getByRole('heading', { name: 'Верх тела · уверенный старт', level: 2 }),
     ).toBeVisible();
@@ -32,8 +41,45 @@ testWithoutServiceWorker(
         name: 'Повторы, Жим гантелей лёжа с контролируемой паузой, подход 3',
       })
       .fill('8');
+    const restResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport' &&
+        request.postDataJSON()?.path === '/api/v1/workouts/50001/rest-sessions'
+      );
+    });
     await page.getByRole('button', { name: /Завершить:.*подход 3/ }).click();
     await expect(page.locator('.active-workout-rest')).toBeVisible();
+    const startedRest = await restResponse;
+    expect(startedRest.status()).toBe(200);
+    expect((await startedRest.json()).status).toBe('running');
+    await expect(page.getByText('Ошибка сохранения', { exact: true })).toHaveCount(0);
+    const actionResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport' &&
+        /^\/api\/v1\/workouts\/rest-sessions\/\d+\/actions$/.test(request.postDataJSON()?.path)
+      );
+    });
+    await page.getByRole('button', { name: '+30 сек' }).click();
+    const extendedRest = await actionResponse;
+    expect(extendedRest.status()).toBe(200);
+    expect((await extendedRest.json()).adjusted_seconds).toBe(120);
+    const stopResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === 'POST' &&
+        new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport' &&
+        /^\/api\/v1\/workouts\/rest-sessions\/\d+\/actions$/.test(request.postDataJSON()?.path) &&
+        request.postDataJSON()?.body?.action === 'complete'
+      );
+    });
+    await page.getByRole('button', { name: 'Стоп: завершить отдых' }).click();
+    const stoppedRest = await stopResponse;
+    expect(stoppedRest.status()).toBe(200);
+    expect((await stoppedRest.json()).status).toBe('completed');
     await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
     await page.reload();
     await expect(page.getByText('3 из 3 подходов отмечено')).toBeVisible();
