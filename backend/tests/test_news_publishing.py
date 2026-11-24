@@ -27,7 +27,13 @@ from fitminiapp_api.models.news import (
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_images, news_publication, news_worker
+from fitminiapp_api.services import (
+    news_editorial,
+    news_images,
+    news_ingestion,
+    news_publication,
+    news_worker,
+)
 from fitminiapp_api.services.news_content import (
     EditorialContent,
     parse_editorial_content,
@@ -828,6 +834,8 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
 
 def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -> None:
     fixed_now = datetime(2026, 9, 25, 10, 5, 0)
+    monkeypatch.setattr(news_ingestion, "utcnow", lambda: fixed_now)
+    monkeypatch.setattr(news_editorial, "utcnow", lambda: fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
