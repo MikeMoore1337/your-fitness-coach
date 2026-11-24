@@ -290,6 +290,7 @@ for (const entry of cases) {
       const actual = await page.screenshot({
         path: path.join(evidence, 'candidate', `owner-baseline-${entry.file}`),
         animations: 'disabled',
+        scale: 'css',
       });
       const ownerSourcePath = disposition.ownerSource
         ? path.resolve(ownerEvidence, path.basename(disposition.ownerSource))
@@ -335,6 +336,7 @@ for (const entry of cases) {
       path: path.join(evidence, 'candidate', entry.file),
       clip: entry.candidateClip,
       animations: 'disabled',
+      scale: 'css',
     });
     const source = PNG.sync.read(fs.readFileSync(path.join(root, 'screenshots', entry.file)));
     const candidate = PNG.sync.read(actual);

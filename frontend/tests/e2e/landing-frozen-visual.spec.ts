@@ -45,6 +45,7 @@ for (const item of manifest.images)
     const actual = await page.screenshot({
       path: path.join(evidence, 'frozen', item.file),
       animations: 'disabled',
+      scale: 'css',
     });
     const source = PNG.sync.read(data);
     const candidate = PNG.sync.read(actual);
