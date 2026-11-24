@@ -247,13 +247,21 @@ jobs:
           set -Eeuo pipefail
           npm run test -- tests/unit/shared/numeric/decimalDraft.test.ts tests/unit/features/dashboard/TodayDashboard.test.tsx
           python - <<'PY'
+          import base64
           import json
           import os
           from pathlib import Path
+          from zipfile import ZipFile
 
-          results = list(Path(os.environ['ALLURE_RESULTS_DIR']).glob('*-result.json'))
+          root = Path(os.environ['ALLURE_RESULTS_DIR'])
+          results = list(root.glob('*-result.json'))
           if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
               raise SystemExit('scheduled Allure reporter did not record all 35 successful tests')
+          (root / 'synthetic-attachment.png').write_bytes(base64.b64decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
+          ))
+          with ZipFile(root / 'synthetic-attachment.zip', 'w') as archive:
+              archive.writestr('trace.trace', 'synthetic test trace')
           PY
           key="$(openssl rand -hex 32)"
           echo "::add-mask::$key"
@@ -281,12 +289,18 @@ jobs:
             --source .artifacts/runtime/tests/allure-bundles/pr-vitest-smoke.enc \
             --output .artifacts/runtime/tests/pr-vitest-smoke-decrypted
           python - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
 
-          results = list(Path('.artifacts/runtime/tests/pr-vitest-smoke-decrypted').glob('*-result.json'))
+          source = Path('.artifacts/runtime/tests/allure-results/pr-vitest-smoke')
+          target = Path('.artifacts/runtime/tests/pr-vitest-smoke-decrypted')
+          results = list(target.glob('*-result.json'))
           if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
               raise SystemExit('encrypted reporter bundle did not preserve all 35 successful tests')
+          for name in ('synthetic-attachment.png', 'synthetic-attachment.zip'):
+              if hashlib.sha256((source / name).read_bytes()).digest() != hashlib.sha256((target / name).read_bytes()).digest():
+                  raise SystemExit('encrypted reporter bundle did not preserve a synthetic attachment')
           PY
       - name: Sync API schema dependencies
         if: matrix.lane == 'checks'
