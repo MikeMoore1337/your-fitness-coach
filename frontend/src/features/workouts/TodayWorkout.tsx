@@ -2484,8 +2484,10 @@ export function RestTimer({
     const sync = () => {
       if (!hasPending() || syncInFlight) return;
       const pendingAtStart = new Set(pendingIds());
+      let syncSucceeded = true;
       syncInFlight = true;
       void syncRestJournal(userId, workoutId, (status) => {
+        syncSucceeded = false;
         setRestSaveError(
           status === 409
             ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
@@ -2496,6 +2498,7 @@ export function RestTimer({
           if (!hasPending()) setRestSaveError(null);
         })
         .catch((error: unknown) => {
+          syncSucceeded = false;
           setRestSaveError(
             error instanceof ApiError && error.status === 409
               ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
@@ -2506,7 +2509,9 @@ export function RestTimer({
           syncInFlight = false;
           // Work added while the previous snapshot was syncing needs its own pass.
           // Do not immediately retry the same blocked or failed operations.
-          if (!disposed && pendingIds().some((id) => !pendingAtStart.has(id))) sync();
+          if (syncSucceeded && !disposed && pendingIds().some((id) => !pendingAtStart.has(id))) {
+            sync();
+          }
         });
     };
     const scheduleRetry = () => {

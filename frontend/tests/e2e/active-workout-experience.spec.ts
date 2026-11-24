@@ -9885,18 +9885,32 @@ test.describe('#1338 v2 compact timer', () => {
 
     restApi.failActions(409);
     const requestsBeforeConflict = restApi.actionCount();
+    const releaseBlockedAction = restApi.holdNextAction();
+    const blockedRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/900/actions') &&
+        request.method() === 'POST' &&
+        request.postDataJSON().action === 'add30',
+    );
     const blockedResponse = page.waitForResponse(
       (response) => response.url().endsWith('/900/actions') && response.status() === 409,
     );
-    await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+    try {
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await blockedRequest;
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+    } finally {
+      releaseBlockedAction();
+    }
     await blockedResponse;
     await expect.poll(() => restApi.actionCount()).toBe(requestsBeforeConflict + 1);
-    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(1);
+    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(2);
     await new Promise((resolve) => setTimeout(resolve, 500));
     expect(restApi.actionCount()).toBe(requestsBeforeConflict + 1);
     const pendingAfterConflict = (await readRestJournal(page))[0]?.pending;
-    expect(pendingAfterConflict).toHaveLength(1);
+    expect(pendingAfterConflict).toHaveLength(2);
     expect(pendingAfterConflict[0]).toMatchObject({ action: 'add30' });
+    expect(pendingAfterConflict[1]).toMatchObject({ action: 'add60' });
   });
 
   for (const theme of ['dark', 'light'] as const) {
