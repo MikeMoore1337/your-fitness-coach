@@ -33,10 +33,12 @@ from fitminiapp_api.schemas.workout import (
     SessionRotationStateResponse,
     TrainingAnalyticsResponse,
     WorkoutScheduleItem,
+    WorkoutSetHistoryResponse,
     WorkoutStatusResponse,
     WorkoutTimelineItem,
     WorkoutTodayResponse,
 )
+from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 from fitminiapp_api.services.demo_sessions import DemoSessionExpiredError, DemoSessionStore
 
 
@@ -374,6 +376,121 @@ def test_demo_transport_serves_calendar_and_date_target_without_account_access(
         "/api/v1/workouts/session-rotation/unknown",
     ):
         assert _transport(client, token, path).status_code == 403
+
+
+def test_demo_rest_and_set_history_are_session_scoped_and_idempotent(client) -> None:
+    token, _ = _create_session(client, "self_training")
+    other, _ = _create_session(client, "self_training")
+    assert _transport(client, token, "/api/v1/workouts/50001/start", "POST").status_code == 200
+    history = _transport(client, token, "/api/v1/workouts/50001/set-history")
+    assert history.status_code == 200
+    parsed_history = WorkoutSetHistoryResponse.model_validate(history.json())
+    assert len(parsed_history.sets) == 3
+    assert all(item.history_status == "identity_unproven" for item in parsed_history.sets)
+
+    now = datetime.now(UTC).isoformat()
+    start = {"source_set_id": 60002, "started_at": now, "mutation_id": "demo-rest-start-0001"}
+    path = "/api/v1/workouts/50001/rest-sessions"
+    created = _transport(client, token, path, "POST", start)
+    assert created.status_code == 200
+    rest = RestSessionResponse.model_validate(created.json())
+    assert rest.status == "running" and rest.planned_seconds == 90 and rest.version == 1
+    assert _transport(client, token, path, "POST", start).json() == created.json()
+    assert (
+        _transport(
+            client, token, path, "POST", {**start, "mutation_id": "another-start-0001"}
+        ).json()
+        == created.json()
+    )
+    assert (
+        _transport(client, token, path, "POST", {**start, "source_set_id": 60003}).status_code
+        == 409
+    )
+    assert (
+        _transport(
+            client,
+            token,
+            path,
+            "POST",
+            {**start, "mutation_id": "demo-rest-other-0001", "source_set_id": 99999},
+        ).status_code
+        == 403
+    )
+    assert _transport(client, other, path).json() == []
+    assert (
+        _transport(
+            client, other, f"/api/v1/workouts/rest-sessions/{rest.id}/actions", "POST", {}
+        ).status_code
+        == 403
+    )
+
+    action_path = f"/api/v1/workouts/rest-sessions/{rest.id}/actions"
+    extend = {
+        "action": "add30",
+        "mutation_id": "demo-rest-action-0001",
+        "expected_version": 1,
+        "occurred_at": now,
+    }
+    updated = _transport(client, token, action_path, "POST", extend)
+    assert updated.status_code == 200 and updated.json()["adjusted_seconds"] == 120
+    assert _transport(client, token, action_path, "POST", extend).json() == updated.json()
+    assert (
+        _transport(client, token, action_path, "POST", {**extend, "action": "add60"}).status_code
+        == 409
+    )
+    assert (
+        _transport(
+            client, token, action_path, "POST", {**extend, "mutation_id": "other-action-001"}
+        ).status_code
+        == 409
+    )
+
+    stop = {
+        "action": "complete",
+        "mutation_id": "demo-rest-action-0002",
+        "expected_version": 2,
+        "ended_at": now,
+    }
+    finished = _transport(client, token, action_path, "POST", stop)
+    assert finished.status_code == 200 and finished.json()["status"] == "completed"
+    assert _transport(client, token, action_path, "POST", stop).json() == finished.json()
+    restart_path = f"/api/v1/workouts/rest-sessions/{rest.id}/restart"
+    restart = {"started_at": now, "mutation_id": "demo-rest-restart-001"}
+    restarted = _transport(client, token, restart_path, "POST", restart)
+    assert restarted.status_code == 200 and restarted.json()["id"] != rest.id
+    assert _transport(client, token, restart_path, "POST", restart).json() == restarted.json()
+    assert (
+        _transport(
+            client, token, restart_path, "POST", {**restart, "mutation_id": "another-restart-001"}
+        ).status_code
+        == 409
+    )
+    restarted_path = f"/api/v1/workouts/rest-sessions/{restarted.json()['id']}/actions"
+    skipped = _transport(
+        client,
+        token,
+        restarted_path,
+        "POST",
+        {
+            "action": "skip",
+            "mutation_id": "demo-rest-action-0003",
+            "expected_version": 1,
+            "occurred_at": now,
+        },
+    )
+    assert skipped.status_code == 200
+    assert skipped.json()["status"] == "skipped" and skipped.json()["measured_seconds"] is None
+    assert _transport(client, token, "/api/v1/workouts/50002/set-history").status_code == 403
+
+    offline, _ = _create_session(client, "self_training")
+    assert _transport(client, offline, "/api/v1/workouts/50001/start", "POST").status_code == 200
+    assert (
+        _transport(
+            client, offline, "/api/v1/workouts/50001/finish", "POST", {"confirm_incomplete": True}
+        ).status_code
+        == 200
+    )
+    assert _transport(client, offline, path, "POST", start).status_code == 200
 
 
 def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
