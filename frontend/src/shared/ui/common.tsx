@@ -1,4 +1,4 @@
-import { useId, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { useId, useState, type ComponentPropsWithoutRef, type ReactNode, type Ref } from 'react';
 import { handleTabKeyDown } from './tabs';
 import { Icon, type IconName } from './Icon';
 import { glassProps, type GlassVariant } from './Glass';
@@ -142,14 +142,33 @@ export function SegmentedControl({
   onChange,
   options,
   value,
+  tabListRef,
+  tabListHandlers,
 }: {
   ariaLabel: string;
   onChange: (value: string) => void;
   options: readonly { label: string; value: string; disabled?: boolean }[];
   value: string;
+  tabListRef?: Ref<HTMLDivElement>;
+  tabListHandlers?: Pick<
+    ComponentPropsWithoutRef<'div'>,
+    | 'onPointerDown'
+    | 'onPointerMove'
+    | 'onPointerUp'
+    | 'onPointerCancel'
+    | 'onLostPointerCapture'
+    | 'onClickCapture'
+  >;
 }) {
   return (
-    <div {...glassProps()} aria-label={ariaLabel} className="ui-tabs" role="tablist">
+    <div
+      {...glassProps()}
+      {...tabListHandlers}
+      ref={tabListRef}
+      aria-label={ariaLabel}
+      className="ui-tabs"
+      role="tablist"
+    >
       {options.map((option) => (
         <button
           aria-selected={option.value === value}

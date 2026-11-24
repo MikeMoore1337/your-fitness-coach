@@ -3,12 +3,14 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { QuickAddPlacementContext } from '../../app/QuickAddPlacementContext';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
@@ -44,6 +46,8 @@ import { NutritionPeriodReport, type ControlledNutritionPeriod } from './Nutriti
 import { Icon } from '../../shared/ui/Icon';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
+import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
+import { useWeekSwipe } from '../../shared/ui/useWeekSwipe';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadDistribution } from './MuscleWorkload';
@@ -390,6 +394,32 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
 function ProgressCategoryNav({ search, view }: { search: string; view: ProgressView }) {
   const { navigate } = useNavigation();
   const shouldRestoreFocus = useRef(false);
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const categories: Array<{ label: string; value: ProgressView }> = [
+    { label: 'Обзор', value: 'overview' },
+    { label: 'Тело', value: 'body' },
+    { label: 'Тренировки', value: 'training' },
+    { label: 'Питание', value: 'nutrition' },
+    { label: 'Кардио', value: 'cardio' },
+    { label: 'Самочувствие', value: 'wellbeing' },
+    { label: 'История', value: 'history' },
+  ];
+  const index = categories.findIndex((category) => category.value === view);
+  const swipe = useWeekSwipe(
+    tabListRef,
+    {
+      onPrevious: () => selectCategory(categories[index - 1]?.value),
+      onNext: () => selectCategory(categories[index + 1]?.value),
+      previousDisabled: index <= 0,
+      nextDisabled: index >= categories.length - 1,
+    },
+    { durationMs: 180, disableReducedMotionDrag: true, maxOffsetPx: 6 },
+  );
+  function selectCategory(value: ProgressView | undefined) {
+    if (!value) return;
+    shouldRestoreFocus.current = true;
+    navigate(progressViewPath(search, value), false, undefined, { preserveScroll: true });
+  }
   useEffect(() => {
     const selected = document.querySelector<HTMLButtonElement>(
       '.progress-category-nav [role="tab"][aria-selected="true"]',
@@ -423,24 +453,14 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
       observer?.disconnect();
     };
   }, [view]);
-  const categories: Array<{ label: string; value: ProgressView }> = [
-    { label: 'Обзор', value: 'overview' },
-    { label: 'Тело', value: 'body' },
-    { label: 'Тренировки', value: 'training' },
-    { label: 'Питание', value: 'nutrition' },
-    { label: 'Кардио', value: 'cardio' },
-    { label: 'Самочувствие', value: 'wellbeing' },
-    { label: 'История', value: 'history' },
-  ];
   return (
     <nav className="progress-category-nav section-navigation" aria-label="Разделы прогресса">
       <SegmentedControl
         ariaLabel="Разделы прогресса"
-        onChange={(value) => {
-          shouldRestoreFocus.current = true;
-          navigate(progressViewPath(search, value as ProgressView));
-        }}
+        onChange={(value) => selectCategory(value as ProgressView)}
         options={categories}
+        tabListRef={tabListRef}
+        tabListHandlers={swipe}
         value={view}
       />
     </nav>
@@ -963,7 +983,17 @@ function TrainingSection({
           </div>
         }
       />
-      {analytics.isLoading ? (
+      {analytics.isPlaceholderData && analytics.data ? (
+        <>
+          <LoadingState label="Собираем историю тренировок…" />
+          <DataConfidence
+            isStale
+            kind="training"
+            signal={analytics.data.data_sufficiency.working_sets}
+            staleBasis={`Оценка сохранена за ${formatDate(analytics.data.period_start, true)} — ${formatDate(analytics.data.period_end, true)}. Данные выбранного периода ещё загружаются.`}
+          />
+        </>
+      ) : analytics.isLoading ? (
         <LoadingState label="Собираем историю тренировок…" />
       ) : analytics.error ? (
         <ErrorState
@@ -1497,21 +1527,30 @@ function ComplianceRow({ label, component }: { label: string; component: Adheren
 function ProgressPeriodControls({
   onSelectPreset,
   onApplyCustom,
+  initialCustomDraft,
+  onCustomDraftChange,
   selection,
   timeZone,
   today,
 }: {
   onApplyCustom: (selection: Extract<ProgressSelection, { kind: 'custom' }>) => void;
   onSelectPreset: (days: 7 | 30 | 90) => void;
+  initialCustomDraft?: { dateFrom: string; dateTo: string } | null;
+  onCustomDraftChange?: (draft: { dateFrom: string; dateTo: string } | null) => void;
   selection: ProgressSelection;
   timeZone: string;
   today: string;
 }) {
   const initialRange = selectionDateRange(selection, today);
   const [customOpen, setCustomOpen] = useState(false);
-  const [customDateFrom, setCustomDateFrom] = useState(initialRange.dateFrom);
-  const [customDateTo, setCustomDateTo] = useState(initialRange.dateTo);
+  const [customDateFrom, setCustomDateFrom] = useState(
+    initialCustomDraft?.dateFrom ?? initialRange.dateFrom,
+  );
+  const [customDateTo, setCustomDateTo] = useState(
+    initialCustomDraft?.dateTo ?? initialRange.dateTo,
+  );
   const [customError, setCustomError] = useState('');
+  const customDraftEdited = useRef(Boolean(initialCustomDraft));
   const selectionKey = progressSelectionKey(selection);
   const [draftSelectionKey, setDraftSelectionKey] = useState(selectionKey);
   if (draftSelectionKey !== selectionKey) {
@@ -1524,9 +1563,11 @@ function ProgressPeriodControls({
     customOpen || selection.kind === 'custom' ? 'custom' : String(selection.days);
   const onTabChange = (value: string) => {
     if (value === 'custom') {
-      const nextRange = selectionDateRange(selection, today);
-      setCustomDateFrom(nextRange.dateFrom);
-      setCustomDateTo(nextRange.dateTo);
+      if (!customDraftEdited.current) {
+        const nextRange = selectionDateRange(selection, today);
+        setCustomDateFrom(nextRange.dateFrom);
+        setCustomDateTo(nextRange.dateTo);
+      }
       setCustomError('');
       setCustomOpen(true);
       return;
@@ -1543,12 +1584,16 @@ function ProgressPeriodControls({
       return;
     }
     setCustomError('');
+    customDraftEdited.current = false;
+    onCustomDraftChange?.(null);
     setCustomOpen(false);
     onApplyCustom({ kind: 'custom', dateFrom: customDateFrom, dateTo: customDateTo });
   }
 
   function cancelCustom(): void {
     setCustomError('');
+    customDraftEdited.current = false;
+    onCustomDraftChange?.(null);
     setCustomOpen(false);
     setCustomDateFrom(range.dateFrom);
     setCustomDateTo(range.dateTo);
@@ -1583,7 +1628,11 @@ function ProgressPeriodControls({
               className="ui-input"
               id="progress-period-from"
               max={customDateTo || today}
-              onChange={(event) => setCustomDateFrom(event.target.value)}
+              onChange={(event) => {
+                customDraftEdited.current = true;
+                setCustomDateFrom(event.target.value);
+                onCustomDraftChange?.({ dateFrom: event.target.value, dateTo: customDateTo });
+              }}
 
               value={customDateFrom}
             />
@@ -1595,7 +1644,11 @@ function ProgressPeriodControls({
               id="progress-period-to"
               max={today}
               min={customDateFrom}
-              onChange={(event) => setCustomDateTo(event.target.value)}
+              onChange={(event) => {
+                customDraftEdited.current = true;
+                setCustomDateTo(event.target.value);
+                onCustomDraftChange?.({ dateFrom: customDateFrom, dateTo: event.target.value });
+              }}
 
               value={customDateTo}
             />
@@ -1638,7 +1691,11 @@ function ProgressDetailHeader({
     <header
       className={`progress-detail-header${view === 'training' ? ' progress-detail-header--training' : ''}`}
     >
-      <AppLink className="progress-detail-header__back" to={progressViewPath(search, 'overview')}>
+      <AppLink
+        className="progress-detail-header__back"
+        to={progressViewPath(search, 'overview')}
+        preserveScroll
+      >
         <Icon name="arrow-left" size={16} /> Обзор
       </AppLink>
       <div>
@@ -1666,17 +1723,54 @@ export function ProgressExperience({
   canExport = true,
   detailContent,
   focusMeasurements = false,
+  initialCustomDraft,
   measurementDiary,
+  onCustomDraftChange,
   progressView,
   timeZone,
 }: {
   detailContent?: ReactNode;
   canExport?: boolean;
   focusMeasurements?: boolean;
+  initialCustomDraft?: { dateFrom: string; dateTo: string } | null;
   measurementDiary?: ReactNode;
+  onCustomDraftChange?: (draft: { dateFrom: string; dateTo: string } | null) => void;
   progressView?: ProgressView;
   timeZone?: string | null;
 } = {}) {
+  const heroRef = useRef<HTMLElement>(null);
+  const [desktopReport, setDesktopReport] = useState(
+    () => window.matchMedia?.('(min-width: 1101px)').matches ?? window.innerWidth >= 1101,
+  );
+  const [reportHost] = useState(() => document.createElement('div'));
+  const desktopReportSlot = useRef<HTMLDivElement>(null);
+  const mobileReportSlot = useRef<HTMLDivElement>(null);
+  const pendingReportFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia?.('(min-width: 1101px)');
+    const sync = () => {
+      pendingReportFocus.current =
+        document.activeElement instanceof HTMLElement && reportHost.contains(document.activeElement)
+          ? document.activeElement
+          : null;
+      setDesktopReport(media?.matches ?? window.innerWidth >= 1101);
+    };
+    media?.addEventListener?.('change', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      media?.removeEventListener?.('change', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [reportHost]);
+  useLayoutEffect(() => {
+    const target = desktopReport ? desktopReportSlot.current : mobileReportSlot.current;
+    if (!target || target.contains(reportHost)) return;
+    target.appendChild(reportHost);
+    if (pendingReportFocus.current?.isConnected && document.activeElement === document.body) {
+      pendingReportFocus.current.focus({ preventScroll: true });
+    }
+    pendingReportFocus.current = null;
+  }, [desktopReport, reportHost]);
   const { navigate, search } = useNavigation();
   const view = progressView ?? parseProgressView(search, window.location.hash);
   const selection = useMemo(() => parseProgressSelection(search), [search]);
@@ -1686,8 +1780,17 @@ export function ProgressExperience({
   const selectionKey = progressSelectionKey(selection);
   const summary = useQuery({
     queryKey: queryKeys.progress.summary(selectionKey),
-    queryFn: () =>
-      api<ProgressSummary>(`/api/v1/workouts/progress/summary${progressApiQuery(selection)}`),
+    queryFn: async () => {
+      const result = await api<ProgressSummary>(
+        `/api/v1/workouts/progress/summary${progressApiQuery(selection)}`,
+      );
+      const matches =
+        selection.kind === 'custom'
+          ? result.period_start === selection.dateFrom && result.period_end === selection.dateTo
+          : result.period_days === selection.days;
+      if (!matches) throw new Error('Не удалось загрузить данные за выбранный период.');
+      return result;
+    },
     placeholderData: keepPreviousData,
   });
   const weeklyReview = useQuery({
@@ -1717,10 +1820,7 @@ export function ProgressExperience({
   );
 
   function navigateWithinProgress(to: string): void {
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    navigate(to);
-    window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+    navigate(to, false, undefined, { preserveScroll: true });
   }
 
   function selectPreset(days: 7 | 30 | 90): void {
@@ -1738,6 +1838,44 @@ export function ProgressExperience({
       : summary.data.period_days === selection.days
     : false;
   const isSummaryUpdating = Boolean(summary.data && !summaryMatchesSelection);
+  const contentMotion = useSemanticMotion<HTMLDivElement>(
+    `${view}|${isSummaryUpdating ? 'pending' : selectionKey}`,
+    { animateInitial: false },
+  );
+
+  useLayoutEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+    const period = hero.querySelector<HTMLElement>('.progress-hero__period');
+    if (!period) return;
+    // Container queries here caused multi-second layout stalls in Demo.
+    const sync = () => {
+      const compact = hero.clientWidth <= 15 * parseFloat(getComputedStyle(hero).fontSize);
+      const periodCompact =
+        period.clientWidth <= 15 * parseFloat(getComputedStyle(period).fontSize);
+      if (hero.hasAttribute('data-compact') !== compact) {
+        hero.toggleAttribute('data-compact', compact);
+      }
+      if (hero.hasAttribute('data-period-compact') !== periodCompact) {
+        hero.toggleAttribute('data-period-compact', periodCompact);
+      }
+    };
+    sync();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
+    observer?.observe(hero);
+    observer?.observe(period);
+    const rootObserver = new MutationObserver(sync);
+    rootObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+    window.addEventListener('resize', sync);
+    return () => {
+      observer?.disconnect();
+      rootObserver.disconnect();
+      window.removeEventListener('resize', sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (!focusMeasurements || !summary.data) return;
@@ -1752,11 +1890,16 @@ export function ProgressExperience({
 
   return (
     <div className="progress-experience progress-experience--approved">
-      <header className="progress-hero">
+      <header className="progress-hero" ref={heroRef}>
         <div className="progress-hero__heading">
           <div className="progress-hero__copy">
             <span className="eyebrow">Факты за период</span>
             <h1>Прогресс</h1>
+            <p className="progress-hero__selection">
+              {selection.kind === 'preset'
+                ? `Выбрано: ${selection.days} дней`
+                : `Выбран период: ${periodDateLabel(selection.dateFrom, selection.dateTo)}`}
+            </p>
           </div>
           <div className="progress-hero__help">
             <ContextualHelp
@@ -1770,8 +1913,11 @@ export function ProgressExperience({
             </ContextualHelp>
           </div>
         </div>
+        {desktopReport && <div className="progress-hero__download" ref={desktopReportSlot} />}
         <div className="progress-hero__period">
           <ProgressPeriodControls
+            initialCustomDraft={initialCustomDraft}
+            onCustomDraftChange={onCustomDraftChange}
             onApplyCustom={applyCustom}
             onSelectPreset={selectPreset}
             selection={selection}
@@ -1779,8 +1925,9 @@ export function ProgressExperience({
             today={today}
           />
         </div>
-        <div className="progress-hero__download">
-          {canExport ? (
+        {!desktopReport && <div className="progress-hero__download" ref={mobileReportSlot} />}
+        {createPortal(
+          canExport ? (
             <AppLink
               className="button-link secondary-link"
               to={progressReportPath(selection, view)}
@@ -1791,8 +1938,9 @@ export function ProgressExperience({
             <button className="button-link secondary-link" disabled type="button">
               <Icon name="print" size={16} /> Скачать отчёт
             </button>
-          )}
-        </div>
+          ),
+          reportHost,
+        )}
       </header>
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />
@@ -1809,77 +1957,94 @@ export function ProgressExperience({
             </p>
           )}
           <ProgressCategoryNav search={search} view={view} />
-          {view === 'overview' ? (
-            <>
-              <SummaryOverview current={weeklyReview.data} search={search} summary={summary.data} />
-            </>
-          ) : (
-            <>
-              <ProgressDetailHeader search={search} view={view} />
-              <div className="progress-details" aria-label="Подробности прогресса">
-                {view === 'training' && (
-                  <>
-                    {activity.isLoading ? (
-                      <LoadingState label="Загружаем календарь активности…" />
-                    ) : activity.error ? (
-                      <ErrorState
-                        message={(activity.error as Error).message}
-                        retry={() => void activity.refetch()}
+          <div
+            className="progress-local-context"
+            id={contentMotion.elementId}
+            data-motion-phase={contentMotion.motionPhase}
+            data-motion-revision={contentMotion.motionRevision}
+            aria-hidden={isSummaryUpdating || undefined}
+            inert={isSummaryUpdating || undefined}
+            onAnimationEnd={contentMotion.onMotionAnimationEnd}
+          >
+            {view === 'overview' ? (
+              <>
+                <SummaryOverview
+                  current={weeklyReview.data}
+                  search={search}
+                  summary={summary.data}
+                />
+              </>
+            ) : (
+              <>
+                <ProgressDetailHeader search={search} view={view} />
+                <div className="progress-details" aria-label="Подробности прогресса">
+                  {view === 'training' && (
+                    <>
+                      {activity.isLoading ? (
+                        <LoadingState label="Загружаем календарь активности…" />
+                      ) : activity.error ? (
+                        <ErrorState
+                          message={(activity.error as Error).message}
+                          retry={() => void activity.refetch()}
+                        />
+                      ) : activity.data ? (
+                        <ActivityHeatmap
+                          key={activityYear}
+                          data={activity.data}
+                          year={activityYear}
+                          onYearChange={setActivityYear}
+                        />
+                      ) : null}
+                      <TrainingSection
+                        analytics={analytics}
+                        selection={selection}
+                        summary={summary.data}
                       />
-                    ) : activity.data ? (
-                      <ActivityHeatmap
-                        key={activityYear}
-                        data={activity.data}
-                        year={activityYear}
-                        onYearChange={setActivityYear}
-                      />
-                    ) : null}
-                    <TrainingSection
-                      analytics={analytics}
-                      selection={selection}
-                      summary={summary.data}
-                    />
-                  </>
-                )}
-                {view === 'cardio' && (
-                  <CardioHistory
-                    dateFrom={summary.data.period_start}
-                    dateTo={summary.data.period_end}
-                    summary={summary.data.cardio}
-                    timeZone={resolvedTimeZone}
-                  />
-                )}
-                {view === 'body' && (
-                  <BodySection measurementDiary={measurementDiary} summary={summary.data} />
-                )}
-                {view === 'nutrition' && (
-                  <>
-                    <NutritionSection isStale={summary.isPlaceholderData} summary={summary.data} />
-                    <div id="progress-reports">
-                      <NutritionPeriodReport
-                        canExport={canExport}
-                        controlledPeriod={controlledNutritionPeriod}
-                        showSelector={false}
-                      />
-                    </div>
-                  </>
-                )}
-                {(view === wellbeingProgressView || view === historyProgressView) &&
-                  detailContent && (
-                    <div className={`progress-external-detail progress-external-detail--${view}`}>
-                      {detailContent}
-                    </div>
+                    </>
                   )}
-                {(view === wellbeingProgressView || view === historyProgressView) &&
-                  !detailContent && (
-                    <EmptyState
-                      title="Раздел пока недоступен"
-                      text="Попробуйте открыть его ещё раз."
+                  {view === 'cardio' && (
+                    <CardioHistory
+                      dateFrom={summary.data.period_start}
+                      dateTo={summary.data.period_end}
+                      summary={summary.data.cardio}
+                      timeZone={resolvedTimeZone}
                     />
                   )}
-              </div>
-            </>
-          )}
+                  {view === 'body' && (
+                    <BodySection measurementDiary={measurementDiary} summary={summary.data} />
+                  )}
+                  {view === 'nutrition' && (
+                    <>
+                      <NutritionSection
+                        isStale={summary.isPlaceholderData}
+                        summary={summary.data}
+                      />
+                      <div id="progress-reports">
+                        <NutritionPeriodReport
+                          canExport={canExport}
+                          controlledPeriod={controlledNutritionPeriod}
+                          showSelector={false}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {(view === wellbeingProgressView || view === historyProgressView) &&
+                    detailContent && (
+                      <div className={`progress-external-detail progress-external-detail--${view}`}>
+                        {detailContent}
+                      </div>
+                    )}
+                  {(view === wellbeingProgressView || view === historyProgressView) &&
+                    !detailContent && (
+                      <EmptyState
+                        title="Раздел пока недоступен"
+                        text="Попробуйте открыть его ещё раз."
+                      />
+                    )}
+                </div>
+              </>
+            )}
+          </div>
         </>
       ) : null}
 

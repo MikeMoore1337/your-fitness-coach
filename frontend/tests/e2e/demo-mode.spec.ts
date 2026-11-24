@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { demoFixture } from './fixtures/demo-session';
 import type { DemoScenario, DemoSessionSnapshot } from '../../src/features/demo/demoApi';
@@ -6,6 +7,8 @@ import {
   expectDockWithinViewport,
   expectElementsWithinHorizontalViewport,
   expectNoHorizontalOverflow,
+  installTelegramHarness,
+  TelegramHarness,
 } from './fixtures/mobile-tma';
 import { expectUiAuditClean, UI_AUDIT_VIEWPORTS } from './fixtures/ui-audit';
 
@@ -75,6 +78,9 @@ async function assertBottomNavigationGeometry(page: Page, width: number): Promis
     const lastActionRect = lastAction?.getBoundingClientRect() ?? null;
     const floatingAction = document.querySelector<HTMLElement>('.app-quick-add-trigger');
     const floatingActionRect = floatingAction?.getBoundingClientRect() ?? null;
+    const capsuleRect = navigation
+      .querySelector<HTMLElement>('.app-bottom-nav__primary')
+      ?.getBoundingClientRect();
     const overlaps = (left: DOMRect, right: DOMRect) =>
       left.left < right.right &&
       left.right > right.left &&
@@ -91,7 +97,7 @@ async function assertBottomNavigationGeometry(page: Page, width: number): Promis
       viewportHeight: window.innerHeight,
       viewportBottomGap: window.innerHeight - navigationRect.bottom,
       floatingActionOverlap: Boolean(
-        floatingActionRect && overlaps(floatingActionRect, navigationRect),
+        floatingActionRect && capsuleRect && overlaps(floatingActionRect, capsuleRect),
       ),
     };
   });
@@ -654,7 +660,11 @@ function timeline() {
 function transport(snapshot: DemoSessionSnapshot, path: string, method: string, body: unknown) {
   if (path === '/api/v1/me') return demoUser(snapshot);
   if (path === '/api/v1/workouts/today') return workout(snapshot);
-  if (path === '/api/v1/workouts/week' || path === '/api/v1/workouts/schedule')
+  if (
+    path === '/api/v1/workouts/week' ||
+    path === '/api/v1/workouts/schedule' ||
+    path.startsWith('/api/v1/workouts/schedule?')
+  )
     return [
       {
         id: 50001,
@@ -1132,6 +1142,408 @@ async function installDemoTransport(page: Page) {
     await route.fulfill({ status: 404, json: { detail: 'Неизвестный demo endpoint' } });
   });
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`demo scenario control stays usable at very narrow and ordinary widths in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 196, height: 852 });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const header = page.locator('.app-mobile-header');
+    const scenarios = header.getByRole('button', { name: 'Сценарии' });
+    await expect(scenarios).toBeVisible();
+    await expect(header.locator('.app-mobile-header__brand')).toBeHidden();
+    for (const width of [196, 393]) {
+      await page.setViewportSize({ width, height: 852 });
+      const box = (await scenarios.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      if (process.env.YFC_994_EVIDENCE_DIR) {
+        mkdirSync(process.env.YFC_994_EVIDENCE_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(
+            process.env.YFC_994_EVIDENCE_DIR,
+            `${info.project.name}-${width}-${theme}-demo.png`,
+          ),
+        });
+      }
+    }
+    await scenarios.click();
+    await expect(scenarios).toHaveAttribute('aria-expanded', 'true');
+  });
+}
+
+test.use({ video: process.env.ISSUE_983_EVIDENCE_DIR ? 'on' : 'off' });
+
+test('#1500 desktop Quick Add restores focus and can reopen during exit', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const trigger = page.getByTestId('quick-add-trigger');
+  const sheet = page.getByTestId('quick-add-sheet');
+  await expect(page.locator('.app-desktop-header').getByTestId('quick-add-trigger')).toBeVisible();
+  await trigger.click();
+  await expect(sheet).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(sheet).toBeVisible();
+  await page.waitForTimeout(350);
+  await expect(sheet).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('quick-add-layer')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test('#1500 Today header adapts without changing the mobile composition', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  const summary = page.locator('.today-dashboard__desktop-summary');
+  await expect(heading).toBeVisible();
+  await expect(summary).toBeVisible();
+  await expect(heading).toHaveCSS('text-transform', 'none');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(summary).toBeHidden();
+  await expect(heading).toHaveCSS('text-transform', 'uppercase');
+});
+
+test('#1500 Today week navigation preserves the selected day and mobile controls', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  const week = page.getByRole('navigation', { name: 'Эта неделя' });
+  const workout = page.locator('.today-workout-spotlight');
+  const heading = page.getByRole('heading', { name: /^Сегодня ·/ });
+  await expect(heading).toBeVisible();
+  await expect(workout).toBeVisible();
+  expect((await week.boundingBox())!.y).toBeLessThan((await workout.boundingBox())!.y);
+  const headingBefore = await heading.getAttribute('aria-label');
+  const range = week.locator('.week-strip__context > span');
+  const before = await range.textContent();
+  await week.getByRole('button', { name: 'Следующая неделя' }).click();
+  await expect(range).not.toHaveText(before!);
+  await expect(heading).toHaveAttribute('aria-label', headingBefore!);
+  await week.getByRole('button', { name: 'Предыдущая неделя' }).click();
+  await expect(range).toHaveText(before!);
+  const selectedDay = week.locator('[aria-pressed="true"]');
+  await selectedDay.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(week.getByRole('button', { name: 'Следующая неделя' })).toHaveCount(0);
+  await expect(selectedDay).toBeFocused();
+  expect((await week.boundingBox())!.y).toBeGreaterThan((await workout.boundingBox())!.y);
+});
+
+test('#1500 plan heading uses the desktop design and preserves the mobile label', async ({
+  page,
+}) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=plan');
+  await expect(page.getByRole('heading', { name: 'План', level: 1 })).toBeVisible();
+  await expect(page.locator('.app-section__desktop-eyebrow')).toHaveText('План тренировок');
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.app-section__desktop-eyebrow')).toBeHidden();
+  await expect(page.locator('.app-section__standard-eyebrow')).toBeVisible();
+});
+
+test('#1500 nutrition actions keep focus between desktop and mobile', async ({ page }) => {
+  await installDemoTransport(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  const action = page.getByTestId('nutrition-add-product');
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
+  await action.focus();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(action).toBeFocused();
+  await expect(
+    page.locator('.nutrition-diary__intro').getByTestId('nutrition-add-product'),
+  ).toBeVisible();
+});
+
+test.describe('#983', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`#983 week and Quick Add gestures preserve demo interactions (${theme})`, async ({
+      page,
+    }, testInfo) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await installDemoTransport(page);
+      const writes: string[] = [];
+      page.on('request', (request) => {
+        if (!request.url().endsWith('/transport')) return;
+        const payload = request.postDataJSON() as { path: string; method: string };
+        if (payload.method !== 'GET') writes.push(`${payload.method} ${payload.path}`);
+      });
+      for (const width of [320, 360, 393, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+        const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+        const rail = week.locator('.week-strip__days');
+        await rail.scrollIntoViewIfNeeded();
+        await rail.evaluate((element) => {
+          element.scrollLeft = 0;
+        });
+        const range = week.locator('.week-strip__context span');
+        const before = await range.textContent();
+        const selectedWeekday = await week
+          .locator('[aria-pressed="true"] .week-strip__weekday')
+          .textContent();
+        const bounds = await rail.boundingBox();
+        expect(bounds).not.toBeNull();
+        const x = bounds!.x + bounds!.width / 2;
+        const y = bounds!.y + bounds!.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + 110, y, { steps: 8 });
+        await page.mouse.up();
+        await expect(range).not.toHaveText(before!);
+        await expect(week.locator('[aria-pressed="true"] .week-strip__weekday')).toHaveText(
+          selectedWeekday!,
+        );
+        const previous = await range.textContent();
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x - 20, y, { steps: 5 });
+        await page.mouse.up();
+        await expect(range).toHaveText(previous!);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x - 110, y, { steps: 8 });
+        await page.mouse.up();
+        await expect(range).toHaveText(before!);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + 110, y, { steps: 8 });
+        await page.mouse.up();
+        await expect(range).toHaveText(previous!);
+        const evidence = process.env.ISSUE_983_EVIDENCE_DIR;
+        if (evidence) {
+          mkdirSync(evidence, { recursive: true });
+          await page.screenshot({
+            path: resolve(evidence, `${testInfo.project.name}-${width}-${theme}-week.png`),
+            animations: 'disabled',
+          });
+        }
+
+        const trigger = page.getByTestId('quick-add-trigger');
+        await trigger.click();
+        const sheet = page.getByTestId('quick-add-sheet');
+        const grip = sheet.locator('.app-quick-add-panel__grip');
+        await expect(sheet).toBeVisible();
+        if (evidence) {
+          await page.screenshot({
+            path: resolve(evidence, `${testInfo.project.name}-${width}-${theme}-sheet.png`),
+            animations: 'disabled',
+          });
+        }
+        const gripBounds = await grip.boundingBox();
+        const sheetBounds = await sheet.boundingBox();
+        expect(gripBounds).not.toBeNull();
+        expect(sheetBounds).not.toBeNull();
+        const gx = gripBounds!.x + gripBounds!.width / 2;
+        const gy = gripBounds!.y + gripBounds!.height / 2;
+        await page.mouse.move(gx, gy);
+        await page.mouse.down();
+        await page.mouse.move(gx, gy + 30, { steps: 5 });
+        await expect
+          .poll(() =>
+            sheet.evaluate((element) => {
+              const transform = getComputedStyle(element).transform;
+              return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42;
+            }),
+          )
+          .toBeGreaterThan(20);
+        await page.mouse.up();
+        await expect(sheet).toBeVisible();
+        await expect
+          .poll(() =>
+            sheet.evaluate((element) => {
+              const transform = getComputedStyle(element).transform;
+              return transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42;
+            }),
+          )
+          .toBe(0);
+        await page.mouse.move(gx, gy);
+        await page.mouse.down();
+        await page.mouse.move(gx, gy + sheetBounds!.height * 0.8, { steps: 8 });
+        await page.mouse.up();
+        await expect(sheet).toBeHidden();
+        await expect(trigger).toBeFocused();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+      }
+      expect(writes).toEqual([]);
+    });
+  }
+
+  test('#983 interrupts a sheet dismissal and keeps Telegram Back available', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await installTelegramHarness(page);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const trigger = page.getByTestId('quick-add-trigger');
+    await trigger.click();
+    const sheet = page.getByTestId('quick-add-sheet');
+    const grip = sheet.locator('.app-quick-add-panel__grip');
+    await expect(sheet).toBeVisible();
+    const evidence = process.env.ISSUE_983_EVIDENCE_DIR;
+    if (evidence) {
+      mkdirSync(evidence, { recursive: true });
+      await page.screenshot({
+        path: resolve(evidence, `${testInfo.project.name}-393-tma-sheet.png`),
+        animations: 'disabled',
+      });
+    }
+    const box = await grip.boundingBox();
+    const panel = await sheet.boundingBox();
+    expect(box).not.toBeNull();
+    expect(panel).not.toBeNull();
+    const x = box!.x + box!.width / 2;
+    const y = box!.y + box!.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    const releaseY = y + panel!.height * 0.8;
+    await page.mouse.move(x, releaseY, { steps: 8 });
+    await page.mouse.up();
+    await page.mouse.down();
+    await page.mouse.move(x, releaseY - panel!.height, { steps: 8 });
+    await page.mouse.up();
+    await expect(sheet).toBeVisible();
+    const telegram = new TelegramHarness(page);
+    await expect.poll(async () => (await telegram.state()).backButton.visible).toBe(true);
+    await telegram.clickBack();
+    await expect(sheet).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await trigger.click();
+    await expect(sheet).toBeVisible();
+    const reducedGrip = await grip.boundingBox();
+    const reducedPanel = await sheet.boundingBox();
+    expect(reducedGrip).not.toBeNull();
+    expect(reducedPanel).not.toBeNull();
+    const reducedX = reducedGrip!.x + reducedGrip!.width / 2;
+    const reducedY = reducedGrip!.y + reducedGrip!.height / 2;
+    await page.mouse.move(reducedX, reducedY);
+    await page.mouse.down();
+    await page.mouse.move(reducedX, reducedY + reducedPanel!.height * 0.8, { steps: 8 });
+    await page.mouse.up();
+    await expect(sheet).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('#983 gestures stay local after network loss', async ({ page, context }) => {
+    await page.setViewportSize({ width: 393, height: 844 });
+    await installDemoTransport(page);
+    const writes: string[] = [];
+    page.on('request', (request) => {
+      if (!request.url().endsWith('/transport')) return;
+      const payload = request.postDataJSON() as { path: string; method: string };
+      if (payload.method !== 'GET') writes.push(`${payload.method} ${payload.path}`);
+    });
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+    const rail = week.locator('.week-strip__days');
+    await rail.scrollIntoViewIfNeeded();
+    const range = week.locator('.week-strip__context span');
+    const before = await range.textContent();
+    await context.setOffline(true);
+    const box = (await rail.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 110, y, { steps: 8 });
+    await page.mouse.up();
+    await expect(range).not.toHaveText(before!);
+    await week.getByRole('button', { name: 'Следующая неделя' }).click();
+    await expect(range).toHaveText(before!);
+    await page.getByTestId('quick-add-trigger').click();
+    const sheet = page.getByTestId('quick-add-sheet');
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    expect(writes).toEqual([]);
+  });
+
+  test('#983 touch scrolls an overflowing rail before changing week', async ({
+    browser,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'CDP touch events are Chromium-specific');
+    const context = await browser.newContext({
+      viewport: { width: 320, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+    });
+    const page = await context.newPage();
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+    const rail = week.locator('.week-strip__days');
+    await rail.scrollIntoViewIfNeeded();
+    await rail.evaluate((element) => {
+      element.style.width = '260px';
+      element.scrollLeft = 0;
+    });
+    await expect
+      .poll(() => rail.evaluate((element) => element.scrollWidth - element.clientWidth))
+      .toBeGreaterThan(0);
+    const before = await week.locator('.week-strip__context span').textContent();
+    const cdp = await context.newCDPSession(page);
+    const swipe = async (distance: number) => {
+      const box = await rail.boundingBox();
+      expect(box).not.toBeNull();
+      const x = box!.x + box!.width / 2;
+      const y = box!.y + box!.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 8; step += 1) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: x + (distance * step) / 8, y }],
+        });
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await swipe(-50);
+    await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+    await expect(week.locator('.week-strip__context span')).toHaveText(before!);
+    await rail.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    const next = week.getByRole('button', { name: 'Следующая неделя' });
+    await expect(next).toBeDisabled();
+    await swipe(-110);
+    await expect(week.locator('.week-strip__context span')).toHaveText(before!);
+    await week.getByRole('button', { name: 'Предыдущая неделя' }).click();
+    await expect(week.locator('.week-strip__context span')).not.toHaveText(before!);
+    await expect(next).toBeEnabled();
+    await rail.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await swipe(-110);
+    await expect(week.locator('.week-strip__context span')).toHaveText(before!);
+    await context.close();
+  });
+});
 
 for (const theme of ['light', 'dark'] as const) {
   test(`#1436 demo status is read-only in ${theme}`, async ({ page }, testInfo) => {
@@ -1736,7 +2148,7 @@ for (const viewport of DEMO_VIEWPORTS) {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`production composition keeps responsive geometry, utility and keyboard focus (${viewport.name} ${colorScheme})`, async ({
       browser,
-    }) => {
+    }, testInfo) => {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
         colorScheme,
@@ -1755,6 +2167,7 @@ for (const viewport of DEMO_VIEWPORTS) {
           page,
           '.demo-cabinet-boundary, .demo-route, .app-section',
         );
+        await page.screenshot({ path: testInfo.outputPath('demo-before-audit.png') });
         await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} top`, {
           checkTouchTargets: viewport.mobile,
         });

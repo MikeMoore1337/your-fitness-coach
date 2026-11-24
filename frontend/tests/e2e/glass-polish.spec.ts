@@ -57,7 +57,8 @@ for (const theme of ['dark', 'light'] as const) {
     const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
     await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
     await page.screenshot({ path: info.outputPath(`glass-quick-add-${theme}.png`) });
-    for (const surface of [sheet, page.locator('#appBottomNav')]) {
+    const capsule = page.locator('#appBottomNav .app-bottom-nav__primary');
+    for (const surface of [sheet, capsule, page.locator('.app-bottom-nav__quick-add')]) {
       const alpha = await surface.evaluate((element) => {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = 1;
@@ -159,16 +160,17 @@ for (const theme of ['dark', 'light'] as const) {
       return count;
     });
     expect(preferenceRules).toBeGreaterThan(0);
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', 'none');
-    await expect(page.locator('#appBottomNav')).toHaveCSS(
-      'background-color',
-      theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
-    );
     await page.getByRole('heading', { name: 'Прогресс', exact: true }).hover();
-    await expect(add).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-
+    for (const surface of [capsule, add]) {
+      await expect(surface).toHaveCSS('backdrop-filter', 'none');
+      await expect(surface).toHaveCSS(
+        'background-color',
+        theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
+      );
+    }
     await page.reload();
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+    await expect(capsule).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+    await expect(add).toHaveCSS('backdrop-filter', /blur\(20px\)/);
     // Exercise the unsupported-backdrop branch by removing only its @supports opt-in.
     const supportRules = await page.evaluate(() => {
       let count = 0;
@@ -187,7 +189,8 @@ for (const theme of ['dark', 'light'] as const) {
       return count;
     });
     expect(supportRules).toBeGreaterThan(0);
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', 'none');
+    await expect(capsule).toHaveCSS('backdrop-filter', 'none');
+    await expect(add).toHaveCSS('backdrop-filter', 'none');
     await add.click();
     await expect(sheet).toHaveCSS('backdrop-filter', 'none');
     await expect(sheet).toHaveCSS(
@@ -211,7 +214,14 @@ for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430]) {
       await page.setViewportSize({ width, height: 844 });
       const dock = page.locator('#appBottomNav');
-      await expect(dock).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+      await expect(dock.locator('.app-bottom-nav__primary')).toHaveCSS(
+        'backdrop-filter',
+        /blur\(20px\)/,
+      );
+      await expect(dock.getByRole('button', { name: 'Быстро добавить' })).toHaveCSS(
+        'backdrop-filter',
+        /blur\(20px\)/,
+      );
       const dockBox = (await dock.boundingBox())!;
       expect(dockBox.y + dockBox.height).toBeLessThanOrEqual(844 - 34 - 12);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

@@ -670,7 +670,7 @@ export function NutritionPeriodReport({
           options={reportPeriods.slice(0, 3)}
           onChange={selectPeriod}
         />
-        {report.isLoading && !report.data ? (
+        {(report.isLoading && !report.data) || report.isPlaceholderData ? (
           <LoadingState label="Собираем отчёт по питанию…" />
         ) : report.error ? (
           <ErrorState
@@ -823,7 +823,7 @@ export function NutritionPeriodReport({
         </div>
       )}
 
-      {report.isLoading && !report.data ? (
+      {(report.isLoading && !report.data) || report.isPlaceholderData ? (
         <LoadingState label="Собираем отчёт по питанию…" />
       ) : report.error && (!report.data || clientId != null) ? (
         <ErrorState message={(report.error as Error).message} retry={() => void report.refetch()} />

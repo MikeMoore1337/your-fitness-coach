@@ -1146,6 +1146,11 @@ body:has(.app-shell--design-v2) {
   font-size: clamp(3rem, 7vw, 4.5rem);
   letter-spacing: -0.025em;
   line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.today-dashboard__desktop-summary {
+  display: none;
 }
 
 /* Shared week context/date-picker used by Today, Nutrition and future weekly surfaces. */
@@ -1374,6 +1379,10 @@ body:has(.app-shell--design-v2) {
 
 .week-strip__days > li {
   min-width: 0;
+}
+
+.week-strip__days--swipe {
+  touch-action: pan-y pinch-zoom;
 }
 
 .week-strip__day {
@@ -1695,6 +1704,12 @@ body:has(.app-shell--design-v2) {
   gap: 0;
 }
 
+@media (max-width: 340px) {
+  .today-dashboard--design-v2 .today-progress-grid > .semantic-card--compact {
+    align-self: start;
+  }
+}
+
 .today-dashboard--design-v2 .today-signal {
   min-height: 0;
   gap: var(--v2-space-3);
@@ -1762,6 +1777,24 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-primary);
 }
 
+@media (min-width: 900px) {
+  .today-workout-focus__header {
+    display: flex;
+    padding: 0;
+    border: 0;
+  }
+
+  .today-workout-focus__header > div {
+    display: block;
+    margin-inline-start: auto;
+  }
+
+  .today-workout-focus__header > div > span,
+  .today-workout-focus__header > span {
+    display: none;
+  }
+}
+
 /* Nutrition diary core */
 .nutrition-diary--design-v2 {
   gap: var(--v2-space-4);
@@ -1798,6 +1831,26 @@ body:has(.app-shell--design-v2) {
   margin-top: var(--v2-space-1);
   color: var(--v2-text-secondary);
   font-size: 0.9rem;
+}
+
+@media (min-width: 900px) {
+  .nutrition-diary--design-v2 .nutrition-diary__intro {
+    align-items: end;
+  }
+
+  .nutrition-diary--design-v2 .nutrition-diary__intro h1 {
+    font-size: clamp(3rem, 4vw, 4rem);
+    text-transform: none;
+  }
+
+  .nutrition-diary__intro .nutrition-diary__primary-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nutrition-diary__intro .nutrition-diary__primary-actions .ui-button {
+    padding-inline: 16px;
+  }
 }
 
 .nutrition-diary--design-v2 .nutrition-completeness {
@@ -3190,6 +3243,60 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (min-width: 900px) {
+  html:has(.app-desktop-header) {
+    scroll-padding-block-start: calc(74px + var(--v2-space-3, 12px));
+  }
+
+  .today-dashboard--design-v2 .today-dashboard__header h1 {
+    text-transform: none;
+  }
+
+  .today-dashboard--design-v2 .today-dashboard__date {
+    color: var(--v2-accent-text);
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .today-dashboard__desktop-summary {
+    display: block;
+    margin: 0;
+    color: var(--v2-text-secondary);
+    font-size: var(--font-size-body-lg);
+  }
+
+  .app-desktop-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    min-height: 74px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: -28px -30px 24px;
+    padding: 12px 30px;
+    border-bottom: 1px solid var(--v2-border);
+    background: var(--v2-surface-secondary);
+  }
+
+  .app-desktop-header__workspace span,
+  .app-desktop-header__workspace strong {
+    display: block;
+  }
+
+  .app-desktop-header__workspace span {
+    color: var(--v2-text-secondary);
+    font-size: 0.8125rem;
+  }
+
+  .app-desktop-header .app-quick-add-trigger--floating {
+    position: static;
+  }
+
+  body:has(.ai-coach-workspace--desktop) .app-desktop-header .app-quick-add-trigger--floating {
+    position: fixed;
+  }
+
   body:has(.app-shell--design-v2 #appBottomNav) {
     padding: 28px 30px 44px 250px;
   }
@@ -3276,16 +3383,16 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .app-shell--design-v2 .app-bottom-nav__brand {
-    justify-content: center;
+    justify-content: flex-start;
     margin-bottom: var(--v2-space-4);
-    padding: 0;
+    padding: 0 8px;
   }
 
   .app-shell--design-v2 .app-bottom-nav__brand .yfc-lockup {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     justify-content: center;
-    gap: 7px;
+    gap: 10px;
   }
 
   .app-shell--design-v2 .app-bottom-nav__brand .yfc-lockup__mark {
@@ -3295,9 +3402,9 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .app-shell--design-v2 .app-bottom-nav__brand .yfc-lockup__wordmark {
-    justify-items: center;
+    justify-items: start;
     font-size: 0.57rem;
-    text-align: center;
+    text-align: left;
   }
 
   .app-shell--design-v2 .app-bottom-nav__brand .yfc-lockup__wordmark > span {
@@ -3305,15 +3412,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .app-shell--design-v2 .app-bottom-nav__primary {
-    gap: var(--v2-space-3);
+    gap: 4px;
   }
 
   .app-shell--design-v2 .app-bottom-nav__primary .app-bottom-nav__btn {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     min-height: var(--touch-target);
-    gap: var(--v2-space-2);
-    padding: 4px 6px;
+    gap: 12px;
+    padding: 8px 12px;
   }
 
   .app-shell--design-v2 .app-bottom-nav__primary .app-bottom-nav__more {
@@ -3354,7 +3461,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .app-shell--design-v2 .app-bottom-nav__primary .app-bottom-nav__label {
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
   }
 
   .app-shell--design-v2
@@ -3680,10 +3787,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-workout-focus__header {
-    grid-template-columns: auto minmax(0, 1fr);
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
   }
 
   .today-workout-focus__header > div {
+    flex: 1 0 max-content;
+    min-width: 0;
+    max-width: 100%;
     justify-items: end;
   }
 
@@ -3956,6 +4068,30 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   flex: 0 0 28px;
 }
 
+.app-section--progress .progress-hero[data-compact] .progress-hero__heading {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-section--progress .progress-hero[data-compact] .progress-hero__help,
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help:has(.contextual-help[open]) {
+  grid-column: 1;
+  grid-row: 2;
+  justify-self: start;
+  width: 100%;
+}
+
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help
+  .contextual-help
+  > summary {
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help {
   display: block;
   width: 100%;
@@ -4016,6 +4152,22 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     padding-inline: var(--v2-space-2);
     white-space: nowrap;
   }
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls__tabs {
+  overflow: visible;
+  padding: calc(var(--focus-width) + var(--focus-offset));
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls .ui-tabs {
+  flex-wrap: wrap;
+}
+
+.app-section--progress .progress-hero[data-period-compact] .progress-period-controls .ui-tab {
+  flex: 1 1 40%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .app-section--progress .progress-period-controls__meta {
@@ -5090,6 +5242,20 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
       var(--glass-shadow);
   }
 
+  .app-shell--design-v2 .app-bottom-nav[data-workspace='coach'][data-dock-columns='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell--design-v2 .app-bottom-nav[data-workspace='coach'][data-dock-columns='1'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-bottom-nav[data-workspace='coach'][data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__label {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
   html:has(.app-shell--design-v2 #appBottomNav) {
     scroll-padding-bottom: var(--yfc-mobile-dock-clearance);
   }
@@ -5248,6 +5414,24 @@ body:has(.standalone-page--design-v2) {
   font-size: clamp(2.25rem, 4vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
+}
+
+.app-section__desktop-eyebrow {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  :is(.app-section--programs, .app-section--profile) .app-section__standard-eyebrow {
+    display: none;
+  }
+
+  :is(.app-section--programs, .app-section--profile) .app-section__desktop-eyebrow {
+    display: inline;
+  }
+
+  :is(.app-section--programs, .app-section--profile) .hero-card {
+    border-bottom: 0;
+  }
 }
 
 .app-section--design-v2 .eyebrow,

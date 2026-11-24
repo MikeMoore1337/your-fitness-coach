@@ -409,7 +409,10 @@ test('canonical brand assets render on light and dark public surfaces', async ({
       await page.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
     }
     await assertHeaderMark(page, 'dark', 38, 44);
-    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(page.locator('#landing-title')).toHaveCSS(
+      'color',
+      viewport.name === 'mobile' ? 'rgb(250, 250, 250)' : 'rgb(255, 255, 255)',
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {
@@ -438,7 +441,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     if (viewport.name === 'desktop') {
       await expect(page.locator('.app-bottom-nav__brand .yfc-lockup__wordmark')).toBeVisible();
     } else {
-      await expect(page.locator('.app-bottom-nav--demo .app-bottom-nav__more')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Сценарии', exact: true })).toBeVisible();
     }
   }
 });

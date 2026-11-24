@@ -37,10 +37,17 @@ for (const theme of ['light', 'dark'] as const) {
       expect(heroBox).not.toBeNull();
       expect(headerBox!.y).toBe(heroBox!.y);
       const heroAction = page.locator('.landing-hero .landing-button--secondary');
-      await expect(heroAction).toHaveCSS('background-color', 'rgba(20, 25, 25, 0.64)');
+      await expect(heroAction).toHaveCSS(
+        'background-color',
+        width < 500
+          ? theme === 'dark'
+            ? 'rgb(27, 31, 31)'
+            : 'rgb(240, 240, 240)'
+          : 'rgba(20, 25, 25, 0.64)',
+      );
       await expect(heroAction).toHaveCSS(
         'backdrop-filter',
-        'blur(3px) saturate(1.12) brightness(1.03)',
+        width < 500 ? 'none' : 'blur(3px) saturate(1.12) brightness(1.03)',
       );
       await expect(heroAction).toHaveCSS('filter', 'none');
       if (width < 500) {
@@ -53,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      const nav = page.locator('.app-bottom-nav');
+      const nav = page.locator(width < 900 ? '.app-bottom-nav__primary' : '.app-bottom-nav');
       await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(20px\)/ : 'none');
       await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
@@ -170,7 +177,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+      await expect(page.locator('.app-bottom-nav__primary')).toHaveCSS(
+        'backdrop-filter',
+        /blur\(20px\)/,
+      );
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();

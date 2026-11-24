@@ -26,6 +26,7 @@ BUNDLE_SCHEMA_VERSION = 1
 MEASUREMENT_SCHEMA_VERSION = 1
 DEFAULT_KEY_ENV = "ALLURE_REPORT_ENCRYPTION_KEY"
 BUNDLE_MAGIC = b"YFC-ALLURE-BUNDLE-v1\n"
+MAX_MEASUREMENT_METADATA_BYTES = 5 * 1024 * 1024
 _SAFE_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _MEASUREMENT_CLASSES = (
     "allure_result_json",
@@ -79,12 +80,24 @@ def _source_files(source: Path, *, enforce_limit: bool = True) -> tuple[tuple[Pa
     return tuple(files)
 
 
-def _measurement_class(relative: str) -> str:
+def _measurement_class(relative: str, attachment_types: set[str] | None = None) -> str:
     normalized = relative.lower()
     if normalized.endswith("-result.json"):
         return "allure_result_json"
     if normalized.endswith("-container.json"):
         return "allure_container_json"
+    if attachment_types and len(attachment_types) == 1:
+        attachment_type = next(iter(attachment_types))
+        if attachment_type == "application/vnd.allure.playwright-trace":
+            return "trace_archive"
+        if attachment_type.startswith("image/"):
+            return "screenshots"
+        if attachment_type.startswith("video/"):
+            return "video"
+        if attachment_type.startswith("text/"):
+            return "text_attachment"
+        if attachment_type == "application/json":
+            return "json_attachment"
     if normalized.endswith((".trace.zip", ".trace.tar", ".trace.tar.gz")):
         return "trace_archive"
     if normalized.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")):
@@ -96,6 +109,42 @@ def _measurement_class(relative: str) -> str:
     if normalized.endswith((".txt", ".log", ".html", ".htm", ".xml", ".csv")):
         return "text_attachment"
     return "other"
+
+
+def _measurement_attachment_types(
+    files: tuple[tuple[Path, str, int], ...],
+) -> tuple[dict[str, set[str]], int]:
+    """Read only bounded Allure metadata; never emit names or attachment contents."""
+    types: dict[str, set[str]] = {}
+    unreadable = 0
+    for path, relative, size in files:
+        if not relative.endswith(("-result.json", "-container.json")):
+            continue
+        if size > MAX_MEASUREMENT_METADATA_BYTES:
+            unreadable += 1
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except OSError, UnicodeDecodeError, json.JSONDecodeError, RecursionError:
+            unreadable += 1
+            continue
+        pending = [data]
+        while pending:
+            item = pending.pop()
+            if isinstance(item, dict):
+                attachments = item.get("attachments")
+                if isinstance(attachments, list):
+                    for attachment in attachments:
+                        if not isinstance(attachment, dict):
+                            continue
+                        source = attachment.get("source")
+                        content_type = attachment.get("type")
+                        if isinstance(source, str) and isinstance(content_type, str):
+                            types.setdefault(source, set()).add(content_type.lower())
+                pending.extend(item.values())
+            elif isinstance(item, list):
+                pending.extend(item)
+    return types, unreadable
 
 
 def measure_bundle(
@@ -114,11 +163,25 @@ def measure_bundle(
     if output == source or output.is_relative_to(source):
         raise AllureBundleError("measurement output must be outside the result directory")
     files = _source_files(source, enforce_limit=False)
+    attachment_types, unreadable = _measurement_attachment_types(files)
     classes = {name: {"file_count": 0, "bytes": 0} for name in _MEASUREMENT_CLASSES}
-    for _, relative, size in files:
-        category = classes[_measurement_class(relative)]
+    seen: set[tuple[int, bytes]] = set()
+    duplicate_files = 0
+    duplicate_bytes = 0
+    for path, relative, size in files:
+        category = classes[_measurement_class(relative, attachment_types.get(relative))]
         category["file_count"] += 1
         category["bytes"] += size
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        fingerprint = (size, digest.digest())
+        if fingerprint in seen:
+            duplicate_files += 1
+            duplicate_bytes += size
+        else:
+            seen.add(fingerprint)
     source_bytes = sum(size for _, _, size in files)
     payload: dict[str, object] = {
         "schema_version": MEASUREMENT_SCHEMA_VERSION,
@@ -129,6 +192,10 @@ def measure_bundle(
         "limit_bytes": MAX_BUNDLE_BYTES,
         "within_limit": source_bytes <= MAX_BUNDLE_BYTES,
         "classes": classes,
+        "classification_basis": "filename-and-declared-allure-type",
+        "duplicate_files": duplicate_files,
+        "duplicate_bytes": duplicate_bytes,
+        "unreadable_result_metadata": unreadable,
         "created_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -187,6 +254,8 @@ def encrypt_bundle(
     normalized_suite = _safe_text(suite, field="suite")
     normalized_browser = _safe_text(browser, field="browser")
     files = _source_files(source)
+    if not any(relative.endswith("-result.json") for _, relative, _ in files):
+        raise AllureBundleError("result bundle contains no Allure test results")
     source_bytes = sum(size for _, _, size in files)
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)

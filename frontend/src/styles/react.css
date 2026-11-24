@@ -4619,6 +4619,9 @@ button.today-text-link {
 .active-workout-exercise.is-completed:not(.is-current) {
   background: var(--bg-soft);
 }
+.active-workout-exercise[data-motion-confirm='true'] {
+  animation: active-workout-set-confirm var(--motion-state) var(--motion-ease);
+}
 .active-workout-exercise.is-superset {
   border-left: 4px solid var(--accent);
 }
@@ -6323,6 +6326,29 @@ html[data-yfc-pwa-focus-placement='true'][data-yfc-keyboard='visible']
 }
 
 /* App shell: shared mobile composition and a purpose-built desktop sidebar. */
+.progress-local-context {
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+}
+.progress-local-context[inert] {
+  visibility: hidden;
+}
+.progress-category-nav .ui-tabs {
+  touch-action: pan-y pinch-zoom;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .progress-local-context[data-motion-phase='update']:not([inert]) {
+    animation: app-section-context-enter var(--motion-state) var(--motion-ease);
+  }
+  .nutrition-experience[data-motion-phase='update'] {
+    animation: yfc-motion-phase-marker var(--motion-state) linear;
+  }
+  .nutrition-experience[data-motion-phase='update']
+    > :is(.nutrition-day-content:not([hidden]), .nutrition-local-context) {
+    animation: app-section-context-enter var(--motion-state) var(--motion-ease);
+  }
+}
 .app-shell {
   min-height: 100dvh;
 }
@@ -6408,6 +6434,20 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 .app-mobile-header__profile.is-active {
   background: var(--surface-active);
+}
+@media (max-width: 240px) {
+  .app-shell--design-v2 .app-mobile-header {
+    flex-wrap: wrap;
+    gap: 2px;
+  }
+
+  .app-shell--design-v2 .app-mobile-header__brand {
+    flex: 1 0 100%;
+  }
+
+  .app-shell--design-v2 .app-mobile-header__profile {
+    margin-left: auto;
+  }
 }
 .app-bottom-nav {
   position: fixed;
@@ -9626,6 +9666,11 @@ html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
 }
 .nutrition-targets__macros {
   display: contents;
+}
+@media (max-width: 240px) {
+  .nutrition-targets {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (min-width: 768px) {
   .nutrition-targets:not(.nutrition-targets--unset) {

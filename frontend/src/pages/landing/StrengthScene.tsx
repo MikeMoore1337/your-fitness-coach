@@ -16,7 +16,7 @@ export function strengthFrame(progress: number) {
     result: clamp((progress - 0.8) / 0.1),
   };
 }
-export function StrengthScene() {
+export function StrengthScene({ interactive = false }: { interactive?: boolean }) {
   const root = useRef<HTMLElement>(null);
   useEffect(() => {
     const node = root.current;
@@ -26,7 +26,11 @@ export function StrengthScene() {
     const count = node.querySelector<HTMLElement>('[data-reps]')!;
     const record = node.querySelector<HTMLElement>('[data-record]')!;
     const result = node.querySelector<HTMLElement>('.strength-scene__result')!;
-    const indicators = node.querySelectorAll('[data-step]');
+    const indicators = node.querySelectorAll<HTMLElement>('[data-step]');
+    const announcement = node.querySelector<HTMLElement>('[data-strength-announcement]')!;
+    const header = interactive
+      ? document.querySelector<HTMLElement>('.public-shell__header')
+      : null;
     const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let frame = 0;
     let displayed: number | null = null;
@@ -34,12 +38,39 @@ export function StrengthScene() {
     const schedule = () => {
       if (!frame && !document.hidden) frame = requestAnimationFrame(render);
     };
+    function apply(progress: number) {
+      const state = strengthFrame(progress);
+      photo.style.opacity = String(media?.matches ? Number(state.phase > 0) : state.lift);
+      count.textContent = String(state.count);
+      record.textContent = state.phase > 0 ? '18 кг × 3' : '18 кг × —';
+      result.hidden = state.phase !== 2;
+      result.style.opacity = String(media?.matches ? 1 : state.result);
+      node!.dataset.phase = String(state.phase);
+      indicators.forEach((indicator, index) => {
+        if (interactive) indicator.setAttribute('aria-pressed', String(index === state.phase));
+        if (index === state.phase) indicator.setAttribute('aria-current', 'step');
+        else indicator.removeAttribute('aria-current');
+      });
+    }
     function render(time: number) {
       frame = 0;
+      if (interactive) {
+        const headerHeight = header?.offsetHeight ?? 0;
+        node!.style.setProperty('--strength-header', `${headerHeight}px`);
+        node!.classList.toggle(
+          'is-flow',
+          sticky.scrollHeight > window.innerHeight - headerHeight + 2,
+        );
+      }
       const bounds = node!.getBoundingClientRect();
+      const photoBounds = photo.parentElement!.getBoundingClientRect();
       const target = media?.matches
         ? 1
-        : strengthProgress(bounds.top, node!.offsetHeight, sticky.offsetHeight);
+        : getComputedStyle(sticky).position === 'sticky'
+          ? strengthProgress(bounds.top, node!.offsetHeight, sticky.offsetHeight)
+          : clamp(
+              (window.innerHeight - photoBounds.top) / (window.innerHeight + photoBounds.height),
+            );
       const delta = previous === null ? 16 : Math.min(40, Math.max(0, time - previous));
       previous = time;
       if (
@@ -53,17 +84,7 @@ export function StrengthScene() {
       displayed +=
         Math.sign(gap) * Math.min(Math.abs(gap) * (1 - Math.exp(-delta / 180)), delta * 0.0006);
       if (Math.abs(target - displayed) < 0.0005) displayed = target;
-      const state = strengthFrame(displayed);
-      photo.style.opacity = String(media?.matches ? Number(state.phase > 0) : state.lift);
-      count.textContent = String(state.count);
-      record.textContent = state.phase > 0 ? '18 кг × 3' : '18 кг × —';
-      result.hidden = state.phase !== 2;
-      result.style.opacity = String(media?.matches ? 1 : state.result);
-      node!.dataset.phase = String(state.phase);
-      indicators.forEach((indicator, index) => {
-        if (index === state.phase) indicator.setAttribute('aria-current', 'step');
-        else indicator.removeAttribute('aria-current');
-      });
+      apply(displayed);
       if (displayed !== target) schedule();
       else previous = null;
     }
@@ -73,9 +94,24 @@ export function StrengthScene() {
       previous = null;
       schedule();
     };
+    const choose = (event: Event) => {
+      const index = Array.from(indicators).indexOf(event.currentTarget as HTMLElement);
+      if (index < 0) return;
+      cancelAnimationFrame(frame);
+      frame = 0;
+      previous = null;
+      displayed = [0, 0.65, 1][index]!;
+      apply(displayed);
+      announcement.textContent = `Этап: ${indicators[index]!.textContent?.trim()}.`;
+    };
+    const onScroll = () => {
+      if (!interactive || !media?.matches) schedule();
+    };
+    if (interactive) indicators.forEach((indicator) => indicator.addEventListener('click', choose));
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
     resize?.observe(sticky);
-    window.addEventListener('scroll', schedule, { passive: true });
+    if (header) resize?.observe(header);
+    window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', schedule);
     document.addEventListener('visibilitychange', visibility);
     media?.addEventListener('change', schedule);
@@ -83,14 +119,20 @@ export function StrengthScene() {
     return () => {
       cancelAnimationFrame(frame);
       resize?.disconnect();
-      window.removeEventListener('scroll', schedule);
+      indicators.forEach((indicator) => indicator.removeEventListener('click', choose));
+      window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', schedule);
       document.removeEventListener('visibilitychange', visibility);
       media?.removeEventListener('change', schedule);
     };
-  }, []);
+  }, [interactive]);
   return (
-    <section className="strength-scene" ref={root} aria-labelledby="strength-title">
+    <section
+      id={interactive ? 'strength' : undefined}
+      className="strength-scene"
+      ref={root}
+      aria-labelledby="strength-title"
+    >
       <div className="strength-scene__sticky">
         <div className="strength-scene__copy">
           <p className="landing-kicker">01 / ОТ ДВИЖЕНИЯ К ЗАПИСИ</p>
@@ -98,16 +140,40 @@ export function StrengthScene() {
             Каждый подход
             <br /> имеет значение.
           </h2>
-          <p>Сделай повторения. Запиши подход. Сохрани результат для следующей тренировки.</p>
+          <p>Сделайте повторения. Запишите подход. Сохраните результат для следующей тренировки.</p>
+          <p>Движение не распознаётся автоматически. Результат отмечаете вы.</p>
         </div>
         <div className="strength-scene__visual">
-          <div className="strength-scene__steps" aria-label="Этапы демонстрации">
-            {['Усилие', 'Запись', 'Результат'].map((label) => (
-              <span data-step key={label}>
-                {label}
-              </span>
-            ))}
+          {interactive && (
+            <>
+              <span className="strength-scene__label">Демонстрационный подход · 18 кг</span>
+              <h3>Тяга гантели</h3>
+            </>
+          )}
+          <div
+            className="strength-scene__steps"
+            role={interactive ? 'group' : undefined}
+            aria-label="Этапы демонстрации"
+          >
+            {['Усилие', 'Запись', 'Результат'].map((label) =>
+              interactive ? (
+                <button
+                  type="button"
+                  data-step
+                  data-yfc-choice="compact"
+                  aria-pressed="false"
+                  key={label}
+                >
+                  {label}
+                </button>
+              ) : (
+                <span data-step key={label}>
+                  {label}
+                </span>
+              ),
+            )}
           </div>
+          <span className="sr-only" role="status" data-strength-announcement />
           <div className="strength-scene__photo">
             <img
               src="/assets/marketing/strength-row-lowered.webp"
@@ -138,7 +204,7 @@ export function StrengthScene() {
             </div>
             <div className="strength-scene__result" hidden>
               <Icon name="exercise" size={110} />
-              <strong>Подход сохранён.</strong>
+              <strong>{interactive ? 'Подход сохранён в примере.' : 'Подход сохранён.'}</strong>
               <span>18 кг × 3 повторения</span>
             </div>
           </div>

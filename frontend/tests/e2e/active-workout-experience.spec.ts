@@ -18,6 +18,40 @@ const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EI
 const replacementMediaThumbnailUrl =
   '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg';
 
+test('desktop workout keeps one truthful heading and a usable return action', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const header = page.locator('.today-workout-focus__header');
+  const back = header.getByRole('button', { name: 'К сводке' });
+  const hero = page.locator('.active-workout-hero');
+  await expect(hero.locator('h2')).toBeVisible();
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate((value) => {
+      localStorage.setItem('app-theme', value);
+      window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+    }, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    for (const width of [900, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(header.locator(':scope > div > span')).toBeHidden();
+      await expect(header.getByText('Текущая тренировка')).toBeVisible();
+      await expect(header.locator(':scope > span')).toBeHidden();
+      await expect(back).toBeVisible();
+      await expect(hero.getByText('В процессе', { exact: true })).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width,
+      );
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(header.getByText('Текущая тренировка')).toBeVisible();
+  await back.click();
+  await expect(page.locator('.today-dashboard')).toBeVisible();
+});
+
 test.use({
   serviceWorkers: 'block',
   video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on',
@@ -6268,6 +6302,245 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
   }
 });
 
+test('#985 confirms the last strength set on its visible collapsed exercise', async ({ page }) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done, is_completed: false, version: 1 }],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise
+    .locator('[data-workout-set-id="203"]')
+    .getByRole('button', { name: /^Завершить:/ })
+    .click();
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 confirms the last cardio interval on its visible collapsed exercise', async ({
+  page,
+}) => {
+  const done = {
+    actual_reps: 8,
+    actual_weight: 40,
+    rir: null,
+    set_kind: 'working',
+    reached_failure: false,
+    is_completed: true,
+    version: 2,
+  } as SetState;
+  const cardio = {
+    actual_reps: null,
+    actual_weight: null,
+    duration_minutes: null,
+    distance_km: null,
+    average_heart_rate_bpm: null,
+    heart_rate_zone: null,
+    rir: null,
+    set_kind: null,
+    reached_failure: null,
+    is_completed: false,
+    version: 1,
+  } as SetState;
+  const sets = new Map<number, SetState>([
+    [201, { ...done }],
+    [202, { ...done }],
+    [203, { ...done }],
+    [204, cardio],
+  ]);
+  const server = await mockActiveWorkout(
+    page,
+    true,
+    'approved_animated',
+    false,
+    null,
+    false,
+    null,
+    false,
+    false,
+    sets,
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await exercise.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await exercise.evaluate((element) => {
+    element.setAttribute('data-observed-confirm', 'false');
+    new MutationObserver(() => {
+      const details = element.querySelector<HTMLElement>('[id^="workout-exercise-"]');
+      if (element.getAttribute('data-motion-confirm') === 'true' && details?.hidden)
+        element.setAttribute('data-observed-confirm', 'true');
+    }).observe(element, { attributes: true, attributeFilter: ['data-motion-confirm'] });
+  });
+  await exercise.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await server.cardioCompleted;
+  await expect(exercise).toHaveAttribute('data-observed-confirm', 'true');
+  await expect(page.getByRole('button', { name: 'Завершить тренировку' })).toBeVisible();
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 confirms a successful retry once after a failed save', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  server.failSetPatch(true);
+  await row.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+  server.failSetPatch(false);
+  await row.getByRole('button', { name: /^Повторить сохранение:/ }).click();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+});
+
+test('#985 double tap completes a strength set only once', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const row = page.locator('[data-workout-set-id="201"]');
+  await row.getByLabel(/^Вес,/).fill('42');
+  await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  const done = row.getByRole('button', { name: /^Завершить:/ });
+  await done.scrollIntoViewIfNeeded();
+  const bounds = await done.boundingBox();
+  expect(bounds).not.toBeNull();
+  const release = server.holdNextPatch();
+  await page.mouse.dblclick(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2, {
+    delay: 25,
+  });
+  release();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(1);
+});
+
+test('#985 cardio confirms only after save and does not replay on reload', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await expect(page.getByText('Синхронизировано')).toBeVisible();
+  await page.addStyleTag({
+    content: '[data-motion-confirm] { animation-play-state: paused !important; }',
+  });
+  const release = server.holdNextPatch();
+  const row = cardio.locator('.active-workout-set--cardio');
+  await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+  release();
+  await expect(row).toHaveAttribute('data-motion-confirm', 'true');
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(1);
+  await page.reload();
+  const entry = page.getByRole('button', { name: 'Клиент' });
+  if (await entry.isVisible()) await entry.click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await cardio.getByRole('button', { name: 'Кардио сохранено' }).click();
+  await expect(row).not.toHaveAttribute('data-motion-confirm', 'true');
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#985 cardio AFTER ${theme}`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 393, height: 852 });
+    await page.emulateMedia({ colorScheme: theme });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page, true);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+    await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+    await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+    await server.cardioCompleted;
+    await expect(page.getByText('Синхронизировано')).toBeVisible();
+    const saved = cardio.getByRole('button', { name: 'Кардио сохранено' });
+    if (await saved.isVisible()) await saved.click();
+    const row = cardio.locator('.active-workout-set--cardio');
+    await expect(row.getByText('Выполнено', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      393,
+    );
+    if (process.env.CAPTURE_985 === '1') {
+      const directory = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux-proposals',
+        'issue-985-after',
+        'screens',
+      );
+      await mkdir(directory, { recursive: true });
+      await row.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: resolve(directory, `${info.project.name}-web-${theme}-393-cardio.png`),
+      });
+    }
+  });
+}
+
 test('mixed workout keeps cardio type-aware, compact and stable during input', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -7683,7 +7956,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
 
   for (const width of [320, 360, 393, 430]) {
     for (const theme of ['dark', 'light'] as const) {
-      test(`five-item dock preserves the workout across quick add and navigation at ${width}px ${theme}`, async ({
+      test(`dock 4+1 preserves the workout across quick add and navigation at ${width}px ${theme}`, async ({
         page,
       }, testInfo) => {
         const pageErrors: string[] = [];
@@ -7702,7 +7975,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         const add = navigation.getByRole('button', { name: 'Быстро добавить', exact: true });
         await expect(
           navigation.locator('.app-bottom-nav__primary > a, .app-bottom-nav__primary > button'),
-        ).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс', 'Добавить']);
+        ).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс']);
         await expect(add).toBeVisible();
         await context.panel.getByRole('button', { name: '+30 сек' }).tap();
         await expect(context.panel.getByRole('timer')).toHaveText('1:58');
@@ -8226,6 +8499,7 @@ async function mockRestSessions(page: Page) {
   const intervals: Record<number, Record<string, unknown>> = {};
   let nextId = 900;
   let restartRequests = 0;
+  let actionRequests = 0;
   let actionFailure: number | null = null;
   let actionBarrier: Promise<void> | null = null;
   await page.route('**/api/v1/workouts/42/rest-sessions', async (route) => {
@@ -8254,6 +8528,7 @@ async function mockRestSessions(page: Page) {
     await route.fulfill({ json: intervals[id] });
   });
   await page.route('**/api/v1/workouts/rest-sessions/*/actions', async (route) => {
+    actionRequests += 1;
     if (actionBarrier) await actionBarrier;
     if (actionFailure) {
       await route.fulfill({
@@ -8317,6 +8592,7 @@ async function mockRestSessions(page: Page) {
   return {
     intervals,
     restartCount: () => restartRequests,
+    actionCount: () => actionRequests,
     failActions(status: number | null) {
       actionFailure = status;
     },
@@ -8448,19 +8724,23 @@ for (const theme of ['light', 'dark'] as const) {
       for (const action of await third
         .locator('.active-workout-set__prefill-actions button')
         .all()) {
-        await action.evaluate((element) =>
-          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
-        );
-        expect(
-          await action.evaluate((element) => {
-            const box = element.getBoundingClientRect();
-            const hit = document.elementFromPoint(
-              box.left + box.width / 2,
-              box.top + box.height / 2,
-            );
-            return hit === element || element.contains(hit);
-          }),
-        ).toBe(true);
+        // A resize can reflow the page after scrolling. Keep the hit-test, but
+        // recenter while geometry settles so it measures the reachable control.
+        await expect(async () => {
+          await action.evaluate((element) =>
+            element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+          );
+          expect(
+            await action.evaluate((element) => {
+              const box = element.getBoundingClientRect();
+              const hit = document.elementFromPoint(
+                box.left + box.width / 2,
+                box.top + box.height / 2,
+              );
+              return hit === element || element.contains(hit);
+            }),
+          ).toBe(true);
+        }).toPass({ timeout: 5_000, intervals: [50, 100, 200] });
       }
       if (
         (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') ||
@@ -9565,6 +9845,73 @@ test.describe('#1292 compact rest panel', () => {
 
 test.describe('#1338 v2 compact timer', () => {
   test.use({ hasTouch: true });
+
+  test('sends a timer change queued while the previous action is in flight', async ({ page }) => {
+    const start = new Date('2026-10-10T12:00:00Z');
+    await page.clock.install({ time: start });
+    await page.clock.setFixedTime(start);
+    const server = await mockActiveWorkout(page);
+    const restApi = await mockRestSessions(page);
+    Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, rir: '1' });
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page
+      .locator('[data-workout-set-id="201"]')
+      .getByRole('button', { name: /^Завершить:/ })
+      .click();
+    await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+
+    const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+    const releaseFirstAction = restApi.holdNextAction();
+    try {
+      const firstRequest = page.waitForRequest(
+        (request) =>
+          request.url().endsWith('/900/actions') &&
+          request.method() === 'POST' &&
+          request.postDataJSON().action === 'add30',
+      );
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await firstRequest;
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+      await expect(panel.getByRole('timer')).toHaveText('3:00');
+    } finally {
+      releaseFirstAction();
+    }
+
+    // The fake clock is still frozen, so the 15-second retry cannot hide a missed wake-up.
+    await expect.poll(() => restApi.intervals[900]?.adjusted_seconds).toBe(180);
+    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+
+    restApi.failActions(409);
+    const requestsBeforeConflict = restApi.actionCount();
+    const releaseBlockedAction = restApi.holdNextAction();
+    const blockedRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/900/actions') &&
+        request.method() === 'POST' &&
+        request.postDataJSON().action === 'add30',
+    );
+    const blockedResponse = page.waitForResponse(
+      (response) => response.url().endsWith('/900/actions') && response.status() === 409,
+    );
+    try {
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await blockedRequest;
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+    } finally {
+      releaseBlockedAction();
+    }
+    await blockedResponse;
+    await expect.poll(() => restApi.actionCount()).toBe(requestsBeforeConflict + 1);
+    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(restApi.actionCount()).toBe(requestsBeforeConflict + 1);
+    const pendingAfterConflict = (await readRestJournal(page))[0]?.pending;
+    expect(pendingAfterConflict).toHaveLength(2);
+    expect(pendingAfterConflict[0]).toMatchObject({ action: 'add30' });
+    expect(pendingAfterConflict[1]).toMatchObject({ action: 'add60' });
+  });
 
   for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430, 1120, 1440]) {

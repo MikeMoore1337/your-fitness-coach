@@ -23,6 +23,8 @@ MAX_BUNDLE_BYTES: Final = 50 * 1024 * 1024
 MAX_REPORT_BYTES: Final = 100 * 1024 * 1024
 FRONTEND_E2E_SHARD_COUNT: Final = 5
 PYTHON_TEST_SHARD_COUNT: Final = 5
+CROSS_BROWSER_SHARD_COUNT: Final = 5
+CROSS_BROWSER_PROJECTS: tuple[str, ...] = ("chromium", "firefox", "webkit")
 
 RUN_KINDS: tuple[str, ...] = ("daily", "weekly")
 PROFILE_BY_RUN_KIND: Mapping[str, str] = {
@@ -69,9 +71,11 @@ REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
         ),
         ("frontend-mobile-regression", "mobile-chromium-webkit"),
         ("frontend-mobile-regression-extended", "mobile-firefox-webkit"),
-        ("frontend-cross-browser", "chromium"),
-        ("frontend-cross-browser", "firefox"),
-        ("frontend-cross-browser", "webkit"),
+        *tuple(
+            ("frontend-cross-browser", f"{browser}-shard-{shard}")
+            for browser in CROSS_BROWSER_PROJECTS
+            for shard in range(1, CROSS_BROWSER_SHARD_COUNT + 1)
+        ),
         *tuple(
             ("python-tests", f"python-shard-{shard}")
             for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)

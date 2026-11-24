@@ -15,7 +15,7 @@
   backdrop-filter: blur(14px) saturate(125%);
 }
 
-@media (min-width: 681px) {
+@media (min-width: 851px) {
   .landing-v10-header-navigation {
     padding: 0;
     border: 0;
@@ -140,7 +140,7 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 680px) {
+@media (max-width: 850px) {
   .landing-v10-page.public-shell .public-shell__header {
     position: sticky;
     top: 0;
@@ -1454,7 +1454,7 @@
   outline: 2px solid var(--v2-lime);
   outline-offset: 4px;
 }
-@media (min-width: 681px) {
+@media (min-width: 851px) {
   .landing-v10-page .landing-nav {
     gap: 24px;
   }
@@ -1530,7 +1530,7 @@
     align-items: center;
   }
 }
-@media (max-width: 680px) {
+@media (max-width: 850px) {
   .landing-v10-page.public-shell .public-shell__header {
     padding-inline: max(16px, env(safe-area-inset-left));
     gap: 8px;
@@ -1586,14 +1586,14 @@
 .landing-v10-page .public-shell__header {
   backdrop-filter: blur(12px) saturate(115%);
 }
-@media (max-width: 680px) {
+@media (max-width: 850px) {
   .landing-v10-page .landing-header__actions .landing-button--compact svg {
     display: none;
   }
 }
 
 /* Owner reference header: the desktop bar stays dark and translucent in both themes. */
-@media (min-width: 681px) {
+@media (min-width: 851px) {
   .landing-v10-page .public-shell__header {
     min-height: 72px;
     padding-inline: max(5vw, calc((100vw - 1180px) / 2));
@@ -1639,7 +1639,7 @@
   }
 }
 
-@media (min-width: 681px) and (max-width: 1100px) {
+@media (min-width: 851px) and (max-width: 1100px) {
   .landing-v10-page .public-shell__header {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 14px;

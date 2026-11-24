@@ -102,10 +102,7 @@ test('current action and floating dock preserve the shared navigation contract',
     await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
     await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    const panelRadius = await dock.evaluate((element) =>
-      getComputedStyle(element).getPropertyValue('--v2-panel-radius').trim(),
-    );
-    await expect(dock).toHaveCSS('border-radius', panelRadius);
+    await expect(dock.locator('.app-bottom-nav__primary')).toHaveCSS('border-radius', '9999px');
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 
@@ -113,7 +110,7 @@ test('current action and floating dock preserve the shared navigation contract',
       const box = element.getBoundingClientRect();
       const targets = Array.from(
         element.querySelectorAll<HTMLElement>(
-          '.app-bottom-nav__primary > a, .app-bottom-nav__primary > button',
+          '.app-bottom-nav__primary > a, .app-bottom-nav__quick-add',
         ),
       ).map((target) => {
         const targetBox = target.getBoundingClientRect();
@@ -524,4 +521,46 @@ test('reduced motion keeps completion confirmation and final values without trav
     await completion.locator('.workout-completion__hero').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${screenshotRoot}/completion-reduced-390-dark.png` });
   }
+});
+
+test('#985 finish can be skipped with the keyboard and is not replayed on reload', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  const server = await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+  const completion = await completeWorkout(page);
+  await expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+  await expect(completion.getByRole('heading', { name: 'Тренировка завершена' })).toBeInViewport();
+  await expect(completion.getByText('1 ч')).toBeInViewport();
+  await expect(completion.getByText('1 ч')).toBeVisible();
+  await expect(completion.getByText(/максимальный вес 40 кг/)).toBeVisible();
+  const skip = completion.getByRole('button', { name: 'Показать сразу' });
+  await skip.focus();
+  await skip.press('Enter');
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.getByRole('heading', { name: 'Тренировка завершена' })).toBeFocused();
+  expect(server.finishCalls()).toBe(1);
+
+  await page.reload();
+  await expect(completion).toBeVisible();
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.locator('.workout-completion__skip')).toBeHidden();
+  expect(server.finishCalls()).toBe(1);
+});
+
+test('#985 finish stops when backgrounded and does not replay on resume', async ({ page }) => {
+  await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+  const completion = await completeWorkout(page);
+  await expect(completion).toHaveAttribute('data-motion-phase', 'enter');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(completion).toHaveAttribute('data-motion-phase', 'idle');
+  await expect(completion.getByText('1 ч')).toBeVisible();
 });

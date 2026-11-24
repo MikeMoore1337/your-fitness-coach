@@ -1,0 +1,34 @@
+test('issue 984 controlled frame sample', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await mockProgress(page);
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+  await expect(progressOverview(page)).toBeVisible();
+  await page.screenshot({ path: process.env.ISSUE984_SCREEN });
+  await page.evaluate(() => {
+    const state = { frames: [], tasks: [], last: 0, active: true, supported: false };
+    window.__issue984 = state;
+    if (PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+      state.supported = true;
+      const observer = new PerformanceObserver((list) => state.tasks.push(...list.getEntries().map((entry) => entry.duration)));
+      observer.observe({ type: 'longtask', buffered: false });
+      state.observer = observer;
+    }
+    const frame = (now) => { if (!state.active) return; if (state.last) state.frames.push(now - state.last); state.last = now; requestAnimationFrame(frame); };
+    requestAnimationFrame(frame);
+  });
+  const controls = page.getByRole('tablist', { name: 'Период прогресса' });
+  for (let i = 0; i < 4; i++) {
+    for (const name of ['7 дней', '90 дней', '30 дней']) {
+      await controls.getByRole('tab', { name }).click();
+      await expect(controls.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true');
+      await expect(progressOverview(page)).toBeVisible();
+    }
+  }
+  await page.waitForTimeout(400);
+  const result = await page.evaluate(() => { const state = window.__issue984; state.active = false; state.observer?.disconnect(); return { frames: state.frames, tasks: state.tasks, supported: state.supported }; });
+  await writeFile(process.env.ISSUE984_METRICS!, JSON.stringify({viewport: '393x852', theme: 'light', actions: 12, ...result}, null, 2));
+});

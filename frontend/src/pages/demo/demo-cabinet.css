@@ -34,6 +34,29 @@
   min-width: 0;
 }
 
+@media (max-width: 899px) {
+  .app-shell--design-v2:has(.app-mobile-header--demo) {
+    position: relative;
+  }
+
+  .app-mobile-header--demo {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    width: auto;
+    margin: 0;
+  }
+
+  .app-mobile-header--demo .app-mobile-header__brand {
+    display: none;
+  }
+
+  .app-shell--design-v2:has(.app-mobile-header--demo) .demo-cabinet-boundary > strong {
+    padding-right: 52px;
+  }
+}
+
 .demo-cabinet-boundary__scenario {
   align-items: center;
   display: inline-flex;

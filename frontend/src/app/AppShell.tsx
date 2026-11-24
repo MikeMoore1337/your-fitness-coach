@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { QuickAddPlacementContext } from './QuickAddPlacementContext';
 import {
   AppLink,
+  coachPathForTab,
   coachTabFromSearch,
   safeTrainerReturnPath,
   useNavigation,
@@ -138,12 +139,20 @@ function analyticsSectionForDestination(to: string): ProductSection | null {
   }
 }
 
-function useMobileNavigation(): boolean {
+function useMobileNavigation(beforeChange?: () => void): boolean {
   const [mobile, setMobile] = useState(mobileNavigationMatches);
+  const previousMobile = useRef(mobile);
 
   useEffect(() => {
     const media = window.matchMedia?.('(max-width: 899px)');
-    const sync = () => setMobile(media?.matches ?? window.innerWidth < 900);
+    const sync = () => {
+      const next = media?.matches ?? window.innerWidth < 900;
+      if (previousMobile.current !== next) {
+        beforeChange?.();
+        previousMobile.current = next;
+      }
+      setMobile(next);
+    };
     media?.addEventListener?.('change', sync);
     window.addEventListener('resize', sync);
     sync();
@@ -151,7 +160,7 @@ function useMobileNavigation(): boolean {
       media?.removeEventListener?.('change', sync);
       window.removeEventListener('resize', sync);
     };
-  }, []);
+  }, [beforeChange]);
 
   return mobile;
 }
@@ -216,11 +225,13 @@ export function AppShell({
   demo,
   narrow = false,
   section,
+  progressDestination,
 }: {
   children: React.ReactNode;
   demo?: DemoAppShellConfig;
   narrow?: boolean;
   section?: AppSection;
+  progressDestination?: string;
 }) {
   const auth = useOptionalAuth();
   const user = auth?.user ?? null;
@@ -267,20 +278,83 @@ export function AppShell({
   const accountRole = accountRoleLabel(Boolean(user?.is_root), Boolean(user?.is_coach));
   const secondaryActive = section === 'catalog' || section === 'profile';
   const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
-  const mobileNavigation = useMobileNavigation();
+  const focusedTrainerTab = useRef<string | null>(null);
+  const pendingTrainerFocus = useRef<string | null>(null);
+  const captureTrainerFocus = useCallback(() => {
+    pendingTrainerFocus.current = focusedTrainerTab.current;
+  }, []);
+  const mobileNavigation = useMobileNavigation(captureTrainerFocus);
+  const renderedMobileNavigation = useRef(mobileNavigation);
   const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
+  const desktopTrainerNavigation = trainerWorkspace && !mobileNavigation && !isMiniApp;
+  const currentTrainerTab = useRef(coachTabFromSearch(search));
+  useLayoutEffect(() => {
+    renderedMobileNavigation.current = mobileNavigation;
+    currentTrainerTab.current = coachTabFromSearch(search);
+  }, [mobileNavigation, search]);
+  useEffect(() => {
+    if (!trainerWorkspace || isMiniApp) return;
+    const trackFocus = (event: FocusEvent) => {
+      const focused = event.target instanceof Element ? event.target : null;
+      if (
+        focused === document.body &&
+        mobileNavigationMatches() !== renderedMobileNavigation.current
+      )
+        return;
+      const tabs = Array.from(document.querySelectorAll('.coach-os-desktop-nav [role="tab"]'));
+      const tabIndex = focused ? tabs.indexOf(focused) : -1;
+      const mobileTab = focused?.getAttribute('data-trainer-tab');
+      focusedTrainerTab.current =
+        tabIndex >= 0
+          ? (['today', 'clients', 'programs', 'tools'][tabIndex] ?? null)
+          : (mobileTab ?? (focused?.closest('#appBottomNav') ? currentTrainerTab.current : null));
+    };
+    const clearOnPointer = (event: PointerEvent) => {
+      if (
+        !(event.target instanceof Element) ||
+        !event.target.closest('.coach-os-desktop-nav, [data-trainer-tab]')
+      )
+        focusedTrainerTab.current = null;
+    };
+    document.addEventListener('focusin', trackFocus);
+    document.addEventListener('pointerdown', clearOnPointer);
+    return () => {
+      document.removeEventListener('focusin', trackFocus);
+      document.removeEventListener('pointerdown', clearOnPointer);
+      focusedTrainerTab.current = null;
+      pendingTrainerFocus.current = null;
+    };
+  }, [isMiniApp, trainerWorkspace]);
+  useLayoutEffect(() => {
+    const key = pendingTrainerFocus.current;
+    if (!trainerWorkspace || isMiniApp || !key) return;
+    const index = ['today', 'clients', 'programs', 'tools'].indexOf(key);
+    const target = mobileNavigation
+      ? document.querySelector<HTMLElement>(`[data-trainer-tab="${key}"]`)
+      : document.querySelectorAll<HTMLElement>('.coach-os-desktop-nav [role="tab"]')[index];
+    target?.focus({ preventScroll: true });
+    pendingTrainerFocus.current = null;
+  }, [isMiniApp, mobileNavigation, trainerWorkspace]);
   const personalWorkspace = Boolean(!demo && user?.is_coach && path === '/app' && section);
   const trainerReturnTo = personalWorkspace
     ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
     : null;
   const shellDestinations =
-    demo?.destinations ?? (trainerWorkspace ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+    demo?.destinations ??
+    (trainerWorkspace && !desktopTrainerNavigation ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+  const personalSearch = desktopTrainerNavigation
+    ? `?trainer_return=${encodeURIComponent(coachPathForTab(coachTabFromSearch(search)))}`
+    : search;
   const quickAddLinks = demo?.quickAddLinks ?? DEFAULT_QUICK_ADD_ACTIONS;
   const brandTo = demo?.brandTo ?? '/app?section=today';
-  const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
+  const resolvedBrandTo = demo
+    ? brandTo
+    : personalDestinationWithTrainerReturn(brandTo, personalSearch);
   const shellVisible = Boolean(user || demo);
-  const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
-  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
+  const quickAddVisible =
+    shellVisible &&
+    (Boolean(demo) || section !== undefined || (mobileNavigation && path === '/admin'));
+  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation;
   const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
   const inlineQuickAdd = Boolean(quickAddTarget && !demo && section === 'progress');
   useLayoutEffect(() => {
@@ -328,7 +402,7 @@ export function AppShell({
       to: '/coach',
       icon: 'coach' as const,
       desktopGroup: 'workspaces' as const,
-      visible: Boolean(user?.is_coach) && !trainerWorkspace,
+      visible: Boolean(user?.is_coach) && (!trainerWorkspace || desktopTrainerNavigation),
     },
     {
       key: 'admin',
@@ -391,24 +465,124 @@ export function AppShell({
     }
 
     const syncNavigationHeight = () => {
-      root.style.setProperty(
-        '--app-bottom-nav-height',
-        mobileNavigationMatches() ? `${navigation.getBoundingClientRect().height}px` : '0px',
-      );
+      const height = mobileNavigationMatches()
+        ? `${navigation.getBoundingClientRect().height}px`
+        : '0px';
+      if (root.style.getPropertyValue('--app-bottom-nav-height') !== height) {
+        root.style.setProperty('--app-bottom-nav-height', height);
+      }
     };
 
-    syncNavigationHeight();
-    window.addEventListener('resize', syncNavigationHeight);
+    let disposed = false;
+    let rootFontSize = getComputedStyle(root).fontSize;
+    const syncDockLayout = () => {
+      const coachDock = trainerWorkspace && mobileNavigation;
+      if (disposed || (!embeddedQuickAddVisible && !coachDock)) return;
+      const labels = Array.from(
+        navigation.querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label'),
+      );
+      const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
+      if (!primary || labels.length !== 4) return;
+      const layout = coachDock ? navigation : primary;
+      const navStyle = getComputedStyle(layout);
+      const width =
+        layout.clientWidth - parseFloat(navStyle.paddingLeft) - parseFloat(navStyle.paddingRight);
+      const gap = parseFloat(navStyle.columnGap) || 0;
+      const need = Math.max(
+        44,
+        ...labels.map((label) => {
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          return (
+            Math.ceil(
+              typeof range.getBoundingClientRect === 'function'
+                ? range.getBoundingClientRect().width
+                : label.scrollWidth,
+            ) + 2
+          );
+        }),
+      );
+      const largeText = parseFloat(getComputedStyle(labels[0]!).fontSize) >= 20;
+      const horizontal = !coachDock && largeText && (width - gap) / 2 >= need + 25;
+      const standardText =
+        !coachDock && parseFloat(getComputedStyle(root).fontSize) <= 16 && window.innerWidth >= 320;
+      const availableColumns = window.innerWidth < 320 ? [2, 1] : [4, 2, 1];
+      const columns = standardText
+        ? 4
+        : horizontal
+          ? 2
+          : (availableColumns.find((count) => (width - (count - 1) * gap) / count >= need) ?? 1);
+      const orientation = horizontal
+        ? 'horizontal'
+        : columns === 1
+          ? width >= need + 25
+            ? 'single-horizontal'
+            : 'single-mixed'
+          : 'vertical';
+      const reflow = parseFloat(getComputedStyle(root).fontSize) >= 24 || window.innerWidth < 320;
+      if (navigation.dataset.dockColumns !== String(columns)) {
+        navigation.dataset.dockColumns = String(columns);
+      }
+      if (navigation.dataset.dockOrientation !== orientation) {
+        navigation.dataset.dockOrientation = orientation;
+      }
+      if (navigation.dataset.dockReflow !== String(reflow)) {
+        navigation.dataset.dockReflow = String(reflow);
+      }
+    };
+    const sync = () => {
+      if (disposed) return;
+      syncDockLayout();
+      syncNavigationHeight();
+    };
+    const rootObserver = new MutationObserver(() => {
+      const current = getComputedStyle(root).fontSize;
+      if (current !== rootFontSize) {
+        rootFontSize = current;
+        sync();
+      }
+    });
+    const selectionObserver = new MutationObserver(sync);
+    rootObserver.observe(root, { attributes: true, attributeFilter: ['style', 'class'] });
+    selectionObserver.observe(navigation, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-current'],
+    });
+    sync();
+    window.addEventListener('resize', sync);
+    document.fonts?.addEventListener('loadingdone', sync);
+    void document.fonts?.ready.then(sync);
+    let resizeObserverFrame: number | null = null;
     const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncNavigationHeight);
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (resizeObserverFrame !== null) return;
+            resizeObserverFrame = window.requestAnimationFrame(() => {
+              resizeObserverFrame = null;
+              sync();
+            });
+          });
     observer?.observe(navigation);
+    navigation
+      .querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label')
+      .forEach((label) => observer?.observe(label));
 
     return () => {
+      disposed = true;
       observer?.disconnect();
-      window.removeEventListener('resize', syncNavigationHeight);
+      if (resizeObserverFrame !== null) window.cancelAnimationFrame(resizeObserverFrame);
+      rootObserver.disconnect();
+      selectionObserver.disconnect();
+      window.removeEventListener('resize', sync);
+      document.fonts?.removeEventListener('loadingdone', sync);
+      delete navigation.dataset.dockColumns;
+      delete navigation.dataset.dockOrientation;
+      delete navigation.dataset.dockReflow;
       root.style.removeProperty('--app-bottom-nav-height');
     };
-  }, [mobileNavigation, shellVisible]);
+  }, [mobileNavigation, shellVisible, embeddedQuickAddVisible, trainerWorkspace]);
 
   useEffect(() => {
     if (moreOpen) {
@@ -467,43 +641,60 @@ export function AppShell({
   return (
     <AiCoachWorkspaceProvider>
       <div className="app-shell app-shell--design-v2">
-        {!demo && shellVisible && mobileNavigation && (
-          <header className="app-mobile-header">
+        {shellVisible && mobileNavigation && (
+          <header className={`app-mobile-header${demo ? ' app-mobile-header--demo' : ''}`}>
             <AppLink
               className="app-mobile-header__brand"
               to={resolvedBrandTo}
-              aria-label="Your Fitness Coach — сегодня"
+              aria-label={demo ? 'Your Fitness Coach — демо' : 'Your Fitness Coach — сегодня'}
             >
               <BrandLockup markClassName="app-mobile-header__brand-mark" />
             </AppLink>
             <button
-              id="appProfileButton"
+              id={demo ? 'appMoreButton' : 'appProfileButton'}
               type="button"
               className={`app-mobile-header__profile${moreOpen || secondaryActive ? ' is-active' : ''}`}
               aria-expanded={moreOpen}
               aria-controls="appMorePanel"
-              aria-label="Открыть профиль и настройки"
+              aria-label={demo ? 'Сценарии' : 'Открыть профиль и настройки'}
               onClick={(event) => (moreOpen ? closeMore() : openMore(event.currentTarget))}
             >
-              <AccountAvatar
-                className="app-bottom-nav__avatar"
-                customAvatarVersion={user?.custom_avatar?.updated_at}
-                name={displayName}
-                photoUrl={user?.photo_url}
-              />
+              {demo ? (
+                <AppNavigationIcon name="more" />
+              ) : (
+                <AccountAvatar
+                  className="app-bottom-nav__avatar"
+                  customAvatarVersion={user?.custom_avatar?.updated_at}
+                  name={displayName}
+                  photoUrl={user?.photo_url}
+                />
+              )}
             </button>
+          </header>
+        )}
+        {shellVisible && !mobileNavigation && (
+          <header className="app-desktop-header">
+            <div className="app-desktop-header__workspace">
+              <span>Рабочее пространство</span>
+              <strong>
+                {trainerWorkspace
+                  ? 'Клиенты'
+                  : path === '/admin'
+                    ? 'Администрирование'
+                    : 'Для себя'}
+              </strong>
+            </div>
+            {floatingQuickAddVisible && <div ref={quickAddAnchor} />}
           </header>
         )}
         {showPwaInstallPrompt && <PwaInstallPrompt />}
         {floatingQuickAddVisible && (
-          <>
-            <div ref={quickAddAnchor} style={{ display: 'contents' }} />
-            {createPortal(<QuickAddTrigger onOpen={openQuickAdd} />, quickAddHost)}
-          </>
+          <>{createPortal(<QuickAddTrigger onOpen={openQuickAdd} />, quickAddHost)}</>
         )}
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
+            desktop={!mobileNavigation}
             onClose={() => setQuickAddOpen(false)}
             open={quickAddOpen}
           />
@@ -520,9 +711,10 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps('regular', true)}
+              {...(embeddedQuickAddVisible ? {} : glassProps('regular', true))}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
+              data-workspace={trainerWorkspace && mobileNavigation ? 'coach' : undefined}
             >
               <AppLink
                 className="app-bottom-nav__brand"
@@ -539,7 +731,7 @@ export function AppShell({
                     data-yfc-choice="compact"
                     to={
                       demo?.accountTo ??
-                      personalDestinationWithTrainerReturn('/app?section=profile', search)
+                      personalDestinationWithTrainerReturn('/app?section=profile', personalSearch)
                     }
                     className={`app-desktop-account-entry${
                       (
@@ -578,18 +770,25 @@ export function AppShell({
                 </div>
               )}
 
-              <div className="app-bottom-nav__primary">
+              <div
+                className="app-bottom-nav__primary"
+                {...(embeddedQuickAddVisible ? glassProps('regular') : {})}
+              >
                 {shellDestinations.map((destination) => {
                   const destinationKey =
                     'section' in destination ? destination.section : destination.key;
                   const rawDestinationTo =
-                    'to' in destination ? destination.to : `/app?section=${destination.section}`;
+                    'to' in destination
+                      ? destination.to
+                      : destination.section === 'progress' && progressDestination
+                        ? progressDestination
+                        : `/app?section=${destination.section}`;
                   const destinationTo = demo
                     ? rawDestinationTo
-                    : personalDestinationWithTrainerReturn(rawDestinationTo, search);
+                    : personalDestinationWithTrainerReturn(rawDestinationTo, personalSearch);
                   const active = demo
                     ? demo.activeSection === destinationKey
-                    : trainerWorkspace
+                    : trainerWorkspace && !desktopTrainerNavigation
                       ? path === '/coach' && coachTabFromSearch(search) === destinationKey
                       : path === '/app' && section === destinationKey;
                   return (
@@ -602,6 +801,9 @@ export function AppShell({
                           : ''
                       }`}
                       data-yfc-choice="capsule"
+                      data-trainer-tab={
+                        trainerWorkspace && !desktopTrainerNavigation ? destinationKey : undefined
+                      }
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);
@@ -613,7 +815,7 @@ export function AppShell({
                     </AppLink>
                   );
                 })}
-                {demo && (
+                {demo && !mobileNavigation && (
                   <button
                     id="appMoreButton"
                     type="button"
@@ -626,8 +828,8 @@ export function AppShell({
                     <span className="app-bottom-nav__label">Сценарии</span>
                   </button>
                 )}
-                {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
               </div>
+              {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
 
               {!demo && (
                 <div
@@ -655,13 +857,19 @@ export function AppShell({
                           return (
                             <AppLink
                               key={destination.key}
-                              to={personalDestinationWithTrainerReturn(destination.to, search)}
+                              to={personalDestinationWithTrainerReturn(
+                                destination.to,
+                                personalSearch,
+                              )}
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
                               data-yfc-choice="compact"
                               aria-current={active ? 'page' : undefined}
                               onClick={() =>
                                 trackSectionNavigation(
-                                  personalDestinationWithTrainerReturn(destination.to, search),
+                                  personalDestinationWithTrainerReturn(
+                                    destination.to,
+                                    personalSearch,
+                                  ),
                                 )
                               }
                             >
@@ -822,13 +1030,19 @@ export function AppShell({
                         return (
                           <AppLink
                             key={destination.key}
-                            to={personalDestinationWithTrainerReturn(destination.to, search)}
+                            to={personalDestinationWithTrainerReturn(
+                              destination.to,
+                              personalSearch,
+                            )}
                             className="app-more-panel__item"
                             data-yfc-choice="compact"
                             aria-current={active ? 'page' : undefined}
                             onClick={() => {
                               trackSectionNavigation(
-                                personalDestinationWithTrainerReturn(destination.to, search),
+                                personalDestinationWithTrainerReturn(
+                                  destination.to,
+                                  personalSearch,
+                                ),
                               );
                               setMoreOpen(false);
                               hideMorePresence();

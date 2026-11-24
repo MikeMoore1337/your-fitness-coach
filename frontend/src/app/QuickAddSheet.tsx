@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import { AppLink } from '../shared/navigation/router';
 import { glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
+import { useQuickAddDrag } from './useQuickAddDrag';
 import {
   isQuickAddAnalyticsKind,
   productEventSurface,
@@ -49,7 +50,7 @@ export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
   {
     key: 'wellbeing',
     label: 'Самочувствие',
-    detail: 'Короткий ежедневный check-in',
+    detail: 'Ежедневная отметка самочувствия',
     icon: 'checklist',
     to: '/app?section=today&wellbeing=1',
   },
@@ -74,7 +75,7 @@ export function QuickAddTrigger({
     <button
       aria-haspopup="dialog"
       aria-label="Быстро добавить"
-      {...(inNavigation ? {} : glassProps('tinted', true))}
+      {...glassProps(inNavigation ? 'regular' : 'tinted', true)}
       {...(!inNavigation ? { 'data-glass-accent': 'lime' } : {})}
       className={className}
       data-testid="quick-add-trigger"
@@ -91,27 +92,53 @@ export function QuickAddTrigger({
       ) : (
         <Icon name="plus" size={20} className="app-quick-add-trigger__plus" />
       )}
-      <span className={inNavigation ? 'app-bottom-nav__label' : 'app-quick-add-trigger__label'}>
-        Добавить
-      </span>
+      <span className={inNavigation ? 'sr-only' : 'app-quick-add-trigger__label'}>Добавить</span>
     </button>
   );
 }
 
 export function QuickAddSheet({
   actions,
+  desktop = false,
   onClose,
   open,
 }: {
   actions: ReadonlyArray<QuickAddAction>;
+  desktop?: boolean;
   onClose(): void;
   open: boolean;
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
-  useEffect(() => {
+  const drag = useQuickAddDrag(panelRef, open, onClose);
+  const [previousOpen, setPreviousOpen] = useState(open);
+  const [exiting, setExiting] = useState(false);
+  if (previousOpen !== open) {
+    setPreviousOpen(open);
+    setExiting(
+      !open &&
+        (window.matchMedia?.('(min-width: 900px)').matches ?? false) &&
+        !(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false),
+    );
+  }
+  useLayoutEffect(() => {
+    if (!exiting) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    const timer = window.setTimeout(() => setExiting(false), 260);
+    const stopForReducedMotion = (event: MediaQueryListEvent) => {
+      if (event.matches) setExiting(false);
+    };
+    reduced?.addEventListener?.('change', stopForReducedMotion);
+    return () => {
+      window.clearTimeout(timer);
+      reduced?.removeEventListener?.('change', stopForReducedMotion);
+    };
+  }, [exiting]);
+  useLayoutEffect(() => {
     if (!open) return;
     const layer = panelRef.current?.parentElement;
-    const trigger = layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger');
+    const trigger =
+      layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger') ??
+      document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]');
     const background = [...(layer?.parentElement?.children ?? [])].filter(
       (element): element is HTMLElement => element instanceof HTMLElement && element !== layer,
     );
@@ -126,21 +153,30 @@ export function QuickAddSheet({
       // Modal cleanup runs before the background inert state is fully released.
       // Restore keyboard focus on the next frame, after the close commit.
       window.requestAnimationFrame(() => {
+        const activeDialog = document.querySelector<HTMLElement>(
+          '[data-testid="quick-add-layer"]:not([inert])',
+        );
         if (
           trigger?.isConnected &&
+          !activeDialog &&
           !trigger.closest('[inert]') &&
-          (document.activeElement === document.body || document.activeElement === trigger)
+          (document.activeElement === document.body ||
+            document.activeElement === trigger ||
+            layer?.contains(document.activeElement))
         ) {
           trigger.focus({ preventScroll: true });
         }
       });
     };
   }, [open, panelRef]);
-  if (!open) return null;
+  if (!open && !exiting) return null;
 
   return (
     <div
       className="app-quick-add-layer"
+      aria-hidden={!open || undefined}
+      inert={!open}
+      data-motion-phase={!open ? 'closing' : undefined}
       data-testid="quick-add-layer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
@@ -159,8 +195,12 @@ export function QuickAddSheet({
         role="dialog"
         tabIndex={-1}
       >
+        <div aria-hidden="true" className="app-quick-add-panel__grip" {...drag} />
         <header className="app-quick-add-panel__header">
-          <h2 id="quick-add-title">Что добавить?</h2>
+          <div>
+            <p className="app-quick-add-panel__eyebrow">Быстрое добавление</p>
+            <h2 id="quick-add-title">Что добавить?</h2>
+          </div>
           <button
             aria-label="Закрыть быстрые действия"
             className="app-quick-add-panel__close"
@@ -173,6 +213,8 @@ export function QuickAddSheet({
         <nav aria-label="Быстрые действия" className="app-quick-add-panel__actions">
           {actions.map((action) => (
             <AppLink
+              aria-label={action.label}
+              aria-describedby={desktop ? `quick-add-detail-${action.key}` : undefined}
               className="app-quick-add-action"
               key={action.key}
               to={action.to}
@@ -192,7 +234,20 @@ export function QuickAddSheet({
               </span>
               <span className="app-quick-add-action__copy">
                 <strong>{action.label}</strong>
+                {desktop && (
+                  <span
+                    id={`quick-add-detail-${action.key}`}
+                    className="app-quick-add-action__detail"
+                  >
+                    {action.detail}
+                  </span>
+                )}
               </span>
+              {desktop && (
+                <span aria-hidden="true" className="app-quick-add-action__open">
+                  Открыть
+                </span>
+              )}
               <Icon
                 aria-hidden="true"
                 className="app-quick-add-action__arrow"

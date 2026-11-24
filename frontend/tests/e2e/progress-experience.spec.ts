@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { chromium, expect, test, type Locator, type Page } from '@playwright/test';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
@@ -634,8 +634,12 @@ async function mockProgress(
         json: {
           user_id: 7,
           period_days: period,
-          period_start: '2030-01-01',
-          period_end: '2030-01-30',
+          period_start:
+            url.searchParams.get('date_from') ||
+            (process.env.ISSUE_984_CAPTURE_DIR
+              ? shiftDate('2030-01-30', 1 - period)
+              : '2030-01-01'),
+          period_end: url.searchParams.get('date_to') || '2030-01-30',
           training: {
             planned_workouts: 8,
             completed_workouts: 7,
@@ -1246,6 +1250,252 @@ async function expectTrainingHeading(page: Page) {
       exact: true,
     }),
   ).toBeVisible();
+}
+
+test('local Progress swipe respects the scroll boundary and changes only one view', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await mockProgress(page);
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  const tabs = page.getByRole('tablist', { name: 'Разделы прогресса' });
+  await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+  const bounds = await tabs.boundingBox();
+  if (!bounds) throw new Error('Progress tabs are not visible');
+  const dragLeft = async () => {
+    await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + 45, bounds.y + bounds.height / 2, { steps: 8 });
+    await page.mouse.up();
+  };
+  await dragLeft();
+  await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+  await tabs.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 45, bounds.y + bounds.height / 2, { steps: 8 });
+  await tabs.dispatchEvent('pointercancel', { pointerId: 1, isPrimary: true, button: 0 });
+  await page.mouse.up();
+  await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+  await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 45, bounds.y + bounds.height / 2, { steps: 8 });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.mouse.up();
+  await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+  await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 45, bounds.y + bounds.height / 2, { steps: 8 });
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Reflect.deleteProperty(document, 'hidden');
+  });
+  await page.mouse.up();
+  await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+  await dragLeft();
+  await expect(tabs.getByRole('tab', { name: 'Тело' })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('touch navigation first reveals hidden Progress tabs', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'CDP touch events require Chromium');
+  const context = await browser.newContext({
+    viewport: { width: 320, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  const page = await context.newPage();
+  try {
+    await mockProgress(page);
+    await page.goto('/app?section=progress');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    const tabs = page.getByRole('tablist', { name: 'Разделы прогресса' });
+    await tabs.scrollIntoViewIfNeeded();
+    await tabs.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
+    const cdp = await context.newCDPSession(page);
+    const swipe = async () => {
+      const box = await tabs.boundingBox();
+      if (!box) throw new Error('Progress tabs are not visible');
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      for (let step = 1; step <= 8; step += 1) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: x - 10 * step, y }],
+        });
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await swipe();
+    await expect.poll(() => tabs.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+    await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
+    await tabs.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+    });
+    await swipe();
+    await expect(tabs.getByRole('tab', { name: 'Тело' })).toHaveAttribute('aria-selected', 'true');
+  } finally {
+    await context.close();
+  }
+});
+
+if (process.env.ISSUE_984_CAPTURE_DIR) {
+  test('issue 984 AFTER Progress captures', async ({ browser, baseURL }, testInfo) => {
+    test.setTimeout(120_000);
+    const root = process.env.ISSUE_984_CAPTURE_DIR!;
+    await mkdir(resolve(root, 'screens'), { recursive: true });
+    await mkdir(resolve(root, 'video'), { recursive: true });
+    for (const theme of ['light', 'dark'] as const) {
+      const context = await browser.newContext({
+        baseURL,
+        colorScheme: theme,
+        viewport: { width: 393, height: 852 },
+        recordVideo: { dir: testInfo.outputPath('raw-video'), size: { width: 393, height: 852 } },
+      });
+      const page = await context.newPage();
+      const video = page.video();
+      await page.clock.setFixedTime(new Date('2030-01-30T12:00:00Z'));
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockProgress(page);
+      await page.goto('/app?section=progress');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Прогресс' })
+        .click();
+      for (const width of [320, 360, 393, 430]) {
+        await page.setViewportSize({ width, height: 852 });
+        await expect(progressOverview(page)).toBeVisible();
+        const chart = page.locator('.data-viz-chart').first();
+        if (await chart.isVisible()) {
+          await chart.scrollIntoViewIfNeeded();
+          await expect(chart).toHaveAttribute('data-motion-phase', 'idle');
+          await page.evaluate(() => window.scrollTo(0, 0));
+        }
+        await page.screenshot({
+          path: resolve(
+            root,
+            'screens',
+            `progress-overview-${testInfo.project.name}-${theme}-${width}.png`,
+          ),
+          fullPage: true,
+          animations: 'disabled',
+        });
+        await page.getByRole('tab', { name: 'Тело' }).click();
+        await expect(page.getByRole('link', { name: /Обзор/ })).toBeVisible();
+        const bodyChart = page.locator('.data-viz-chart').first();
+        if (await bodyChart.isVisible()) {
+          await bodyChart.scrollIntoViewIfNeeded();
+          await expect(bodyChart).toHaveAttribute('data-motion-phase', 'idle');
+          await page.evaluate(() => window.scrollTo(0, 0));
+        }
+        await page.screenshot({
+          path: resolve(
+            root,
+            'screens',
+            `progress-body-${testInfo.project.name}-${theme}-${width}.png`,
+          ),
+          fullPage: true,
+          animations: 'disabled',
+        });
+        await page.getByRole('link', { name: /Обзор/ }).click();
+      }
+      await page.setViewportSize({ width: 393, height: 852 });
+      for (const period of ['90 дней', '30 дней']) {
+        await page.getByRole('tab', { name: period }).click();
+        await page.waitForTimeout(220);
+      }
+      await page.getByRole('tab', { name: 'Тело' }).click();
+      await page.goBack();
+      await page.goForward();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.getByRole('tab', { name: '90 дней' }).click();
+      await page.waitForTimeout(250);
+      await context.close();
+      if (!video) throw new Error('Progress video was not recorded');
+      await copyFile(
+        await video.path(),
+        resolve(root, 'video', `progress-${testInfo.project.name}-${theme}.webm`),
+      );
+    }
+  });
+}
+
+if (process.env.ISSUE_984_NATIVE_ZOOM === '1') {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`Progress native 200 percent zoom ${theme}`, async () => {
+      test.setTimeout(90_000);
+      const extension = resolve('../.artifacts/runtime/tests/984-zoom-extension');
+      await mkdir(extension, { recursive: true });
+      await writeFile(
+        resolve(extension, 'manifest.json'),
+        JSON.stringify({
+          manifest_version: 3,
+          name: 'YFC local zoom test',
+          version: '1.0',
+          permissions: ['tabs'],
+          background: { service_worker: 'background.js' },
+        }),
+      );
+      await writeFile(
+        resolve(extension, 'background.js'),
+        'chrome.runtime.onInstalled.addListener(() => {});',
+      );
+      const context = await chromium.launchPersistentContext('', {
+        headless: true,
+        channel: 'chromium',
+        viewport: { width: 1280, height: 900 },
+        args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+      });
+      try {
+        const worker =
+          context.serviceWorkers()[0] ??
+          (await context.waitForEvent('serviceworker', { timeout: 15_000 }));
+        const page = context.pages()[0] ?? (await context.newPage());
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+        await mockProgress(page);
+        await page.goto(
+          new URL(
+            '/app?section=progress',
+            process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
+          ).toString(),
+        );
+        await page.getByRole('button', { name: 'Клиент' }).click();
+        await page
+          .getByRole('navigation', { name: 'Основная навигация' })
+          .getByRole('link', { name: 'Прогресс' })
+          .click();
+        await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+        const zoom = await worker.evaluate<number>(
+          `(async () => { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); await chrome.tabs.setZoom(tab.id, 2); return chrome.tabs.getZoom(tab.id); })()`,
+        );
+        expect(zoom).toBe(2);
+        for (const width of [320, 360, 393, 430, 1280]) {
+          await page.setViewportSize({ width, height: width === 1280 ? 900 : 844 });
+          const metrics = await page.evaluate(() => ({
+            dpr: devicePixelRatio,
+            innerWidth,
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+          }));
+          expect(metrics.dpr).toBe(2);
+          expect(Math.abs(metrics.innerWidth - width / 2)).toBeLessThanOrEqual(1);
+          expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+          await expect(page.getByRole('tablist', { name: 'Период прогресса' })).toBeVisible();
+          await expect(page.getByRole('tab', { name: '7 дней' })).toBeVisible();
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
 }
 
 test('progress remains clear and free of horizontal overflow at supported widths', async ({
@@ -2317,7 +2567,10 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
   await refreshStarted;
   const loadingState = page.getByRole('status').filter({ hasText: 'Обновляем динамику за период' });
   await expect(loadingState).toBeVisible();
-  await expect(progressOverview(page)).toBeVisible();
+  await expect(progressOverview(page)).toHaveCount(0);
+  const previousContent = page.locator('.progress-local-context');
+  await expect(previousContent).toHaveAttribute('inert', '');
+  await expect(previousContent).toHaveAttribute('aria-hidden', 'true');
   await page.setViewportSize({ width: 390, height: 844 });
   await loadingState.scrollIntoViewIfNeeded();
   await page.screenshot({
@@ -3116,7 +3369,7 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
     ),
   );
   expect(href.searchParams.get('return_to')).toBe(
-    '/app?section=progress&progress_view=nutrition#nutrition-period-report',
+    '/app?section=progress&progress_period=days_30&progress_view=nutrition#nutrition-period-report',
   );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
@@ -3766,13 +4019,24 @@ test('progress header keeps the title row separate from period and report contro
         );
       }
       if (width >= 1280) {
-        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.right + 1);
-        expect(boxes.help!.right).toBeLessThan(boxes.period!.left);
-        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
-        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
+        await expect(page.locator('.progress-hero__selection')).toHaveText('Выбрано: 30 дней');
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.heading!.right);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.heading!.bottom - 1);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.report!.bottom - 1);
+        expect(boxes.period!.left).toBeLessThanOrEqual(boxes.heading!.left + 1);
       }
     }
   }
+  await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
+  await expect(page.locator('.progress-hero__selection')).toHaveText('Выбрано: 7 дней');
+  const report = page.getByRole('link', { name: 'Скачать отчёт' });
+  await report.focus();
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await expect(report).toBeFocused();
+  await expect(page.locator('.progress-hero__period + .progress-hero__download')).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(report).toBeFocused();
+  await expect(page.locator('.progress-hero__download + .progress-hero__period')).toBeVisible();
 });
 
 test('progress header keeps expanded help and custom period in normal flow', async ({ page }) => {

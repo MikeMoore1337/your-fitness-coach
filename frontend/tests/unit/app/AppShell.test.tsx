@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QuickAddPlacementContext } from '../../../src/app/QuickAddPlacementContext';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../../src/app/AppShell';
@@ -75,14 +75,9 @@ vi.mock('../../../src/shared/pwa/PwaProvider', () => ({
   usePwa: () => pwa,
 }));
 
-vi.mock('../../../src/shared/navigation/router', () => ({
+vi.mock('../../../src/shared/navigation/router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/shared/navigation/router')>()),
   useNavigation: () => navigation,
-  coachTabFromSearch: (search: string) => new URLSearchParams(search).get('tab') ?? 'today',
-  safeTrainerReturnPath: (value: string | null | undefined) => {
-    if (!value) return null;
-    const parsed = new URL(value, 'http://localhost');
-    return `${parsed.pathname}${parsed.search}`;
-  },
   AppLink: ({ to, className, children, ...props }: React.ComponentProps<'a'> & { to: string }) => (
     <a href={to} className={className} {...props}>
       {children}
@@ -109,19 +104,21 @@ describe('AppShell', () => {
   it('показывает основные направления и отделяет рабочее пространство тренера', () => {
     render(<AppShell>Содержимое</AppShell>);
 
+    expect(document.querySelector('.app-desktop-header__workspace')).toHaveTextContent(
+      'Рабочее пространствоКлиенты',
+    );
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute('href', '/coach');
-    expect(screen.getByRole('link', { name: 'Клиенты' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute(
       'href',
-      '/coach?tab=clients',
+      '/app?section=today&trainer_return=%2Fcoach',
     );
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
       ),
-    ).toEqual(['Сегодня', 'Клиенты', 'Программы', 'Ещё']);
+    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
     expect(screen.queryByRole('button', { name: 'Ещё' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Тренер' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Админ-панель' })).not.toBeInTheDocument();
     expect(screen.getByText('Ресурсы')).toBeInTheDocument();
     expect(screen.getByText('Михаил')).toBeInTheDocument();
@@ -135,6 +132,14 @@ describe('AppShell', () => {
     navigation.path = '/app';
     render(<AppShell section="today">Содержимое</AppShell>);
 
+    expect(document.querySelector('.app-desktop-header__workspace')).toHaveTextContent(
+      'Рабочее пространствоДля себя',
+    );
+    expect(
+      within(document.querySelector('.app-desktop-header') as HTMLElement).getByRole('button', {
+        name: 'Быстро добавить',
+      }),
+    ).toBeInTheDocument();
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
@@ -208,10 +213,13 @@ describe('AppShell', () => {
       'href',
       '/app?section=nutrition&quick_add=food',
     );
+    expect(within(dialog).getByRole('link', { name: 'Еда' })).toHaveAccessibleDescription(
+      'Быстрый ввод в дневник питания',
+    );
     expect(
       within(dialog)
         .getAllByRole('link')
-        .map((link) => link.textContent),
+        .map((link) => link.getAttribute('aria-label')),
     ).toEqual(['Еда', 'Вода', 'Кардио', 'Замер', 'Самочувствие']);
     expect(document.getElementById('appContent')?.inert).toBe(true);
     expect(
@@ -333,10 +341,9 @@ describe('AppShell', () => {
     resize(390);
     await waitFor(() =>
       expect(
-        within(document.querySelector('.app-bottom-nav__primary') as HTMLElement).getByRole(
-          'button',
-          { name: 'Быстро добавить' },
-        ),
+        within(document.querySelector('#appBottomNav') as HTMLElement).getByRole('button', {
+          name: 'Быстро добавить',
+        }),
       ).toBeInTheDocument(),
     );
     expect(
@@ -361,7 +368,7 @@ describe('AppShell', () => {
     expect(screen.getAllByRole('button', { name: 'Быстро добавить' })).toHaveLength(1);
   });
 
-  it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {
+  it('размещает добавление рядом с четырьмя вкладками dock и возвращает на него фокус', () => {
     stubViewport(390);
     navigation.path = '/app';
     render(<AppShell section="today">Содержимое</AppShell>);
@@ -372,9 +379,10 @@ describe('AppShell', () => {
       'План',
       'Питание',
       'Прогресс',
-      'Добавить',
     ]);
-    const add = within(primary as HTMLElement).getByRole('button', { name: 'Быстро добавить' });
+    const dock = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(dock).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(primary.parentElement);
     expect(add.querySelector('svg[data-icon="plus"]')).toBeInTheDocument();
     expect(add).not.toHaveAttribute('aria-current');
     expect(add).not.toHaveClass('is-active');
@@ -385,6 +393,72 @@ describe('AppShell', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
     expect(add).toHaveFocus();
+  });
+
+  it('keeps the demo quick add in the same navigation group and its scenario menu available', () => {
+    stubViewport(390);
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/',
+          moreLinks: [],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо-содержимое
+      </AppShell>,
+    );
+    const navigation = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(navigation).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(
+      navigation.querySelector('.app-bottom-nav__primary')?.parentElement,
+    );
+    expect(document.querySelector('.app-quick-add-trigger--floating')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
+    expect(screen.getByRole('dialog', { name: 'Демо' })).toBeInTheDocument();
+  });
+
+  it('keeps quick add available in the personal dock on the mobile admin route', () => {
+    stubViewport(390);
+    navigation.path = '/admin';
+    user.is_root = true;
+    render(<AppShell>Администрирование</AppShell>);
+    const dock = screen.getByRole('navigation', { name: 'Основная навигация' });
+    const add = within(dock).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.parentElement).toBe(dock.querySelector('.app-bottom-nav__primary')?.parentElement);
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+  });
+
+  it('does not restore dock height after unmount when fonts finish loading', async () => {
+    stubViewport(390);
+    navigation.path = '/app';
+    const original = Object.getOwnPropertyDescriptor(document, 'fonts');
+    let resolveFonts!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      resolveFonts = resolve;
+    });
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { ready, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    });
+    try {
+      const view = render(<AppShell section="today">Содержимое</AppShell>);
+      expect(document.documentElement.style.getPropertyValue('--app-bottom-nav-height')).not.toBe(
+        '',
+      );
+      view.unmount();
+      await act(async () => resolveFonts());
+      expect(document.documentElement.style.getPropertyValue('--app-bottom-nav-height')).toBe('');
+    } finally {
+      if (original) Object.defineProperty(document, 'fonts', original);
+      else Reflect.deleteProperty(document, 'fonts');
+    }
   });
 
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {
@@ -479,6 +553,40 @@ describe('AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
     const dialog = screen.getByRole('dialog', { name: 'Демо-кабинет' });
     expect(within(dialog).getByText('Отдельная сессия')).toBeInTheDocument();
+  });
+
+  it('keeps Coach OS reflow separate from the personal quick-add dock and Demo', () => {
+    stubViewport(390);
+    const coach = render(<AppShell>Кабинет тренера</AppShell>);
+    const coachNav = screen.getByRole('navigation', { name: 'Основная навигация' });
+    expect(coachNav).toHaveAttribute('data-workspace', 'coach');
+    expect(coachNav).toHaveAttribute('data-dock-columns');
+    expect(
+      within(coachNav).queryByRole('button', { name: 'Быстро добавить' }),
+    ).not.toBeInTheDocument();
+    coach.unmount();
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/demo',
+          moreLinks: [],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо
+      </AppShell>,
+    );
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
+      'data-dock-columns',
+    );
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).not.toHaveAttribute(
+      'data-workspace',
+    );
   });
 
   it('оставляет в минимальном demo utility только тему и полный выход из демо', () => {

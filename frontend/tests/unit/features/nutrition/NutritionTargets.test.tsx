@@ -1,7 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { NutritionTargets } from '../../../../src/features/nutrition/NutritionTargets';
+import {
+  NutritionTargets,
+  type NutritionTargetsDraft,
+} from '../../../../src/features/nutrition/NutritionTargets';
 import { addCalendarDays, dateInputValue } from '../../../../src/shared/dateTime';
 
 const apiMock = vi.hoisted(() => vi.fn());
@@ -126,5 +129,46 @@ describe('NutritionTargets', () => {
       expected_binding_id: null,
       expected_target_version: 1,
     });
+  });
+
+  it('restores an unsaved date draft without restoring a server preview or writing', async () => {
+    let draft: NutritionTargetsDraft | null = null;
+    const onDraftChange = (value: NutritionTargetsDraft) => {
+      draft = value;
+    };
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const renderDraft = (initialDraft?: NutritionTargetsDraft | null) =>
+      render(
+        <QueryClientProvider client={client}>
+          <NutritionTargets
+            mode="override"
+            date={tomorrow}
+            dateTarget={{ ...values, id: 123, user_id: 7 } as never}
+            timeZone="Europe/Moscow"
+            readOnly={false}
+            onClose={() => undefined}
+            initialDraft={initialDraft}
+            onDraftChange={onDraftChange}
+          />
+        </QueryClientProvider>,
+      );
+    const first = renderDraft();
+    await screen.findByText(/Сейчас: 2/);
+    expect(draft).toBeNull();
+    fireEvent.change(screen.getByLabelText('Калории, ккал'), { target: { value: '2250' } });
+    fireEvent.change(screen.getByLabelText('Тип дня'), { target: { value: 'recovery' } });
+    await waitFor(() =>
+      expect(draft).toMatchObject({ values: { calories: 2250 }, dayType: 'recovery' }),
+    );
+    first.unmount();
+    renderDraft(draft);
+    expect(screen.getByLabelText('Калории, ккал')).toHaveValue(2250);
+    expect(screen.getByLabelText('Тип дня')).toHaveValue('recovery');
+    expect(
+      screen.queryByRole('heading', { name: 'Цель на выбранную дату' }),
+    ).not.toBeInTheDocument();
+    expect(apiMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
   });
 });

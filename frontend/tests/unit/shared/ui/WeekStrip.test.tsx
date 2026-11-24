@@ -16,7 +16,161 @@ vi.mock('../../../../src/shared/navigation/router', () => ({
 
 afterEach(cleanup);
 
+function pointer(target: Element, type: string, x: number, y = 100) {
+  const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+  Object.defineProperties(event, { pointerId: { value: 1 }, isPrimary: { value: true } });
+  fireEvent(target, event);
+}
+
 describe('WeekStrip', () => {
+  it('switches only one enabled week and suppresses the click after a drag', () => {
+    const onSelect = vi.fn();
+    const onPrevious = vi.fn();
+    const onNext = vi.fn();
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя дневника"
+        mode="picker"
+        navigation={{ onPrevious, onNext, nextDisabled: true }}
+        onSelect={onSelect}
+        selectedDate="2026-08-20"
+        title="Эта неделя"
+        today="2026-08-20"
+      />,
+    );
+    const rail = container.querySelector<HTMLOListElement>('.week-strip__days')!;
+    Object.defineProperty(rail, 'clientWidth', { value: 320 });
+    rail.scrollLeft = 0;
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 140);
+    pointer(rail, 'pointerup', 140);
+    expect(onNext).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /20 августа.*выбрано/i }), { detail: 1 });
+    expect(onSelect).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    pointer(rail, 'pointermove', 250);
+    pointer(rail, 'pointerup', 250);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 200);
+    pointer(rail, 'pointerup', 200);
+    fireEvent.click(screen.getByRole('button', { name: /20 августа.*выбрано/i }), { detail: 1 });
+    expect(onSelect).toHaveBeenCalledOnce();
+  });
+
+  it('scrolls hidden days before navigating and cancels an interrupted gesture', () => {
+    const onNext = vi.fn();
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя"
+        mode="overview"
+        navigation={{ onPrevious: vi.fn(), onNext }}
+        title="Неделя"
+        today="2026-08-20"
+      />,
+    );
+    const rail = container.querySelector<HTMLOListElement>('.week-strip__days')!;
+    Object.defineProperties(rail, { clientWidth: { value: 300 }, scrollWidth: { value: 400 } });
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 190);
+    pointer(rail, 'pointerup', 190);
+    expect(rail.scrollLeft).toBe(60);
+    expect(onNext).not.toHaveBeenCalled();
+    rail.scrollLeft = 100;
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 140);
+    pointer(rail, 'pointercancel', 140);
+    expect(onNext).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 140);
+    pointer(rail, 'pointerup', 140);
+    expect(onNext).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the gesture when implicit capture transfers from a day to the rail', () => {
+    const onPrevious = vi.fn();
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя"
+        mode="picker"
+        navigation={{ onPrevious, onNext: vi.fn() }}
+        onSelect={vi.fn()}
+        selectedDate="2026-08-20"
+        title="Неделя"
+        today="2026-08-20"
+      />,
+    );
+    const rail = container.querySelector<HTMLOListElement>('.week-strip__days')!;
+    Object.defineProperty(rail, 'clientWidth', { value: 320 });
+    rail.scrollLeft = 0;
+    const day = screen.getByRole('button', { name: /20 августа.*выбрано/i });
+    pointer(day, 'pointerdown', 140);
+    pointer(day, 'pointermove', 160);
+    pointer(day, 'lostpointercapture', 160);
+    pointer(rail, 'pointermove', 250);
+    pointer(rail, 'pointerup', 250);
+    expect(onPrevious).toHaveBeenCalledOnce();
+  });
+
+  it('distinguishes short, fast, vertical and edge gestures and resets on resize', () => {
+    const now = vi.spyOn(performance, 'now');
+    let clock = 0;
+    now.mockImplementation(() => clock);
+    const onPrevious = vi.fn();
+    const onNext = vi.fn();
+    const { container } = render(
+      <WeekStrip
+        anchorDate="2026-08-20"
+        ariaLabel="Неделя"
+        mode="overview"
+        navigation={{ onPrevious, onNext }}
+        title="Неделя"
+        today="2026-08-20"
+      />,
+    );
+    const rail = container.querySelector<HTMLOListElement>('.week-strip__days')!;
+    Object.defineProperty(rail, 'clientWidth', { value: 320 });
+    pointer(rail, 'pointerdown', 140);
+    clock += 100;
+    pointer(rail, 'pointermove', 160);
+    pointer(rail, 'pointerup', 160);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 200;
+    pointer(rail, 'pointermove', 190);
+    pointer(rail, 'pointerup', 190);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 10;
+    pointer(rail, 'pointermove', 200);
+    clock += 10;
+    pointer(rail, 'pointermove', 190);
+    pointer(rail, 'pointerup', 190);
+    expect(onPrevious).not.toHaveBeenCalled();
+    pointer(rail, 'pointerdown', 140);
+    clock += 10;
+    pointer(rail, 'pointermove', 175);
+    pointer(rail, 'pointerup', 175);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 140);
+    pointer(rail, 'pointermove', 180, 150);
+    pointer(rail, 'pointerup', 250, 220);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 10);
+    pointer(rail, 'pointermove', 150);
+    pointer(rail, 'pointerup', 150);
+    expect(onPrevious).toHaveBeenCalledOnce();
+    pointer(rail, 'pointerdown', 250);
+    pointer(rail, 'pointermove', 140);
+    fireEvent(window, new Event('resize'));
+    pointer(rail, 'pointerup', 140);
+    expect(onNext).not.toHaveBeenCalled();
+    expect(rail.style.transform).toBe('');
+    now.mockRestore();
+  });
+
   it('reveals a selected date inside the narrow rail without scrolling the page', () => {
     const scrollPage = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     const measure = vi

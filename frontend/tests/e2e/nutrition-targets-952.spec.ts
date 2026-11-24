@@ -257,6 +257,16 @@ for (const width of [320, 390, 1280]) {
       await expect(page.getByRole('heading', { name: 'Изменить цель' })).toBeFocused();
       await page.getByLabel('Тип дня').selectOption('recovery');
       await page.getByLabel('Калории, ккал').fill('2250');
+      if (width === 390 && theme === 'light') {
+        await page.getByRole('button', { name: 'К дневнику' }).click();
+        const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+        await dock.getByRole('link', { name: 'Прогресс' }).click();
+        await dock.getByRole('link', { name: 'Питание' }).click();
+        await page.getByRole('button', { name: 'Изменить на эту дату' }).click();
+        await expect(page.getByLabel('Калории, ккал')).toHaveValue('2250');
+        await expect(page.getByLabel('Тип дня')).toHaveValue('recovery');
+        expect(writes).toBe(0);
+      }
       await capture('override');
       await page.getByLabel('Будущие такие дни').check();
       await capture('future-override');
@@ -277,7 +287,11 @@ for (const width of [320, 390, 1280]) {
       await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
       await expect(page.getByText('Программа изменилась')).toBeVisible();
       await capture('conflict');
-      await page.getByRole('button', { name: 'Проверить изменения' }).click();
+      await page
+        .locator('.nutrition-goal-notice')
+        .filter({ hasText: 'Программа изменилась' })
+        .getByRole('button', { name: 'Проверить изменения' })
+        .click();
       await expect(page.getByRole('heading', { name: 'Будущие цели' })).toBeVisible();
       await capture('binding-preview');
       empty = true;

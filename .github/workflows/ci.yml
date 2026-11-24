@@ -234,9 +234,74 @@ jobs:
           test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
           node -e 'const { chromium } = require("@playwright/test"); (async () => { const browser = await chromium.launch(); const page = await browser.newPage(); await page.setContent("<title>Chromium ready</title>"); if (await page.title() !== "Chromium ready") throw new Error("Chromium page failed"); console.log(`Chromium ${browser.version()} launched`); await browser.close(); })().catch(error => { console.error(error); process.exit(1); });'
       - name: Install scheduled Vitest reporter
-        if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
+        if: matrix.lane == 'unit' && (needs.scope-router.outputs.run_scheduled_report == 'true' || github.event_name == 'pull_request')
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Verify scheduled Vitest reporter on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        working-directory: frontend
+        shell: bash
+        env:
+          ALLURE_RESULTS_DIR: ${{ github.workspace }}/.artifacts/runtime/tests/allure-results/pr-vitest-smoke
+        run: |
+          set -Eeuo pipefail
+          npm run test -- tests/unit/shared/numeric/decimalDraft.test.ts tests/unit/features/dashboard/TodayDashboard.test.tsx
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          root = Path(os.environ['ALLURE_RESULTS_DIR'])
+          results = list(root.glob('*-result.json'))
+          if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
+              raise SystemExit('scheduled Allure reporter did not record all 35 successful tests')
+          (root / 'synthetic-attachment.png').write_bytes(base64.b64decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC'
+          ))
+          with ZipFile(root / 'synthetic-attachment.zip', 'w') as archive:
+              archive.writestr('trace.trace', 'synthetic test trace')
+          PY
+          key="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "ALLURE_PR_SMOKE_KEY=$key" >> "$GITHUB_ENV"
+      - name: Encrypt synthetic reporter results on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_PR_SMOKE_KEY }}
+        with:
+          enabled: "true"
+          source: .artifacts/runtime/tests/allure-results/pr-vitest-smoke
+          bundle: .artifacts/runtime/tests/allure-bundles/pr-vitest-smoke.enc
+          artifact-name: allure-pr-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          suite: frontend-checks
+          browser: pr-smoke
+      - name: Verify synthetic encrypted results on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_PR_SMOKE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          python scripts/allure_bundle.py decrypt \
+            --source .artifacts/runtime/tests/allure-bundles/pr-vitest-smoke.enc \
+            --output .artifacts/runtime/tests/pr-vitest-smoke-decrypted
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          source = Path('.artifacts/runtime/tests/allure-results/pr-vitest-smoke')
+          target = Path('.artifacts/runtime/tests/pr-vitest-smoke-decrypted')
+          results = list(target.glob('*-result.json'))
+          if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
+              raise SystemExit('encrypted reporter bundle did not preserve all 35 successful tests')
+          for name in ('synthetic-attachment.png', 'synthetic-attachment.zip'):
+              if hashlib.sha256((source / name).read_bytes()).digest() != hashlib.sha256((target / name).read_bytes()).digest():
+                  raise SystemExit('encrypted reporter bundle did not preserve a synthetic attachment')
+          PY
       - name: Sync API schema dependencies
         if: matrix.lane == 'checks'
         run: |
@@ -259,7 +324,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-checks
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-checks.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-checks
           suite: frontend-checks
@@ -367,7 +432,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-e2e-shard-${{ matrix.shard }}
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-e2e-shard-${{ matrix.shard }}.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-e2e-shard-${{ matrix.shard }}
           suite: frontend-e2e
@@ -447,7 +512,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-mobile-regression
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression
           suite: frontend-mobile-regression
@@ -519,19 +584,27 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-mobile-regression-extended
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression-extended.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression-extended
           suite: frontend-mobile-regression-extended
           browser: mobile-firefox-webkit
 
   frontend-cross-browser:
-    name: Weekly cross-browser regression (Chromium + Firefox + WebKit)
+    name: Weekly cross-browser regression (${{ matrix.browser }}, shard ${{ matrix.shard }}/5)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_cross_browser == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1, 2, 3, 4, 5]
     env:
+      YFC_CROSS_BROWSER_PROJECT: ${{ matrix.browser }}
+      YFC_CROSS_BROWSER_SHARD: ${{ matrix.shard }}/5
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
       APP_ENV: test
@@ -608,8 +681,13 @@ jobs:
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Run shared cross-browser regression group
         run: python scripts/ci_contract.py run-group frontend-cross-browser
+      - name: Run shared UI quality sweep
+        if: matrix.browser == 'chromium' && matrix.shard == 1
+        env:
+          ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser/chromium-shard-1', github.workspace) || '' }}
+        run: python scripts/ci_contract.py run-group frontend-ui-quality-sweep
       - name: Upload UI quality sweep evidence
-        if: always()
+        if: always() && matrix.browser == 'chromium' && matrix.shard == 1
         uses: actions/upload-artifact@v4
         with:
           name: ui-quality-sweep-${{ github.run_id }}
@@ -617,42 +695,18 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14
-      - name: Upload encrypted Allure results
+      - name: Upload encrypted cross-browser Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
         env:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/chromium
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-chromium.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-chromium
+          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/${{ matrix.browser }}-shard-${{ matrix.shard }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}
           suite: frontend-cross-browser
-          browser: chromium
-      - name: Upload encrypted Firefox Allure results
-        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
-        uses: ./.github/actions/upload-allure-results
-        env:
-          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
-        with:
-          enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/firefox
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-firefox.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-firefox
-          suite: frontend-cross-browser
-          browser: firefox
-      - name: Upload encrypted WebKit Allure results
-        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
-        uses: ./.github/actions/upload-allure-results
-        env:
-          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
-        with:
-          enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/webkit
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-webkit.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-webkit
-          suite: frontend-cross-browser
-          browser: webkit
+          browser: ${{ matrix.browser }}-shard-${{ matrix.shard }}
 
   python-tests:
     name: Python tests (${{ matrix.shard }}/5)
@@ -715,7 +769,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/python-tests-shard-${{ matrix.shard }}
           bundle: .artifacts/runtime/tests/allure-bundles/python-tests-shard-${{ matrix.shard }}.enc
           artifact-name: allure-results-${{ github.run_id }}-python-tests-shard-${{ matrix.shard }}
           suite: python-tests
@@ -819,7 +873,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/migrated-stack
           bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack.enc
           artifact-name: allure-results-${{ github.run_id }}-migrated-stack
           suite: migrated-stack
@@ -1201,16 +1255,76 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  allure-quarantine:
+    name: Quarantine encrypted Allure attachments
+    needs:
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      manifest_digest: ${{ steps.manifest.outputs.digest }}
+      environment_id: ${{ steps.environment.outputs.id }}
+      environment_name: ${{ steps.environment.outputs.name }}
+    env:
+      RUN_KIND: ${{ needs.scope-router.outputs.profile == 'weekly-exhaustive' && 'weekly' || 'daily' }}
+      QUARANTINE_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/downloaded-allure
+      QUARANTINE_MANIFEST: ${{ github.workspace }}/.artifacts/runtime/tests/allure-quarantine.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Download current-run encrypted result bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-${{ github.run_id }}-*
+          path: .artifacts/runtime/tests/downloaded-allure
+          merge-multiple: true
+      - name: Bind the complete quarantine to this run and commit
+        id: manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          digest="$(python scripts/allure_quarantine.py manifest --root "$QUARANTINE_ROOT" --manifest "$QUARANTINE_MANIFEST" --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA")"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Review every decrypted attachment before approving this exact manifest." >> "$GITHUB_STEP_SUMMARY"
+          echo "Approval comment: allure-review:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:$digest" >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the quarantine manifest for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-quarantine-manifest-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: .artifacts/runtime/tests/allure-quarantine.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require an existing protected review environment
+        id: environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "name=allure-review" >> "$GITHUB_OUTPUT"
+
   scheduled-report:
     name: Private scheduled Allure report
     concurrency:
       group: yfc-scheduled-allure-publication
       cancel-in-progress: false
     needs:
-      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
-    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, allure-quarantine]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true' && needs.allure-quarantine.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    environment:
+      name: ${{ needs.allure-quarantine.outputs.environment_name }}
     permissions:
       actions: read
       contents: read
@@ -1256,6 +1370,27 @@ jobs:
           pattern: allure-results-${{ github.run_id }}-*
           path: .artifacts/runtime/tests/downloaded-allure
           merge-multiple: true
+      - name: Download the reviewed manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-quarantine-manifest-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: .artifacts/runtime/tests/quarantine-manifest
+      - name: Verify the exact owner review and encrypted attachments
+        id: quarantine-verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_OWNER: ${{ github.repository_owner }}
+          REVIEW_ENVIRONMENT_ID: ${{ needs.allure-quarantine.outputs.environment_id }}
+          REVIEW_MANIFEST_DIGEST: ${{ needs.allure-quarantine.outputs.manifest_digest }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          test "$id" = "$REVIEW_ENVIRONMENT_ID"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > "$RUNNER_TEMP/allure-approvals.json"
+          python scripts/allure_quarantine.py approval --json "$RUNNER_TEMP/allure-approvals.json" --owner "$REVIEW_OWNER" --environment-id "$id" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --digest "$REVIEW_MANIFEST_DIGEST"
+          python scripts/allure_quarantine.py verify --root "$BUNDLE_DOWNLOAD_ROOT" --manifest .artifacts/runtime/tests/quarantine-manifest/allure-quarantine.json --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA" --digest "$REVIEW_MANIFEST_DIGEST"
       - name: Decrypt only current-run result bundles
         if: always()
         continue-on-error: true
@@ -1322,7 +1457,7 @@ jobs:
         continue-on-error: true
         run: python scripts/allure_report.py validate --report-root "$REPORT_ROOT" --metadata "$REPORT_METADATA"
       - name: Publish private report to isolated VPS origin
-        if: always()
+        if: always() && steps.quarantine-verified.outcome == 'success'
         continue-on-error: true
         env:
           ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}

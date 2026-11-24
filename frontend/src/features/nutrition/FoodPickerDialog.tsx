@@ -1,5 +1,5 @@
 import { TimeInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { ApiError, api } from '../../shared/api/client';
@@ -47,7 +47,7 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
-import { FoodEditor } from './FoodEditor';
+import { FoodEditor, type FoodDraft } from './FoodEditor';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
 import { PhotoMealScanner } from './PhotoMealScanner';
 import { MealTemplateBrowser } from './MealTemplateBrowser';
@@ -128,6 +128,9 @@ type FoodAmountUnit = FoodDiaryEntry['amount_unit'];
 
 interface AddDraft {
   food: FoodDraftSelection | null;
+  recipe?: Recipe | null;
+  recipeAmount?: string;
+  editor?: { food?: Food; barcode: string; values: FoodDraft } | null;
   amount: string;
   amountUnit: FoodAmountUnit;
   quick?: QuickAddDraft;
@@ -593,19 +596,14 @@ export function FoodPickerDialog({
   const { user } = useAuth();
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<PickerView>(initialView);
   const [source, setSource] = useState<PickerSource>('recent');
   const [entryMethod, setEntryMethod] = useState<FoodEntryMethod>(
     initialView === 'quick-add' ? 'quick_add' : 'recent',
   );
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingFood, setEditingFood] = useState<Food | undefined>();
-  const [editorBarcode, setEditorBarcode] = useState('');
   const [scanBarcode, setScanBarcode] = useState('');
   const [flowStartedAt, setFlowStartedAt] = useState(() => Date.now());
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [recipeAmount, setRecipeAmount] = useState('100');
   const [draft, setDraft, clearDraft] = usePersistentState<AddDraft>(
     foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType),
     {
@@ -616,6 +614,19 @@ export function FoodPickerDialog({
       requestId: newEntryRequestId(),
     },
   );
+  const [view, setView] = useState<PickerView>(() => (draft.editor ? 'food-editor' : initialView));
+  const [editingFood, setEditingFood] = useState<Food | undefined>(() => draft.editor?.food);
+  const [editorBarcode, setEditorBarcode] = useState(() => draft.editor?.barcode ?? '');
+  const onEditorDraftChange = useCallback(
+    (values: FoodDraft) =>
+      setDraft((current) => ({
+        ...current,
+        editor: { food: editingFood, barcode: editorBarcode, values },
+      })),
+    [editingFood, editorBarcode, setDraft],
+  );
+  const selectedRecipe = draft.recipe ?? null;
+  const recipeAmount = draft.recipeAmount ?? '100';
   const batchStorageKey = `${foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType)}_batch`;
   const [batch, setBatch, clearBatch] = usePersistentState<BatchDraft>(batchStorageKey, {
     items: [],
@@ -627,7 +638,6 @@ export function FoodPickerDialog({
   const [importedExternal, setImportedExternal] = useState<Record<string, Food>>({});
   const handleClose = () => {
     if (batchInFlight.current) return;
-    if (!batch.pending) clearBatch();
     onClose();
   };
   const panelRef = useModalA11y<HTMLDivElement>(
@@ -639,11 +649,11 @@ export function FoodPickerDialog({
 
   useEffect(() => {
     if (draft.requestId && draft.quick?.nutritionSource) return;
-    setDraft({
-      ...draft,
-      quick,
-      requestId: draft.requestId ?? newEntryRequestId(),
-    });
+    setDraft((current) => ({
+      ...current,
+      quick: { ...emptyQuickAdd, ...(current.quick ?? {}) },
+      requestId: current.requestId ?? newEntryRequestId(),
+    }));
   }, [draft, quick, setDraft]);
 
   const normalizedSearchInput = searchInput.trim().replace(/\s+/g, ' ');
@@ -959,7 +969,6 @@ export function FoodPickerDialog({
       toast(`Добавлено в ${mealLabels[mealType]}`);
       if (variables.closeAfter) onClose();
       else {
-        setSelectedRecipe(null);
         setEntryMethod(initialView === 'quick-add' ? 'quick_add' : 'recent');
         setFlowStartedAt(Date.now());
         setView(initialView);
@@ -1103,10 +1112,11 @@ export function FoodPickerDialog({
       surface: productEventSurface(),
       entry_method: entryMethod,
     });
-    setSelectedRecipe(null);
     const amountUnit = foodAmountUnit(food);
     updateDraft({
       food: foodDraftSelection(food),
+      recipe: null,
+      editor: null,
       amount: amountUnit === 'serving' ? '1' : '100',
       amountUnit,
     });
@@ -1150,9 +1160,7 @@ export function FoodPickerDialog({
       surface: productEventSurface(),
       entry_method: 'recipe',
     });
-    updateDraft({ food: null });
-    setSelectedRecipe(recipe);
-    setRecipeAmount('100');
+    updateDraft({ food: null, recipe, recipeAmount: '100' });
   };
   const title =
     draft.food?.name ||
@@ -1218,8 +1226,7 @@ export function FoodPickerDialog({
               type="button"
               onClick={() => {
                 addEntry.reset();
-                setSelectedRecipe(null);
-                updateDraft({ food: null });
+                updateDraft({ food: null, recipe: null });
               }}
             >
               <Icon name="arrow-left" size={16} /> Выбрать другое
@@ -1300,7 +1307,7 @@ export function FoodPickerDialog({
                       step="any"
                       required
                       value={recipeAmount}
-                      onChange={(event) => setRecipeAmount(event.target.value)}
+                      onChange={(event) => updateDraft({ recipeAmount: event.target.value })}
                     />
                   </Field>
                 </>
@@ -1493,7 +1500,12 @@ export function FoodPickerDialog({
               userId={user?.id ?? 'anonymous'}
               barcode={editorBarcode}
               food={editingFood}
-              onCancel={() => setView('browse')}
+              initialValues={draft.editor?.values}
+              onDraftChange={onEditorDraftChange}
+              onCancel={() => {
+                updateDraft({ editor: null });
+                setView('browse');
+              }}
               onSaved={(food) => {
                 toast(editingFood ? 'Продукт обновлён' : 'Продукт создан');
                 setEditingFood(undefined);

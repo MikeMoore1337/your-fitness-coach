@@ -1,6 +1,6 @@
 import { chromium, expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type {
   FoodDiaryEntry,
@@ -1325,13 +1325,32 @@ if (process.env.MACRO_NATIVE_ZOOM === '1') {
           expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
           const targets = summary.locator('.nutrition-target');
           await expect(targets).toHaveCount(4);
-          for (const label of ['Калории', 'Белки', 'Жиры', 'Углеводы'])
-            await expect(targets.getByText(label, { exact: true })).toBeVisible();
+          for (const label of ['Калории', 'Белки', 'Жиры', 'Углеводы']) {
+            const summaryLabel = targets
+              .locator('.nutrition-target__summary')
+              .getByText(label, { exact: true });
+            await expect(summaryLabel).toHaveCount(1);
+            await expect(summaryLabel).toBeVisible();
+          }
           const fits = await summary.evaluate((root) => {
             const card = root.getBoundingClientRect();
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
             while (walker.nextNode()) {
               if (!walker.currentNode.textContent?.trim()) continue;
+              const clippedLabel = walker.currentNode.parentElement?.closest(
+                '.data-viz-progress__label',
+              );
+              if (clippedLabel) {
+                const style = getComputedStyle(clippedLabel);
+                const bounds = clippedLabel.getBoundingClientRect();
+                if (
+                  style.overflow === 'hidden' &&
+                  style.position === 'absolute' &&
+                  bounds.width <= 1 &&
+                  bounds.height <= 1
+                )
+                  continue;
+              }
               const range = document.createRange();
               range.selectNodeContents(walker.currentNode);
               for (const rect of range.getClientRects())
@@ -1371,6 +1390,138 @@ if (process.env.MACRO_NATIVE_ZOOM === '1') {
     });
   }
 }
+
+if (process.env.ISSUE_984_CAPTURE_DIR) {
+  test('issue 984 AFTER Nutrition captures', async ({ browser, baseURL }, testInfo) => {
+    test.setTimeout(120_000);
+    const root = process.env.ISSUE_984_CAPTURE_DIR!;
+    await mkdir(resolve(root, 'screens'), { recursive: true });
+    await mkdir(resolve(root, 'video'), { recursive: true });
+    for (const theme of ['light', 'dark'] as const) {
+      const context = await browser.newContext({
+        baseURL,
+        colorScheme: theme,
+        viewport: { width: 393, height: 852 },
+        recordVideo: { dir: testInfo.outputPath('raw-video'), size: { width: 393, height: 852 } },
+      });
+      const page = await context.newPage();
+      const video = page.video();
+      const writes: string[] = [];
+      page.on('request', (request) => {
+        const url = new URL(request.url());
+        if (
+          ['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method()) &&
+          /\/nutrition\/(diary|hydration)/.test(url.pathname) &&
+          !url.pathname.endsWith('/preview')
+        )
+          writes.push(`${request.method()} ${url.pathname}`);
+      });
+      await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+      await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+      await mockNutritionApi(page);
+      await page.goto('/app?section=nutrition');
+      for (const width of [320, 360, 393, 430]) {
+        await page.setViewportSize({ width, height: 852 });
+        await expect(nutritionDaySummary(page)).toBeVisible();
+        await page.screenshot({
+          path: resolve(
+            root,
+            'screens',
+            `nutrition-day-${testInfo.project.name}-${theme}-${width}.png`,
+          ),
+          fullPage: true,
+          animations: 'disabled',
+        });
+        await page.getByRole('button', { name: 'Добавить еду в текущий приём пищи' }).click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await page.screenshot({
+          path: resolve(
+            root,
+            'screens',
+            `nutrition-picker-${testInfo.project.name}-${theme}-${width}.png`,
+          ),
+          animations: 'disabled',
+        });
+        await page.getByRole('button', { name: 'Закрыть добавление' }).click();
+      }
+      await page.setViewportSize({ width: 393, height: 852 });
+      await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+      await page.waitForTimeout(250);
+      await page.getByRole('button', { name: 'К дневнику' }).click();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.getByRole('button', { name: 'Настройки КБЖУ' }).click();
+      await page.waitForTimeout(250);
+      await page.getByRole('button', { name: 'К дневнику' }).click();
+      expect(writes).toEqual([]);
+      await context.close();
+      if (!video) throw new Error('Nutrition video was not recorded');
+      await copyFile(
+        await video.path(),
+        resolve(root, 'video', `nutrition-${testInfo.project.name}-${theme}.webm`),
+      );
+    }
+  });
+}
+
+test('nutrition date survives a visit to Progress', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.clock.setFixedTime(new Date('2026-08-19T09:00:00+03:00'));
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition');
+  const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+  await week.getByRole('button', { name: /18 августа/ }).click();
+  await expect(week.getByRole('button', { name: /18 августа/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const breakfast = page.getByRole('region', { name: 'Завтрак' });
+  await breakfast.getByRole('button', { name: 'Завтрак', exact: true }).click();
+  await expect(breakfast.getByRole('button', { name: 'Завтрак', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await page.evaluate(() => window.scrollTo(0, 450));
+  const savedScroll = await page.evaluate(() => window.scrollY);
+  expect(savedScroll).toBeGreaterThan(0);
+  await page.evaluate(() =>
+    document.addEventListener(
+      'click',
+      (event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest('.app-bottom-nav__btn'))
+          sessionStorage.setItem('issue984-scroll-at-click', String(window.scrollY));
+      },
+      true,
+    ),
+  );
+  const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+  await dock.getByRole('link', { name: 'Прогресс' }).click();
+  const departureScroll = Number(
+    await page.evaluate(() => sessionStorage.getItem('issue984-scroll-at-click')),
+  );
+  expect(departureScroll).toBeGreaterThan(0);
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '7 дней' }).click();
+  await page.getByRole('tab', { name: 'Свой период' }).click();
+  await page.getByLabel('Начало периода').fill('2026-07-19');
+  await page.getByLabel('Конец периода').fill('2026-08-18');
+  await page.getByRole('heading', { name: 'Прогресс', exact: true }).click();
+  await dock.getByRole('link', { name: 'Питание' }).click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(departureScroll);
+  await expect(week.getByRole('button', { name: /18 августа/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(breakfast.getByRole('button', { name: 'Завтрак', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await dock.getByRole('link', { name: 'Прогресс' }).click();
+  await expect(page.getByRole('tab', { name: '7 дней' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: 'Свой период' }).click();
+  await expect(page.getByLabel('Начало периода')).toHaveValue('2026-07-19');
+  await expect(page.getByLabel('Конец периода')).toHaveValue('2026-08-18');
+});
 
 test('macro summary remains readable across viewport sizes', async ({ page }, testInfo) => {
   const theme = process.env.MACRO_THEME === 'dark' ? 'dark' : 'light';

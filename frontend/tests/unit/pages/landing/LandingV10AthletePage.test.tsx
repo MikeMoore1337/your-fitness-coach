@@ -74,13 +74,14 @@ describe('canonical archive athlete composition', () => {
   }, 15000);
   it('does not turn planned food into a diary entry without an explicit action', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Покупки' }));
-    expect(screen.getByText('60 г')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Дневник' }));
-    expect(screen.getByText('Записи пока нет')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Отметить съеденное в примере' }));
-    expect(screen.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
+    const { container } = renderPage();
+    const nutrition = within(container.querySelector('#nutrition')! as HTMLElement);
+    fireEvent.click(nutrition.getByRole('button', { name: 'Покупки' }));
+    expect(nutrition.getByText('60 г')).toBeInTheDocument();
+    fireEvent.click(nutrition.getByRole('button', { name: 'Дневник' }));
+    expect(nutrition.getByText('Записи пока нет')).toBeInTheDocument();
+    fireEvent.click(nutrition.getByRole('button', { name: 'Отметить съеденное в примере' }));
+    expect(nutrition.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
   it('runs and resets the local training example without creating a real demo session', () => {

@@ -31,18 +31,20 @@ Daily запускает bounded deterministic набор:
 
 - quality;
 - frontend-checks;
-- frontend-e2e (4 shard, Chromium);
+- frontend-e2e (5 shard, Chromium);
 - frontend-mobile-regression (Chromium + WebKit);
-- python-tests (4 shard, PostgreSQL test stack);
+- python-tests (5 shard, PostgreSQL test stack);
 - migrated-stack (Alembic, migrated API и browser smoke);
 - critical-smoke;
 - workflow-config.
 
 Weekly включает Daily и дополнительно запускает policy, dependency audit, расширенный mobile
 набор, frontend-cross-browser (Chromium + Firefox + WebKit), image/deployment/container
-contracts. Cross-browser suite запускается параллельными изолированными browser-процессами с
-разными API/preview ports и передаёт три
-browser-labelled encrypted bundles; каждый upload также содержит privacy-safe size/class evidence.
+contracts. Cross-browser suite разделён на пять Playwright-шардов для каждого из трёх браузеров.
+Не более пяти jobs выполняются одновременно; каждый получает отдельный runner с тестовой базой,
+API и preview. UI quality sweep выполняется один раз в Chromium shard 1. Карантин требует все
+15 зашифрованных browser/shard bundles; каждый upload также содержит обезличенную сводку размеров.
+Счётчики CPU и max RSS дочернего процесса в журнале не измеряют общий пик памяти runner.
 Allure-агрегатор ожидает только suite, которые фактически производят results:
 frontend-checks, frontend-e2e, frontend-mobile-regression, python-tests, migrated-stack, а для
 Weekly также frontend-mobile-regression-extended и frontend-cross-browser. Native policy, audit и
@@ -125,10 +127,40 @@ Actions, запустить один manual preflight, сверить тольк
 retention-days по умолчанию равен 3. Plaintext results, HTML, screenshots и traces не
 используются как межjob transport и не публикуются в repository artifacts.
 
-Изолированный scheduled-report job:
+До включения публикации администратор репозитория настраивает GitHub Environment
+`allure-review`: обязательный reviewer — владелец репозитория, обход правил администраторами
+выключен, deployment branches ограничены разрешёнными ветками. Отсутствующее или неправильно
+защищённое окружение блокирует публикацию. Настройка Environment не создаётся этим workflow.
+Владелец должен иметь безопасный доступ к существующему ключу расшифровки; GitHub не раскрывает
+значение сохранённого Actions secret. Ключ нельзя передавать в комментариях, аргументах команд
+или логах. Доступ владельца к отчётному origin проверяется отдельно.
 
-1. скачивает artifacts только с текущим run_id;
-2. проверяет целостность и расшифровывает bundles;
+Scheduled workflow сначала помещает исходные результаты в карантин:
+
+1. Все result bundles остаются зашифрованными и хранятся в GitHub artifacts три дня по прежней
+   политике. Job `Quarantine encrypted Allure attachments` проверяет полный набор файлов и
+   публикует manifest с SHA-256 каждого зашифрованного файла, SHA коммита, run ID и attempt.
+2. Уполномоченный владелец скачивает manifest и **все** зашифрованные artifacts этого run,
+   сверяет SHA-256 manifest с digest в summary и локально проверяет каждый SHA-256 из manifest,
+   затем расшифровывает bundles через
+   `python scripts/allure_bundle.py decrypt --source <bundle.enc> --output <new-private-directory>`.
+   Ключ должен быть передан программе только через защищённо заданную переменную
+   `ALLURE_REPORT_ENCRYPTION_KEY`. Нельзя загружать расшифрованные файлы обратно в GitHub.
+3. Владелец отдельно просматривает все вложения, включая изображения, видео и содержимое
+   trace-архивов, и проверяет отсутствие реальных персональных данных, токенов и секретов.
+   При неизвестном содержимом, невозможности просмотра или обнаружении чувствительных данных
+   публикацию не одобряют. Автоматическая проверка строк не распознаёт текст в изображениях.
+4. Только после проверки владелец утверждает ожидающий job Environment с **точным** комментарием
+   `allure-review:<run_id>:<attempt>:<sha256-manifest>`, который показывает summary карантина.
+   Отсутствующее, отклонённое или отличающееся решение не разрешает публикацию. Повторная
+   попытка запуска требует новой проверки и нового решения. При истечении трёх дней срок
+   хранения не увеличивается: нужен новый запуск и новая проверка.
+
+Изолированный scheduled-report job после утверждения:
+
+1. повторно проверяет конфигурацию Environment и историю решения владельца;
+2. скачивает artifacts текущего run, сверяет каждый хеш с утверждённым manifest и только затем
+   проверяет целостность и расшифровывает bundles;
 3. добавляет suite/tier/run-kind labels, browser и synthetic dataset parameters;
 4. проверяет attachments и generated report на traversal, symlink и чувствительные строки;
 5. генерирует Allure HTML независимо от verdict тестовых jobs;
@@ -145,9 +177,10 @@ retention-days по умолчанию равен 3. Plaintext results, HTML, sc
     https://allure.your-fitness-coach.ru/weekly/YYYY-Www/<run-id>/
 
 Immutable path не перезаписывается. latest и history содержат только опубликованные entries.
-При missing/malformed suite создаётся synthetic failed integrity case и report получает статус
-incomplete; ссылка может быть опубликована для диагностики, но финальный scheduled gate
-остаётся красным. При test failure report публикуется с честными failed counts, а исходный
+При отсутствии зашифрованного bundle карантин блокирует публикацию. При malformed suite
+создаётся synthetic failed integrity case и report получает статус incomplete; после проверки
+владельца ссылка может быть опубликована для диагностики, но финальный scheduled gate остаётся
+красным. При test failure report после проверки публикуется с честными failed counts, а исходный
 workflow также остаётся красным.
 
 ## VPS-based hosting contract

@@ -271,6 +271,32 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   justify-content: space-between;
   gap: 12px;
 }
+.app-quick-add-panel__grip {
+  display: none;
+  position: relative;
+  width: 36px;
+  height: 4px;
+  flex: 0 0 4px;
+  align-self: center;
+  margin-bottom: 8px;
+  border-radius: 9999px;
+  background: var(--v2-border-strong);
+  touch-action: none;
+}
+.app-quick-add-panel__grip::after {
+  position: absolute;
+  inset: -12px -4px -28px;
+  content: '';
+}
+.app-quick-add-panel__eyebrow {
+  display: none;
+  margin: 0 0 4px;
+  color: var(--v2-accent-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .app-quick-add-panel__header h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -341,6 +367,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-quick-add-action__arrow {
   color: var(--v2-text-secondary);
 }
+.app-quick-add-action__detail,
+.app-quick-add-action__open {
+  display: none;
+}
 
 .app-section--today .today-dashboard__facts {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -366,6 +396,22 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 
 .app-section--programs .program-active__summary .button-link {
   white-space: nowrap;
+}
+
+.app-section--programs .program-active__summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-section--programs .program-active__desktop-edit {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .app-section--programs .program-active__desktop-edit {
+    display: inline-flex;
+  }
 }
 
 .app-section--programs .programs-content {
@@ -997,14 +1043,75 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 
 @media (min-width: 900px) {
+  .app-quick-add-action {
+    min-height: 72px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 12px 4px;
+  }
+
+  .app-quick-add-action + .app-quick-add-action::before {
+    inset-inline-start: 4px;
+  }
+
+  .app-quick-add-action__icon,
+  .app-quick-add-action__arrow {
+    display: none;
+  }
+
+  .app-quick-add-action__detail {
+    display: block;
+    margin-top: 4px;
+    color: var(--v2-text-secondary);
+    font-size: var(--font-size-body);
+  }
+
+  .app-quick-add-action__open {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 8px 14px;
+    border: 1px solid var(--v2-border);
+    border-radius: var(--v2-control-radius);
+    font-weight: 700;
+  }
+
+  .app-quick-add-layer {
+    align-items: center;
+  }
+
+  .app-quick-add-layer[data-motion-phase='closing'] {
+    pointer-events: none;
+    animation: quick-add-desktop-backdrop-out 260ms ease both;
+  }
+
+  .app-quick-add-layer[data-motion-phase='closing'] .app-quick-add-panel {
+    animation: quick-add-desktop-panel-out 260ms ease both;
+  }
+
   .app-quick-add-trigger--floating {
     right: 30px;
     bottom: 28px;
   }
 
   .app-quick-add-panel {
+    width: min(600px, calc(100% - 32px));
     margin-left: 250px;
-    border-radius: var(--v2-region-radius);
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+  }
+}
+
+@keyframes quick-add-desktop-backdrop-out {
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes quick-add-desktop-panel-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
 
@@ -1663,6 +1770,130 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-width: 44px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-orientation='horizontal']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-height: 52px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 2px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns='1']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn {
+    min-height: 44px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 2px 0;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-orientation='single-mixed']
+    .app-bottom-nav__primary
+    > .app-bottom-nav__btn:nth-child(n + 4) {
+    min-height: 52px;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav[data-dock-columns]:not([data-dock-columns='4'])
+    .app-bottom-nav__label {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  html:has(.app-bottom-nav[data-dock-columns]:not([data-dock-columns='4']))
+    .app-shell--design-v2
+    #appContent
+    :where(button, a, input, select, textarea, summary) {
+    scroll-margin-bottom: 0;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel {
+    padding-inline: 4px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header {
+    gap: 4px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header h2 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__actions {
+    grid-auto-rows: max-content;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action {
+    height: auto;
+    grid-template-columns: 20px minmax(0, 1fr) 16px;
+    gap: 4px;
+    padding-inline: 0;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action__icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-action__copy strong {
+    display: block;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    .today-dashboard__header
+    h1 {
+    font-size: clamp(2rem, 22vw, 3rem);
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    :is(.today-workout-copy h2, .today-workout-copy p) {
+    overflow-wrap: anywhere;
+  }
+
+  html:has(.app-bottom-nav[data-dock-reflow='true'])
+    .today-dashboard--design-v2
+    .today-workout-actions
+    .today-pulse-action {
+    width: 100%;
+  }
+
+  @media (max-width: 319px) {
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px;
+      gap: 6px;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__header h2 {
+      grid-row: 2;
+      grid-column: 1 / -1;
+    }
+
+    html:has(.app-bottom-nav[data-dock-reflow='true']) .app-quick-add-panel__close {
+      grid-row: 1;
+      grid-column: 2;
+    }
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
     .app-bottom-nav__primary
     .app-bottom-nav__btn:not([data-yfc-choice]) {
     min-width: 0;
@@ -1734,6 +1965,140 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
       .app-bottom-nav__primary
       .app-bottom-nav__label {
       font-size: 0.6875rem;
+    }
+  }
+}
+
+/* Dock and Quick Add share the fixed safe-area container but keep separate glass surfaces. */
+@media (max-width: 899px) {
+  .app-quick-add-panel__grip,
+  .app-quick-add-panel__eyebrow {
+    display: block;
+  }
+
+  .app-quick-add-panel__header h2 {
+    font-size: 1.5rem;
+  }
+
+  body:has(.app-quick-add-layer) .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  body:has(.app-bottom-nav__quick-add) .app-quick-add-layer {
+    padding-bottom: calc(
+      12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
+  }
+
+  body:has(.app-bottom-nav__quick-add) .app-quick-add-panel {
+    max-height: calc(
+      var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    );
+  }
+
+  :root .app-shell--design-v2 .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root .app-bottom-nav:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary {
+    --glass-opacity: var(--glass-nav-opacity);
+    --glass-blur: var(--glass-nav-blur);
+    display: grid;
+    min-width: 0;
+    grid-template-columns: repeat(auto-fit, minmax(max(44px, 3.25rem), 1fr));
+    padding: 4px;
+    border: 1px solid var(--glass-edge);
+    border-radius: 9999px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='2'] .app-bottom-nav__primary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 24px;
+  }
+
+  :root .app-bottom-nav[data-dock-columns='1'] .app-bottom-nav__primary {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 24px;
+  }
+
+  :root .app-shell--design-v2 .app-bottom-nav .app-bottom-nav__quick-add {
+    --glass-opacity: var(--glass-nav-opacity);
+    --glass-blur: var(--glass-nav-blur);
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    display: grid;
+    width: 62px;
+    height: 62px;
+    min-height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--glass-edge);
+    border-radius: 50%;
+  }
+
+  :root .app-bottom-nav__quick-add .app-bottom-nav__icon,
+  :root .app-bottom-nav__quick-add .app-bottom-nav__icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  :root
+    .app-bottom-nav:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__btn {
+    min-width: 44px;
+    min-height: 52px;
+  }
+
+  @media (max-width: 250px) {
+    :root .app-shell--design-v2 .app-bottom-nav:has(.app-bottom-nav__quick-add) {
+      right: var(--yfc-layout-safe-right);
+      left: var(--yfc-layout-safe-left);
+      gap: 2px;
+    }
+
+    :root .app-shell--design-v2 .app-bottom-nav .app-bottom-nav__quick-add {
+      width: 44px;
+      height: 44px;
+    }
+
+    :root .app-bottom-nav:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding: 2px;
+      border-radius: 24px;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__btn {
+      min-height: 44px;
+      flex-direction: row;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__icon {
+      display: none;
+    }
+
+    :root
+      .app-bottom-nav:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__label {
+      font-size: 0.625rem;
     }
   }
 }
@@ -2215,6 +2580,47 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   min-width: 0;
 }
 
+.app-section--progress .progress-hero__selection {
+  display: none;
+}
+
+@media (min-width: 1101px) {
+  .app-section--progress .progress-experience--approved .progress-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'heading download'
+      'period period';
+    row-gap: var(--v2-space-4);
+  }
+
+  .app-section--progress .progress-hero__selection {
+    display: block;
+  }
+
+  .app-section--progress .progress-hero__download {
+    justify-self: end;
+    align-self: end;
+  }
+
+  .app-section--progress .progress-period-controls {
+    grid-template-columns: minmax(5rem, 1fr) minmax(0, 620px);
+    align-items: center;
+  }
+
+  .app-section--progress .progress-period-controls::before {
+    content: 'Период';
+    color: var(--v2-text-secondary);
+  }
+
+  .app-section--progress .progress-period-controls__meta {
+    grid-column: 2;
+  }
+
+  .app-section--progress .progress-period-controls__custom {
+    grid-column: 1 / -1;
+  }
+}
+
 .app-section--progress .progress-experience--approved .progress-details {
   display: grid;
   gap: var(--v2-space-5);
@@ -2643,4 +3049,11 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   .app-section--progress .progress-experience--approved .cardio-summary-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.app-section--progress
+  .progress-hero[data-compact]
+  .progress-hero__help:has(.contextual-help[open]) {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
 }

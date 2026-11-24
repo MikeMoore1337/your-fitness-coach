@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -129,9 +130,9 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
 
     assert [browser for suite, browser in daily if suite == "frontend-cross-browser"] == []
     assert [browser for suite, browser in weekly if suite == "frontend-cross-browser"] == [
-        "chromium",
-        "firefox",
-        "webkit",
+        f"{browser}-shard-{shard}"
+        for browser in ("chromium", "firefox", "webkit")
+        for shard in range(1, 6)
     ]
     assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
     assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
@@ -195,9 +196,9 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "process.env.PLAYWRIGHT_OUTPUT_DIR" in cross_browser
     assert "process.env.PW_API_PORT" in cross_browser
     assert "process.env.PW_API_PORT" in vite_config
-    assert "frontend-cross-browser-chromium" in workflow
-    assert "frontend-cross-browser-firefox" in workflow
-    assert "frontend-cross-browser-webkit" in workflow
+    assert "browser: [chromium, firefox, webkit]" in workflow
+    assert "YFC_CROSS_BROWSER_SHARD: ${{ matrix.shard }}/5" in workflow
+    assert "frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}.enc" in workflow
     assert "chromium-firefox-webkit" not in workflow
     assert "Measure isolated Allure results" in action
 
@@ -1071,6 +1072,152 @@ def test_container_attachments_are_rewritten_only_to_copied_files() -> None:
         )
 
 
+def test_identical_attachments_are_scanned_and_preserved_for_each_result(
+    tmp_path: Path, monkeypatch
+) -> None:
+    bundles = tmp_path / "bundles"
+    output = tmp_path / "output"
+    output.mkdir()
+    attachment = b"synthetic image contents"
+    scan_calls: list[str] = []
+    original_scan = allure_report._scan_file
+
+    def scan(source: Path) -> None:
+        if source.name.endswith("-attachment.png"):
+            scan_calls.append(source.name)
+        original_scan(source)
+
+    monkeypatch.setattr(allure_report, "_scan_file", scan)
+    expected = {"frontend-e2e/chromium-shard-1", "frontend-e2e/chromium-shard-2"}
+    seen_suites: set[str] = set()
+    seen_bundles: set[str] = set()
+    index: dict[tuple[str, int, str], list[Path]] = {}
+    stats = {"files": 0, "bytes": 0}
+    sources: list[Path] = []
+    for shard in (1, 2):
+        browser = f"chromium-shard-{shard}"
+        _write_bundle(bundles, suite="frontend-e2e", browser=browser)
+        bundle = bundles / f"frontend-e2e-{browser}"
+        image = bundle / f"image-{shard}-attachment.png"
+        image.write_bytes(attachment)
+        sources.append(image)
+        result_path = bundle / "frontend-e2e-result.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        result["attachments"].append({"name": "image", "source": image.name})
+        _write_json(result_path, result)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        members = [p for p in bundle.iterdir() if p.name != "manifest.json"]
+        manifest["file_count"] = len(members)
+        manifest["source_bytes"] = sum(p.stat().st_size for p in members)
+        _write_json(manifest_path, manifest)
+        count, issues = allure_report._merge_bundle(
+            bundle,
+            output=output,
+            run_kind="daily",
+            tier="daily-regression",
+            seen_suites=seen_suites,
+            expected_bundle_keys=expected,
+            seen_bundle_keys=seen_bundles,
+            attachment_index=index,
+            deduplication=stats,
+        )
+        assert count == 1
+        assert issues == []
+
+    results = [json.loads(p.read_text(encoding="utf-8")) for p in output.glob("*-result.json")]
+    refs = [result["attachments"][1]["source"] for result in results]
+    assert len(results) == 2
+    assert len(set(refs)) == 1
+    assert (output / refs[0]).read_bytes() == attachment
+    assert [source.read_bytes() for source in sources] == [attachment, attachment]
+    assert len(scan_calls) == 2
+    assert stats == {"files": 1, "bytes": len(attachment)}
+
+
+def test_duplicate_candidate_never_deduplicates_different_bytes(tmp_path: Path) -> None:
+    left, right = tmp_path / "left", tmp_path / "right"
+    left.write_bytes(b"same-size-A")
+    right.write_bytes(b"same-size-B")
+    assert not allure_report._same_bytes(left, right)
+
+
+def test_deduplication_cannot_bypass_attachment_privacy_scan(tmp_path: Path) -> None:
+    bundles = tmp_path / "bundles"
+    output = tmp_path / "output"
+    output.mkdir()
+    sensitive = b"DATABASE_URL=postgresql://secret"
+    previous = output / "previous-attachment.png"
+    previous.write_bytes(sensitive)
+    index = {(".png", len(sensitive), hashlib.sha256(sensitive).hexdigest()): [previous]}
+    _write_bundle(bundles, suite="frontend-e2e", browser="chromium-shard-1")
+    bundle = bundles / "frontend-e2e-chromium-shard-1"
+    attachment = bundle / "candidate-attachment.png"
+    attachment.write_bytes(sensitive)
+    manifest_path = bundle / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    members = [p for p in bundle.iterdir() if p.name != "manifest.json"]
+    manifest["file_count"] = len(members)
+    manifest["source_bytes"] = sum(p.stat().st_size for p in members)
+    _write_json(manifest_path, manifest)
+    seen: set[str] = set()
+    stats = {"files": 0, "bytes": 0}
+    count, issues = allure_report._merge_bundle(
+        bundle,
+        output=output,
+        run_kind="daily",
+        tier="daily-regression",
+        seen_suites=set(),
+        expected_bundle_keys={"frontend-e2e/chromium-shard-1"},
+        seen_bundle_keys=seen,
+        attachment_index=index,
+        deduplication=stats,
+    )
+    assert count == 0
+    assert any("sensitive content" in issue for issue in issues)
+    assert not seen
+    assert stats == {"files": 0, "bytes": 0}
+
+
+def test_aggregate_reports_savings_without_losing_test_results(tmp_path: Path, monkeypatch) -> None:
+    original = _write_bundle
+    payload = b"synthetic shared screenshot"
+
+    def bundle_with_attachment(root: Path, *, suite: str, browser: str, **kwargs) -> None:
+        original(root, suite=suite, browser=browser, **kwargs)
+        bundle = root / f"{suite}-{browser}"
+        attachment = bundle / "shared-attachment.png"
+        attachment.write_bytes(payload)
+        result_path = bundle / f"{suite}-result.json"
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        result["attachments"].append({"name": "screenshot", "source": attachment.name})
+        _write_json(result_path, result)
+        manifest_path = bundle / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        members = [p for p in bundle.iterdir() if p.name != "manifest.json"]
+        manifest["file_count"] = len(members)
+        manifest["source_bytes"] = sum(p.stat().st_size for p in members)
+        _write_json(manifest_path, manifest)
+
+    monkeypatch.setattr(sys.modules[__name__], "_write_bundle", bundle_with_attachment)
+    metadata = _aggregate_metadata(tmp_path)
+    count = len(scheduled_regression.report_bundles("daily"))
+    assert metadata["status"] == "complete"
+    assert metadata["result_files"] == count
+    assert metadata["deduplicated_attachments"] == {
+        "files": count - 1,
+        "bytes": (count - 1) * len(payload),
+    }
+    results = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in (tmp_path / "merged").glob("*-result.json")
+    ]
+    references = [result["attachments"][-1]["source"] for result in results]
+    assert len(references) == count
+    assert len(set(references)) == 1
+    assert (tmp_path / "merged" / references[0]).read_bytes() == payload
+
+
 def test_aggregate_results_marks_missing_suite_incomplete_with_visible_failure(
     tmp_path: Path,
 ) -> None:
@@ -1223,7 +1370,7 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
         pytest.skip("openssl is not installed on this development host")
     source = tmp_path / "source"
     source.mkdir()
-    (source / "result.json").write_text('{"status":"passed"}\n', encoding="utf-8")
+    (source / "case-result.json").write_text('{"status":"passed"}\n', encoding="utf-8")
     encrypted = tmp_path / "bundle.enc"
     monkeypatch.setenv("ALLURE_REPORT_ENCRYPTION_KEY", "k" * 48)
     manifest = allure_bundle.encrypt_bundle(
@@ -1248,7 +1395,22 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
             "suite",
         )
     }
-    assert (extracted / "result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
+    assert (extracted / "case-result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
+
+
+def test_bundle_refuses_missing_test_results(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "attachment.txt").write_text("synthetic", encoding="utf-8")
+    monkeypatch.setenv("ALLURE_REPORT_ENCRYPTION_KEY", "k" * 48)
+    with pytest.raises(allure_bundle.AllureBundleError, match="no Allure test results"):
+        allure_bundle.encrypt_bundle(
+            source=source,
+            output=tmp_path / "bundle.enc",
+            suite="python-tests",
+            browser="shard-1",
+        )
+    assert not (tmp_path / "bundle.enc").exists()
 
 
 def test_bundle_measurement_reports_size_classes_without_paths(tmp_path: Path, monkeypatch) -> None:
@@ -1290,6 +1452,46 @@ def test_bundle_measurement_reports_size_classes_without_paths(tmp_path: Path, m
         browser="chromium",
     )
     assert oversized["within_limit"] is False
+
+
+def test_bundle_measurement_identifies_trace_and_duplicates_without_disclosing_names(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_json(
+        source / "case-result.json",
+        {
+            "steps": [
+                {
+                    "attachments": [
+                        {
+                            "name": "trace",
+                            "source": "opaque.zip",
+                            "type": "application/vnd.allure.playwright-trace",
+                        },
+                        {"name": "private", "source": "../../outside", "type": "text/plain"},
+                    ]
+                }
+            ]
+        },
+    )
+    (source / "opaque.zip").write_bytes(b"synthetic trace")
+    (source / "duplicate.bin").write_bytes(b"synthetic trace")
+    (source / "unreadable-result.json").write_text("{invalid", encoding="utf-8")
+    output = tmp_path / "size.json"
+
+    payload = allure_bundle.measure_bundle(
+        source=source, output=output, suite="frontend-cross-browser", browser="chromium"
+    )
+
+    assert payload["classes"]["trace_archive"] == {"file_count": 1, "bytes": 15}
+    assert payload["duplicate_files"] == 1
+    assert payload["duplicate_bytes"] == 15
+    assert payload["unreadable_result_metadata"] == 1
+    serialized = output.read_text(encoding="utf-8")
+    for private in ("opaque.zip", "duplicate.bin", "../../outside", "synthetic trace"):
+        assert private not in serialized
 
 
 def test_retention_keeps_daily_calendar_window_and_four_weeklies() -> None:

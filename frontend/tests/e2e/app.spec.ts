@@ -1821,7 +1821,7 @@ test('deep link показывает тренера до явного подтв
   await expect(page.getByText('Тренер подключён')).toBeVisible();
 });
 
-test('desktop app shell centers the brand lockup and navigation surfaces', async ({ page }) => {
+test('desktop app shell aligns the horizontal brand and navigation surfaces', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApi(page);
@@ -1853,6 +1853,8 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         return Math.abs(referenceBox.left + referenceBox.width / 2 - (left + right) / 2);
       };
       const lockup = element.querySelector('.yfc-lockup');
+      const mark = element.querySelector('.yfc-lockup__mark')?.getBoundingClientRect();
+      const wordmark = element.querySelector('.yfc-lockup__wordmark')?.getBoundingClientRect();
       const groupLabel = element.querySelector<HTMLElement>('.app-bottom-nav__group-label');
       const themeButton = element.querySelector('.app-theme-toggle--nav');
       const logoutButton = element.querySelector('.app-bottom-nav__logout');
@@ -1864,8 +1866,15 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         )
           .filter((button) => button.offsetParent !== null)
           .map(centerOffset),
-        coachOffset: centerOffset(element.querySelector('.yfc-lockup__wordmark > span')),
-        fitnessOffset: centerOffset(element.querySelector('.yfc-lockup__wordmark > strong')),
+        brandGap: mark && wordmark ? wordmark.left - mark.right : -1,
+        brandVerticalOffset:
+          mark && wordmark
+            ? Math.abs(mark.top + mark.height / 2 - wordmark.top - wordmark.height / 2)
+            : Infinity,
+        brandWithinRail:
+          Boolean(mark && wordmark) &&
+          mark!.left >= navigationBox.left &&
+          wordmark!.right <= navigationBox.right,
         groupLabelFits: groupLabel
           ? groupLabel.scrollWidth <= groupLabel.clientWidth &&
             window.getComputedStyle(groupLabel).whiteSpace === 'nowrap'
@@ -1874,7 +1883,6 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
           .filter((label) => label.offsetParent !== null)
           .every((label) => label.scrollWidth <= label.clientWidth),
         lockupDirection: lockup ? window.getComputedStyle(lockup).flexDirection : null,
-        markOffset: centerOffset(element.querySelector('.yfc-lockup__mark')),
         navigationWidth: navigationBox.width,
         primaryLabelSize: window.getComputedStyle(
           element.querySelector('.app-bottom-nav__primary .app-bottom-nav__label')!,
@@ -1914,14 +1922,14 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
       };
     });
 
-    expect(desktopAlignment.lockupDirection).toBe('column');
+    expect(desktopAlignment.lockupDirection).toBe('row');
     expect(desktopAlignment.navigationWidth).toBe(220);
-    expect(desktopAlignment.markOffset).toBeLessThanOrEqual(1);
-    expect(desktopAlignment.fitnessOffset).toBeLessThanOrEqual(1);
-    expect(desktopAlignment.coachOffset).toBeLessThanOrEqual(1);
+    expect(desktopAlignment.brandGap).toBeGreaterThanOrEqual(8);
+    expect(desktopAlignment.brandVerticalOffset).toBeLessThanOrEqual(1);
+    expect(desktopAlignment.brandWithinRail).toBe(true);
     expect(desktopAlignment.groupLabelFits).toBe(true);
     expect(desktopAlignment.labelsFit).toBe(true);
-    expect(desktopAlignment.primaryLabelSize).toBe('13px');
+    expect(desktopAlignment.primaryLabelSize).toBe('15px');
     expect(desktopAlignment.secondaryLabelSize).toBe('12.8px');
     expect(desktopAlignment.buttonOffsets.length).toBeGreaterThan(0);
     expect(desktopAlignment.buttonOffsets.every((offset) => offset <= 1)).toBe(true);
@@ -1962,7 +1970,8 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
   await expect(page.locator('.app-bottom-nav__brand')).not.toBeVisible();
   await expect(
     page.locator('.app-bottom-nav__primary a:visible, .app-bottom-nav__primary button:visible'),
-  ).toHaveCount(5);
+  ).toHaveCount(4);
+  await expect(navigation.getByRole('button', { name: 'Быстро добавить' })).toBeVisible();
 });
 
 test('app shell сохраняет композицию и доступность на целевых viewport', async ({ page }) => {
@@ -1982,7 +1991,12 @@ test('app shell сохраняет композицию и доступност�
     await page.setViewportSize(viewport);
     const primaryNavigation = page.locator('.app-bottom-nav__primary');
     const visibleDestinations = primaryNavigation.locator('a:visible, button:visible');
-    await expect(visibleDestinations).toHaveCount(viewport.width < 900 ? 5 : 4);
+    await expect(visibleDestinations).toHaveCount(4);
+    if (viewport.width < 900) {
+      await expect(
+        page.locator('#appBottomNav').getByRole('button', { name: 'Быстро добавить' }),
+      ).toBeVisible();
+    }
     for (const destination of await visibleDestinations.all()) {
       await expect(destination).toBeInViewport();
     }
@@ -2946,7 +2960,9 @@ test('поля профиля и питания выровнены на деск
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.locator('#profile-personal > summary').click();
+  const personal = page.locator('#profile-personal');
+  await expect(personal).toHaveJSProperty('open', true);
+  await expect(page.locator('.profile-form-grid--fitness')).toBeVisible();
   const profileControlTops = await page.locator('.profile-form-grid--fitness').evaluate((grid) =>
     Array.from(grid.querySelectorAll<HTMLElement>(':scope > .field'))
       .slice(0, 3)
@@ -4072,18 +4088,12 @@ test('тренер открывает кабинет', async ({ page }) => {
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .locator('.app-bottom-nav__primary')
-    .getByRole('link', { name: 'Клиенты', exact: true })
-    .click();
+  const clientsTab = page
+    .getByRole('tablist', { name: 'Разделы тренера' })
+    .getByRole('tab', { name: 'Клиенты', exact: true });
+  await clientsTab.click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Основная навигация' })
-      .locator('.app-bottom-nav__primary')
-      .getByRole('link', { name: 'Клиенты', exact: true }),
-  ).toHaveAttribute('aria-current', 'page');
+  await expect(clientsTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveCount(0);
   await expect(page.getByText('Клиентов пока нет')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();

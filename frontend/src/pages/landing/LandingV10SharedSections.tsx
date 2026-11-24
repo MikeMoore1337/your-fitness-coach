@@ -146,39 +146,34 @@ export function LandingV10SharedSections({
       </LandingChapter>
       <LandingChapter id="continuity" className="ref-section ref-continuity">
         <div className="ref-copy">
-          <p className="landing-kicker">БРАУЗЕР + МИНИ-ПРИЛОЖЕНИЕ TELEGRAM</p>
           <h2>
             Один аккаунт.
             <br />
             Ваш привычный вход.
           </h2>
+        </div>
+        <div>
           <p>
             Браузер — для полного контекста. Мини-приложение Telegram — для быстрых действий с теми
             же основными данными.
           </p>
+          <a
+            className="landing-button landing-button--secondary ref-continuity-visual"
+            href={PUBLIC_TELEGRAM_LINKS.miniApp}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Открыть мини-приложение Telegram"
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_telegram_selected',
+                surface: productEventSurface(),
+                placement: 'continuity',
+              })
+            }
+          >
+            Открыть мини-приложение
+          </a>
         </div>
-        <a
-          className="ref-continuity-visual"
-          href={PUBLIC_TELEGRAM_LINKS.miniApp}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Открыть мини-приложение Telegram"
-          onClick={() =>
-            trackProductEvent({
-              name: 'landing_telegram_selected',
-              surface: productEventSurface(),
-              placement: 'continuity',
-            })
-          }
-        >
-          <Icon name="web-app" size={80} />
-          <div>
-            <b>Общие данные</b>
-            <Icon name="sync" size={56} />
-            <span>Тренировки · питание · прогресс</span>
-          </div>
-          <Icon name="mini-app" size={80} />
-        </a>
       </LandingChapter>
       <LandingV10Faq audience={audience} />
       <section className="ref-closing" id="contact">

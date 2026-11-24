@@ -40,6 +40,12 @@ export default defineConfig({
     setupFiles: './tests/setup.ts',
     include: ['tests/unit/**/*.test.{ts,tsx}'],
     css: true,
-    ...(testReporters ? { reporters: testReporters } : {}),
+    ...(testReporters
+      ? {
+          reporters: testReporters,
+          // Resolve the adapter against the active Vitest runner, not its isolated peer.
+          server: { deps: { inline: [/allure-vitest/] } },
+        }
+      : {}),
   },
 });

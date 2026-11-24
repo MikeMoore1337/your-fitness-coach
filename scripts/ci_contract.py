@@ -201,6 +201,19 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 cwd="backend",
             ),
             _cmd("frontend-cross-browser", "python", "scripts/run_cross_browser_regression.py"),
+        ),
+        prerequisites=(
+            "npm",
+            "frontend/node_modules",
+            "frontend/playwright.cross-browser.config.ts",
+            "python",
+            "alembic",
+            "DATABASE_URL",
+        ),
+    ),
+    "frontend-ui-quality-sweep": GroupSpec(
+        name="frontend-ui-quality-sweep",
+        commands=(
             _cmd(
                 "frontend-ui-quality-sweep",
                 "npm",
@@ -212,12 +225,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
         prerequisites=(
             "npm",
             "frontend/node_modules",
-            "frontend/playwright.cross-browser.config.ts",
             "frontend/playwright.ui-quality-sweep.config.ts",
             "frontend/tests/e2e/ui-quality-sweep.spec.ts",
-            "python",
-            "alembic",
-            "DATABASE_URL",
         ),
     ),
     "python-tests": GroupSpec(
@@ -360,6 +369,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_skill_safety.py",
                 "tests/test_skillspector_guard.py",
                 "tests/test_scheduled_regression.py",
+                "tests/test_allure_quarantine.py",
                 "tests/test_container_image_contract.py",
                 "tests/test_deployment_contract.py",
                 "tests/test_image_sbom.py",
@@ -533,6 +543,7 @@ PROFILE_GROUPS["weekly-exhaustive"] = (
     "dependency-audit",
     "frontend-mobile-regression-extended",
     "frontend-cross-browser",
+    "frontend-ui-quality-sweep",
     "image-contract",
     "deployment-contract",
     "container-contract",
@@ -549,6 +560,7 @@ GROUP_TO_JOB: dict[str, str] = {
     "frontend-mobile-regression": "frontend-mobile-regression",
     "frontend-mobile-regression-extended": "frontend-mobile-regression-extended",
     "frontend-cross-browser": "frontend-cross-browser",
+    "frontend-ui-quality-sweep": "frontend-cross-browser",
     "python-tests": "python-tests",
     "migrated-stack": "migrated-stack",
     "dependency-audit": "dependency-audit",

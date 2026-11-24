@@ -122,11 +122,11 @@ async function assertMobileShellGeometry(page: Page): Promise<void> {
   await expectDockWithinViewport(page);
   await expectElementsWithinHorizontalViewport(
     page,
-    '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__primary > button',
+    '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__quick-add',
   );
   await expectTouchTargets(
     page.locator(
-      '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__primary > button',
+      '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__quick-add',
     ),
   );
   await expectUiAuditClean(page, 'mobile shared shell', { checkTouchTargets: true });
@@ -904,6 +904,34 @@ test('@extended mobile layout stress keeps long content inside viewport', async 
 });
 
 for (const theme of ['light', 'dark'] as const) {
+  for (const platform of ['browser', 'telegram'] as const) {
+    test(`@critical progress card keeps its action visible after resize at 320px ${theme} ${platform}`, async ({
+      page,
+    }) => {
+      await preparePage(page, theme, platform, { longExerciseName: true });
+      await page.setViewportSize({ width: 430, height: 932 });
+      await page.goto('/app?section=today');
+      await waitForSurface(page, 'today');
+      await page.setViewportSize({ width: 320, height: 800 });
+      await waitForSurface(page, 'today');
+
+      const card = page.getByRole('region', { name: 'Главное о прогрессе' }).locator('article');
+      const action = card.getByRole('link', { name: 'Открыть прогресс' });
+      await expect(action).toBeVisible();
+      const cardBox = await card.boundingBox();
+      const actionBox = await action.boundingBox();
+      expect(cardBox).not.toBeNull();
+      expect(actionBox).not.toBeNull();
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height);
+      await expectNoHorizontalOverflow(page);
+      await action.scrollIntoViewIfNeeded();
+      await action.click();
+      await expect(page).toHaveURL(/section=progress/);
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
   for (const width of [320, 360, 390, 393, 430] as const) {
     test(`@critical #867 keeps the browser dock clear at ${width}px ${theme}`, async ({
       page,
@@ -930,17 +958,11 @@ for (const theme of ['light', 'dark'] as const) {
       await expect
         .poll(() =>
           page.evaluate(() => {
-            const rootStyle = getComputedStyle(document.documentElement);
             const dock = document.querySelector<HTMLElement>('#appBottomNav');
-            if (!dock) return null;
-            return {
-              viewportBottom: rootStyle.getPropertyValue('--yfc-viewport-bottom').trim(),
-              safeBottom: rootStyle.getPropertyValue('--yfc-layout-safe-bottom').trim(),
-              dockBottomGap: window.innerHeight - dock.getBoundingClientRect().bottom,
-            };
+            return dock ? window.innerHeight - dock.getBoundingClientRect().bottom : 0;
           }),
         )
-        .not.toBeNull();
+        .toBeGreaterThanOrEqual(19);
 
       const measureGeometry = () =>
         page.evaluate(() => {
