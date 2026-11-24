@@ -832,10 +832,14 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
         assert latest.warnings == []
 
 
+def _freeze_ingestion_and_review_clocks(monkeypatch, now: datetime) -> None:
+    monkeypatch.setattr(news_ingestion, "utcnow", lambda: now)
+    monkeypatch.setattr(news_editorial, "utcnow", lambda: now)
+
+
 def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -> None:
     fixed_now = datetime(2026, 9, 25, 10, 5, 0)
-    monkeypatch.setattr(news_ingestion, "utcnow", lambda: fixed_now)
-    monkeypatch.setattr(news_editorial, "utcnow", lambda: fixed_now)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
@@ -897,6 +901,7 @@ def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -
 
 def test_urgent_manual_publication_bypasses_daily_cap(monkeypatch) -> None:
     fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
@@ -956,6 +961,7 @@ def test_urgent_manual_publication_bypasses_daily_cap(monkeypatch) -> None:
 
 def test_publish_now_escalates_waiting_snapshot_without_duplicate_send(monkeypatch) -> None:
     fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
@@ -1079,6 +1085,7 @@ def test_publish_now_escalates_waiting_snapshot_without_duplicate_send(monkeypat
 
 def test_publish_now_stale_hash_does_not_escalate_and_retries_converge(monkeypatch) -> None:
     fixed_now = datetime(2026, 10, 2, 10, 10, 0)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
@@ -1156,6 +1163,7 @@ def test_publish_now_stale_hash_does_not_escalate_and_retries_converge(monkeypat
 
 def test_publish_now_supersedes_mutable_scheduled_snapshot(monkeypatch) -> None:
     fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
@@ -1217,6 +1225,7 @@ def test_publish_now_does_not_create_send_for_nonmutable_snapshot(
     monkeypatch, terminal_status: str
 ) -> None:
     fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    _freeze_ingestion_and_review_clocks(monkeypatch, fixed_now)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
