@@ -2474,10 +2474,16 @@ export function RestTimer({
   useEffect(() => {
     let retryTimer: number | undefined;
     let syncInFlight = false;
-    const hasPending = () =>
-      loadRestJournal(userId, workoutId).some((item) => !item.server_id || item.pending.length > 0);
+    let disposed = false;
+    const pendingIds = () =>
+      loadRestJournal(userId, workoutId).flatMap((item) => [
+        ...(!item.server_id ? [`start:${item.start_mutation_id}`] : []),
+        ...item.pending.map((operation) => `action:${operation.mutation_id}`),
+      ]);
+    const hasPending = () => pendingIds().length > 0;
     const sync = () => {
       if (!hasPending() || syncInFlight) return;
+      const pendingAtStart = new Set(pendingIds());
       syncInFlight = true;
       void syncRestJournal(userId, workoutId, (status) => {
         setRestSaveError(
@@ -2498,6 +2504,9 @@ export function RestTimer({
         })
         .finally(() => {
           syncInFlight = false;
+          // Work added while the previous snapshot was syncing needs its own pass.
+          // Do not immediately retry the same blocked or failed operations.
+          if (!disposed && pendingIds().some((id) => !pendingAtStart.has(id))) sync();
         });
     };
     const scheduleRetry = () => {
@@ -2526,6 +2535,7 @@ export function RestTimer({
     window.addEventListener('offline', reconcile);
     window.addEventListener('pageshow', reconcile);
     return () => {
+      disposed = true;
       unsubscribe();
       window.removeEventListener('online', reconcile);
       window.removeEventListener('offline', reconcile);
