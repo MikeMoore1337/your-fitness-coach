@@ -51,6 +51,9 @@ METADATA_FILES: Final = frozenset(
 )
 MAX_RESULT_FILES: Final = 100_000
 MAX_ZIP_SCAN_BYTES: Final = 16 * 1024 * 1024
+DEDUPLICATED_ATTACHMENT_SUFFIXES: Final = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp", ".gif", ".zip", ".webm", ".mp4"}
+)
 GITHUB_TOKEN_PATTERN: Final = re.compile(r"\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}\b")
 JWT_PATTERN: Final = re.compile(
     r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
@@ -331,6 +334,16 @@ def _copy_text_checked(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
+def _same_bytes(first: Path, second: Path) -> bool:
+    with first.open("rb") as left, second.open("rb") as right:
+        while True:
+            chunk = left.read(1024 * 1024)
+            if chunk != right.read(1024 * 1024):
+                return False
+            if not chunk:
+                return True
+
+
 def _write_json(path: Path, payload: Mapping[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -420,6 +433,8 @@ def _merge_bundle(
     seen_suites: set[str],
     expected_bundle_keys: set[str],
     seen_bundle_keys: set[str],
+    attachment_index: dict[tuple[str, int, str], list[Path]],
+    deduplication: dict[str, int],
 ) -> tuple[int, list[str]]:
     issues: list[str] = []
     try:
@@ -458,25 +473,49 @@ def _merge_bundle(
     }
     if any((output / target_name).exists() for target_name in target_names.values()):
         return 0, [f"suite {suite} ({browser}) duplicates an existing result bundle"]
+    # Scan every original attachment before considering any duplicate. Encrypted
+    # quarantine inputs remain intact; only the derived report is compacted.
     for name, source in files.items():
-        if name == "manifest.json" or name in METADATA_FILES:
+        if name == "manifest.json" or name in METADATA_FILES or name.endswith(RESULT_SUFFIXES):
             continue
         destination = output / target_names[name]
         try:
-            if name.endswith(RESULT_SUFFIXES):
-                payload = _result_payload(source)
-                if name.endswith("-result.json"):
-                    payload = _enrich_result(
-                        payload,
-                        suite=suite,
-                        browser=browser,
-                        run_kind=run_kind,
-                        tier=tier,
-                    )
-                _rewrite_attachment_sources(payload, target_names=target_names)
-                _write_json(destination, payload)
-            else:
+            suffix = source.suffix.lower()
+            if "-attachment." not in source.name or suffix not in DEDUPLICATED_ATTACHMENT_SUFFIXES:
                 _copy_text_checked(source, destination)
+                continue
+            _scan_file(source)
+            with source.open("rb") as stream:
+                checksum = hashlib.file_digest(stream, "sha256").hexdigest()
+            key = (suffix, source.stat().st_size, checksum)
+            candidates = attachment_index.setdefault(key, [])
+            original = next(
+                (candidate for candidate in candidates if _same_bytes(source, candidate)), None
+            )
+            if original is not None:
+                target_names[name] = original.name
+                deduplication["files"] += 1
+                deduplication["bytes"] += source.stat().st_size
+            else:
+                shutil.copy2(source, destination)
+                candidates.append(destination)
+        except (AllureReportError, OSError) as error:
+            issues.append(str(error))
+    for name, source in files.items():
+        if not name.endswith(RESULT_SUFFIXES):
+            continue
+        try:
+            payload = _result_payload(source)
+            if name.endswith("-result.json"):
+                payload = _enrich_result(
+                    payload,
+                    suite=suite,
+                    browser=browser,
+                    run_kind=run_kind,
+                    tier=tier,
+                )
+            _rewrite_attachment_sources(payload, target_names=target_names)
+            _write_json(output / target_names[name], payload)
         except (AllureReportError, OSError) as error:
             issues.append(str(error))
     if not issues:
@@ -533,6 +572,8 @@ def aggregate_results(
     seen_bundle_keys: set[str] = set()
     issues: list[str] = []
     result_count = 0
+    attachment_index: dict[tuple[str, int, str], list[Path]] = {}
+    deduplication = {"files": 0, "bytes": 0}
     bundles = (
         sorted(
             path
@@ -551,6 +592,8 @@ def aggregate_results(
             seen_suites=seen_suites,
             expected_bundle_keys=expected_bundle_keys,
             seen_bundle_keys=seen_bundle_keys,
+            attachment_index=attachment_index,
+            deduplication=deduplication,
         )
         result_count += count
         issues.extend(bundle_issues)
@@ -605,6 +648,7 @@ def aggregate_results(
         "present_bundles": sorted(seen_bundle_keys),
         "issues": list(dict.fromkeys(issues)),
         "result_files": result_count,
+        "deduplicated_attachments": deduplication,
         "duration_seconds": round(max(0.0, duration_seconds), 3),
         "counts": counts,
         "limits": {"report_bytes": MAX_REPORT_BYTES},
