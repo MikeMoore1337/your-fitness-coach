@@ -234,9 +234,27 @@ jobs:
           test "${PLAYWRIGHT_BROWSERS_PATH:-}" = /ms-playwright
           node -e 'const { chromium } = require("@playwright/test"); (async () => { const browser = await chromium.launch(); const page = await browser.newPage(); await page.setContent("<title>Chromium ready</title>"); if (await page.title() !== "Chromium ready") throw new Error("Chromium page failed"); console.log(`Chromium ${browser.version()} launched`); await browser.close(); })().catch(error => { console.error(error); process.exit(1); });'
       - name: Install scheduled Vitest reporter
-        if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
+        if: matrix.lane == 'unit' && (needs.scope-router.outputs.run_scheduled_report == 'true' || github.event_name == 'pull_request')
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Verify scheduled Vitest reporter on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        working-directory: frontend
+        shell: bash
+        env:
+          ALLURE_RESULTS_DIR: ${{ runner.temp }}/allure-vitest-smoke
+        run: |
+          set -Eeuo pipefail
+          npm run test -- tests/unit/shared/numeric/decimalDraft.test.ts tests/unit/features/dashboard/TodayDashboard.test.tsx
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          results = list(Path(os.environ['ALLURE_RESULTS_DIR']).glob('*-result.json'))
+          if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
+              raise SystemExit('scheduled Allure reporter did not record all 35 successful tests')
+          PY
       - name: Sync API schema dependencies
         if: matrix.lane == 'checks'
         run: |

@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -536,7 +543,7 @@ describe('TodayDashboard', () => {
     expect(screen.getByRole('button', { name: 'Предыдущая неделя' })).toBeInTheDocument();
     failRange = false;
     fireEvent.click(retry);
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Обновить план' })).toBeNull());
+    await waitForElementToBeRemoved(() => screen.queryByRole('button', { name: 'Обновить план' }));
   });
 
   it('shows the selected day from the requested week after navigation', async () => {
