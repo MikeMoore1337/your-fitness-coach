@@ -240,6 +240,7 @@ jobs:
       - name: Verify scheduled Vitest reporter on PRs
         if: matrix.lane == 'unit' && github.event_name == 'pull_request'
         working-directory: frontend
+        shell: bash
         env:
           ALLURE_RESULTS_DIR: ${{ runner.temp }}/allure-vitest-smoke
         run: |
