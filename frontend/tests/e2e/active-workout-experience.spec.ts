@@ -8499,6 +8499,7 @@ async function mockRestSessions(page: Page) {
   const intervals: Record<number, Record<string, unknown>> = {};
   let nextId = 900;
   let restartRequests = 0;
+  let actionRequests = 0;
   let actionFailure: number | null = null;
   let actionBarrier: Promise<void> | null = null;
   await page.route('**/api/v1/workouts/42/rest-sessions', async (route) => {
@@ -8527,6 +8528,7 @@ async function mockRestSessions(page: Page) {
     await route.fulfill({ json: intervals[id] });
   });
   await page.route('**/api/v1/workouts/rest-sessions/*/actions', async (route) => {
+    actionRequests += 1;
     if (actionBarrier) await actionBarrier;
     if (actionFailure) {
       await route.fulfill({
@@ -8590,6 +8592,7 @@ async function mockRestSessions(page: Page) {
   return {
     intervals,
     restartCount: () => restartRequests,
+    actionCount: () => actionRequests,
     failActions(status: number | null) {
       actionFailure = status;
     },
@@ -9842,6 +9845,73 @@ test.describe('#1292 compact rest panel', () => {
 
 test.describe('#1338 v2 compact timer', () => {
   test.use({ hasTouch: true });
+
+  test('sends a timer change queued while the previous action is in flight', async ({ page }) => {
+    const start = new Date('2026-10-10T12:00:00Z');
+    await page.clock.install({ time: start });
+    await page.clock.setFixedTime(start);
+    const server = await mockActiveWorkout(page);
+    const restApi = await mockRestSessions(page);
+    Object.assign(server.readSet(201), { actual_weight: 40, actual_reps: 8, rir: '1' });
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page
+      .locator('[data-workout-set-id="201"]')
+      .getByRole('button', { name: /^Завершить:/ })
+      .click();
+    await expect.poll(async () => (await readRestJournal(page))[0]?.server_id).toBe(900);
+
+    const panel = page.getByRole('complementary', { name: 'Отдых между подходами' });
+    const releaseFirstAction = restApi.holdNextAction();
+    try {
+      const firstRequest = page.waitForRequest(
+        (request) =>
+          request.url().endsWith('/900/actions') &&
+          request.method() === 'POST' &&
+          request.postDataJSON().action === 'add30',
+      );
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await firstRequest;
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+      await expect(panel.getByRole('timer')).toHaveText('3:00');
+    } finally {
+      releaseFirstAction();
+    }
+
+    // The fake clock is still frozen, so the 15-second retry cannot hide a missed wake-up.
+    await expect.poll(() => restApi.intervals[900]?.adjusted_seconds).toBe(180);
+    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(0);
+
+    restApi.failActions(409);
+    const requestsBeforeConflict = restApi.actionCount();
+    const releaseBlockedAction = restApi.holdNextAction();
+    const blockedRequest = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/900/actions') &&
+        request.method() === 'POST' &&
+        request.postDataJSON().action === 'add30',
+    );
+    const blockedResponse = page.waitForResponse(
+      (response) => response.url().endsWith('/900/actions') && response.status() === 409,
+    );
+    try {
+      await panel.getByRole('button', { name: '+30 сек', exact: true }).click();
+      await blockedRequest;
+      await panel.getByRole('button', { name: '+60 сек', exact: true }).click();
+    } finally {
+      releaseBlockedAction();
+    }
+    await blockedResponse;
+    await expect.poll(() => restApi.actionCount()).toBe(requestsBeforeConflict + 1);
+    await expect.poll(async () => (await readRestJournal(page))[0]?.pending.length).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(restApi.actionCount()).toBe(requestsBeforeConflict + 1);
+    const pendingAfterConflict = (await readRestJournal(page))[0]?.pending;
+    expect(pendingAfterConflict).toHaveLength(2);
+    expect(pendingAfterConflict[0]).toMatchObject({ action: 'add30' });
+    expect(pendingAfterConflict[1]).toMatchObject({ action: 'add60' });
+  });
 
   for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430, 1120, 1440]) {
