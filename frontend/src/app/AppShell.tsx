@@ -553,7 +553,17 @@ export function AppShell({
     window.addEventListener('resize', sync);
     document.fonts?.addEventListener('loadingdone', sync);
     void document.fonts?.ready.then(sync);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
+    let resizeObserverFrame: number | null = null;
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (resizeObserverFrame !== null) return;
+            resizeObserverFrame = window.requestAnimationFrame(() => {
+              resizeObserverFrame = null;
+              sync();
+            });
+          });
     observer?.observe(navigation);
     navigation
       .querySelectorAll<HTMLElement>('.app-bottom-nav__primary .app-bottom-nav__label')
@@ -562,6 +572,7 @@ export function AppShell({
     return () => {
       disposed = true;
       observer?.disconnect();
+      if (resizeObserverFrame !== null) window.cancelAnimationFrame(resizeObserverFrame);
       rootObserver.disconnect();
       selectionObserver.disconnect();
       window.removeEventListener('resize', sync);
