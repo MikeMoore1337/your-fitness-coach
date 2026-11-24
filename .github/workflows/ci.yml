@@ -591,12 +591,20 @@ jobs:
           browser: mobile-firefox-webkit
 
   frontend-cross-browser:
-    name: Weekly cross-browser regression (Chromium + Firefox + WebKit)
+    name: Weekly cross-browser regression (${{ matrix.browser }}, shard ${{ matrix.shard }}/5)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_cross_browser == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1, 2, 3, 4, 5]
     env:
+      YFC_CROSS_BROWSER_PROJECT: ${{ matrix.browser }}
+      YFC_CROSS_BROWSER_SHARD: ${{ matrix.shard }}/5
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
       APP_ENV: test
@@ -673,8 +681,13 @@ jobs:
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Run shared cross-browser regression group
         run: python scripts/ci_contract.py run-group frontend-cross-browser
+      - name: Run shared UI quality sweep
+        if: matrix.browser == 'chromium' && matrix.shard == 1
+        env:
+          ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser/chromium-shard-1', github.workspace) || '' }}
+        run: python scripts/ci_contract.py run-group frontend-ui-quality-sweep
       - name: Upload UI quality sweep evidence
-        if: always()
+        if: always() && matrix.browser == 'chromium' && matrix.shard == 1
         uses: actions/upload-artifact@v4
         with:
           name: ui-quality-sweep-${{ github.run_id }}
@@ -682,42 +695,18 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14
-      - name: Upload encrypted Allure results
+      - name: Upload encrypted cross-browser Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
         env:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/chromium
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-chromium.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-chromium
+          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/${{ matrix.browser }}-shard-${{ matrix.shard }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}
           suite: frontend-cross-browser
-          browser: chromium
-      - name: Upload encrypted Firefox Allure results
-        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
-        uses: ./.github/actions/upload-allure-results
-        env:
-          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
-        with:
-          enabled: "true"
-          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/firefox
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-firefox.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-firefox
-          suite: frontend-cross-browser
-          browser: firefox
-      - name: Upload encrypted WebKit Allure results
-        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
-        uses: ./.github/actions/upload-allure-results
-        env:
-          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
-        with:
-          enabled: "true"
-          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/webkit
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-webkit.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-webkit
-          suite: frontend-cross-browser
-          browser: webkit
+          browser: ${{ matrix.browser }}-shard-${{ matrix.shard }}
 
   python-tests:
     name: Python tests (${{ matrix.shard }}/5)

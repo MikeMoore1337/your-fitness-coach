@@ -64,6 +64,15 @@ def test_quarantine_rejects_missing_or_extra_bundles(tmp_path: Path) -> None:
         quarantine.make_manifest(tmp_path, kind="daily", run_id="42", attempt="1", sha=SHA)
 
 
+def test_weekly_quarantine_requires_every_browser_shard(tmp_path: Path) -> None:
+    _bundles(tmp_path)
+    expected = quarantine.expected_bundles("weekly")
+    assert len([name for name in expected if name.startswith("frontend-cross-browser-")]) == 15
+    (tmp_path / "frontend-cross-browser-webkit-shard-5.enc").unlink()
+    with pytest.raises(quarantine.QuarantineError, match="bundle set"):
+        quarantine.make_manifest(tmp_path, kind="weekly", run_id="42", attempt="1", sha=SHA)
+
+
 def test_cli_rejects_changed_bundle_before_decryption(tmp_path: Path) -> None:
     root = tmp_path / "bundles"
     root.mkdir()

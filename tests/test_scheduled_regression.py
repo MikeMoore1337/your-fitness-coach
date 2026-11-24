@@ -129,9 +129,9 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
 
     assert [browser for suite, browser in daily if suite == "frontend-cross-browser"] == []
     assert [browser for suite, browser in weekly if suite == "frontend-cross-browser"] == [
-        "chromium",
-        "firefox",
-        "webkit",
+        f"{browser}-shard-{shard}"
+        for browser in ("chromium", "firefox", "webkit")
+        for shard in range(1, 6)
     ]
     assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
     assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
@@ -195,9 +195,9 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "process.env.PLAYWRIGHT_OUTPUT_DIR" in cross_browser
     assert "process.env.PW_API_PORT" in cross_browser
     assert "process.env.PW_API_PORT" in vite_config
-    assert "frontend-cross-browser-chromium" in workflow
-    assert "frontend-cross-browser-firefox" in workflow
-    assert "frontend-cross-browser-webkit" in workflow
+    assert "browser: [chromium, firefox, webkit]" in workflow
+    assert "YFC_CROSS_BROWSER_SHARD: ${{ matrix.shard }}/5" in workflow
+    assert "frontend-cross-browser-${{ matrix.browser }}-shard-${{ matrix.shard }}.enc" in workflow
     assert "chromium-firefox-webkit" not in workflow
     assert "Measure isolated Allure results" in action
 
