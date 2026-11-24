@@ -16,6 +16,37 @@ const test = base.extend({
 // WebKit service workers intercept requests before Playwright can hold the response.
 const testWithoutServiceWorker = test.extend({ serviceWorkers: 'block' });
 
+testWithoutServiceWorker(
+  'real demo transport opens a workout and resolves nutrition goals',
+  async ({ page }) => {
+    await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+    await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+    await expect(page.getByText('Не удалось проверить порядок тренировок')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Начать тренировку' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Верх тела · уверенный старт', level: 2 }),
+    ).toBeVisible();
+    await page.getByLabel('Вес, Жим гантелей лёжа с контролируемой паузой, подход 3').fill('19');
+    await page
+      .getByRole('spinbutton', {
+        name: 'Повторы, Жим гантелей лёжа с контролируемой паузой, подход 3',
+      })
+      .fill('8');
+    await page.getByRole('button', { name: /Завершить:.*подход 3/ }).click();
+    await expect(page.locator('.active-workout-rest')).toBeVisible();
+    await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+    await page.reload();
+    await expect(page.getByText('3 из 3 подходов отмечено')).toBeVisible();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+
+    await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+    await expect(page.getByRole('heading', { name: 'Питание', level: 1 })).toBeVisible();
+    await expect(page.getByText('Базовая цель', { exact: true })).toBeVisible();
+    await expect(page.getByText('Не удалось узнать источник цели.')).toHaveCount(0);
+  },
+);
+
 function syntheticTelegramInitData(userId: number): string {
   const fields = {
     auth_date: String(Math.floor(Date.now() / 1000)),
