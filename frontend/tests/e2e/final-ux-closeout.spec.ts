@@ -613,6 +613,9 @@ for (const theme of ['dark', 'light'] as const) {
         for (const width of WIDTHS) {
           await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
           await expect.poll(() => page.evaluate(() => innerWidth)).toBe(width);
+          if (width >= 900) {
+            await expect(page.locator('.app-bottom-nav__quick-add')).toHaveCount(0);
+          }
           if (surface.name === 'program-editor') {
             await expect
               .poll(() =>
