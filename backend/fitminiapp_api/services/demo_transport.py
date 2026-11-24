@@ -1945,6 +1945,8 @@ def handle_demo_transport(
             return _user(session)
         if path == "/api/v1/workouts/today":
             return _workout(session)
+        if path == "/api/v1/workouts/session-rotation":
+            return {"mode": "calendar", "status": "disabled", "days": []}
         if path == "/api/v1/workouts/recovery":
             schedule = _schedule(session)
             return {
@@ -2088,6 +2090,25 @@ def handle_demo_transport(
             }
         if path == "/api/v1/nutrition/targets/current":
             return _nutrition_target(session.user_id, _today(session), session)
+        if path == "/api/v1/nutrition/targets/for-date":
+            params = parse_qs(parsed.query, keep_blank_values=True)
+            if set(params) != {"target_date"} or len(params["target_date"]) != 1:
+                raise DemoActionForbiddenError
+            raw_date = params["target_date"][0]
+            try:
+                selected_date = date.fromisoformat(raw_date)
+            except ValueError as exc:
+                raise DemoActionForbiddenError from exc
+            if _iso(selected_date) != raw_date:
+                raise DemoActionForbiddenError
+            return {
+                "date": _iso(selected_date),
+                "target": _nutrition_target(session.user_id, _today(session), session),
+                "origin": "base",
+                "day_type": None,
+                "week_type": None,
+                "frozen": False,
+            }
         if path == "/api/v1/nutrition/targets/history":
             return {
                 "items": [_nutrition_target(session.user_id, _today(session), session)],
