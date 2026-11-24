@@ -1307,6 +1307,46 @@ def test_bundle_measurement_reports_size_classes_without_paths(tmp_path: Path, m
     assert oversized["within_limit"] is False
 
 
+def test_bundle_measurement_identifies_trace_and_duplicates_without_disclosing_names(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_json(
+        source / "case-result.json",
+        {
+            "steps": [
+                {
+                    "attachments": [
+                        {
+                            "name": "trace",
+                            "source": "opaque.zip",
+                            "type": "application/vnd.allure.playwright-trace",
+                        },
+                        {"name": "private", "source": "../../outside", "type": "text/plain"},
+                    ]
+                }
+            ]
+        },
+    )
+    (source / "opaque.zip").write_bytes(b"synthetic trace")
+    (source / "duplicate.bin").write_bytes(b"synthetic trace")
+    (source / "unreadable-result.json").write_text("{invalid", encoding="utf-8")
+    output = tmp_path / "size.json"
+
+    payload = allure_bundle.measure_bundle(
+        source=source, output=output, suite="frontend-cross-browser", browser="chromium"
+    )
+
+    assert payload["classes"]["trace_archive"] == {"file_count": 1, "bytes": 15}
+    assert payload["duplicate_files"] == 1
+    assert payload["duplicate_bytes"] == 15
+    assert payload["unreadable_result_metadata"] == 1
+    serialized = output.read_text(encoding="utf-8")
+    for private in ("opaque.zip", "duplicate.bin", "../../outside", "synthetic trace"):
+        assert private not in serialized
+
+
 def test_retention_keeps_daily_calendar_window_and_four_weeklies() -> None:
     now = date(2026, 9, 7)
 
