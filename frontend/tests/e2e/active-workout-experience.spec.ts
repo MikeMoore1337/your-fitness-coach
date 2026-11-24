@@ -8721,19 +8721,23 @@ for (const theme of ['light', 'dark'] as const) {
       for (const action of await third
         .locator('.active-workout-set__prefill-actions button')
         .all()) {
-        await action.evaluate((element) =>
-          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
-        );
-        expect(
-          await action.evaluate((element) => {
-            const box = element.getBoundingClientRect();
-            const hit = document.elementFromPoint(
-              box.left + box.width / 2,
-              box.top + box.height / 2,
-            );
-            return hit === element || element.contains(hit);
-          }),
-        ).toBe(true);
+        // A resize can reflow the page after scrolling. Keep the hit-test, but
+        // recenter while geometry settles so it measures the reachable control.
+        await expect(async () => {
+          await action.evaluate((element) =>
+            element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+          );
+          expect(
+            await action.evaluate((element) => {
+              const box = element.getBoundingClientRect();
+              const hit = document.elementFromPoint(
+                box.left + box.width / 2,
+                box.top + box.height / 2,
+              );
+              return hit === element || element.contains(hit);
+            }),
+          ).toBe(true);
+        }).toPass({ timeout: 5_000, intervals: [50, 100, 200] });
       }
       if (
         (process.env.YFC_1132_CAPTURE === '1' && info.project.name === 'chromium') ||
