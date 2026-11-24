@@ -1223,7 +1223,7 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
         pytest.skip("openssl is not installed on this development host")
     source = tmp_path / "source"
     source.mkdir()
-    (source / "result.json").write_text('{"status":"passed"}\n', encoding="utf-8")
+    (source / "case-result.json").write_text('{"status":"passed"}\n', encoding="utf-8")
     encrypted = tmp_path / "bundle.enc"
     monkeypatch.setenv("ALLURE_REPORT_ENCRYPTION_KEY", "k" * 48)
     manifest = allure_bundle.encrypt_bundle(
@@ -1248,7 +1248,22 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
             "suite",
         )
     }
-    assert (extracted / "result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
+    assert (extracted / "case-result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
+
+
+def test_bundle_refuses_missing_test_results(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "attachment.txt").write_text("synthetic", encoding="utf-8")
+    monkeypatch.setenv("ALLURE_REPORT_ENCRYPTION_KEY", "k" * 48)
+    with pytest.raises(allure_bundle.AllureBundleError, match="no Allure test results"):
+        allure_bundle.encrypt_bundle(
+            source=source,
+            output=tmp_path / "bundle.enc",
+            suite="python-tests",
+            browser="shard-1",
+        )
+    assert not (tmp_path / "bundle.enc").exists()
 
 
 def test_bundle_measurement_reports_size_classes_without_paths(tmp_path: Path, monkeypatch) -> None:
