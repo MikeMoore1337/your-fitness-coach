@@ -1201,16 +1201,76 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  allure-quarantine:
+    name: Quarantine encrypted Allure attachments
+    needs:
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      manifest_digest: ${{ steps.manifest.outputs.digest }}
+      environment_id: ${{ steps.environment.outputs.id }}
+      environment_name: ${{ steps.environment.outputs.name }}
+    env:
+      RUN_KIND: ${{ needs.scope-router.outputs.profile == 'weekly-exhaustive' && 'weekly' || 'daily' }}
+      QUARANTINE_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/downloaded-allure
+      QUARANTINE_MANIFEST: ${{ github.workspace }}/.artifacts/runtime/tests/allure-quarantine.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Download current-run encrypted result bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-${{ github.run_id }}-*
+          path: .artifacts/runtime/tests/downloaded-allure
+          merge-multiple: true
+      - name: Bind the complete quarantine to this run and commit
+        id: manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          digest="$(python scripts/allure_quarantine.py manifest --root "$QUARANTINE_ROOT" --manifest "$QUARANTINE_MANIFEST" --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA")"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Review every decrypted attachment before approving this exact manifest." >> "$GITHUB_STEP_SUMMARY"
+          echo "Approval comment: allure-review:$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:$digest" >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the quarantine manifest for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-quarantine-manifest-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: .artifacts/runtime/tests/allure-quarantine.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Require an existing protected review environment
+        id: environment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "name=allure-review" >> "$GITHUB_OUTPUT"
+
   scheduled-report:
     name: Private scheduled Allure report
     concurrency:
       group: yfc-scheduled-allure-publication
       cancel-in-progress: false
     needs:
-      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
-    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, allure-quarantine]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true' && needs.allure-quarantine.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    environment:
+      name: ${{ needs.allure-quarantine.outputs.environment_name }}
     permissions:
       actions: read
       contents: read
@@ -1256,6 +1316,27 @@ jobs:
           pattern: allure-results-${{ github.run_id }}-*
           path: .artifacts/runtime/tests/downloaded-allure
           merge-multiple: true
+      - name: Download the reviewed manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-quarantine-manifest-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: .artifacts/runtime/tests/quarantine-manifest
+      - name: Verify the exact owner review and encrypted attachments
+        id: quarantine-verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_OWNER: ${{ github.repository_owner }}
+          REVIEW_ENVIRONMENT_ID: ${{ needs.allure-quarantine.outputs.environment_id }}
+          REVIEW_MANIFEST_DIGEST: ${{ needs.allure-quarantine.outputs.manifest_digest }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          test "$id" = "$REVIEW_ENVIRONMENT_ID"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > "$RUNNER_TEMP/allure-approvals.json"
+          python scripts/allure_quarantine.py approval --json "$RUNNER_TEMP/allure-approvals.json" --owner "$REVIEW_OWNER" --environment-id "$id" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --digest "$REVIEW_MANIFEST_DIGEST"
+          python scripts/allure_quarantine.py verify --root "$BUNDLE_DOWNLOAD_ROOT" --manifest .artifacts/runtime/tests/quarantine-manifest/allure-quarantine.json --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA" --digest "$REVIEW_MANIFEST_DIGEST"
       - name: Decrypt only current-run result bundles
         if: always()
         continue-on-error: true
@@ -1322,7 +1403,7 @@ jobs:
         continue-on-error: true
         run: python scripts/allure_report.py validate --report-root "$REPORT_ROOT" --metadata "$REPORT_METADATA"
       - name: Publish private report to isolated VPS origin
-        if: always()
+        if: always() && steps.quarantine-verified.outcome == 'success'
         continue-on-error: true
         env:
           ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}
