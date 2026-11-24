@@ -258,7 +258,7 @@ jobs:
           if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
               raise SystemExit('scheduled Allure reporter did not record all 35 successful tests')
           (root / 'synthetic-attachment.png').write_bytes(base64.b64decode(
-              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC'
           ))
           with ZipFile(root / 'synthetic-attachment.zip', 'w') as archive:
               archive.writestr('trace.trace', 'synthetic test trace')
