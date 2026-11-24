@@ -110,3 +110,24 @@ test('coach navigation keeps readable labels inside emulated Telegram safe areas
   const navBox = (await nav.boundingBox())!;
   expect(navBox.y + navBox.height).toBeLessThanOrEqual(852 - 34);
 });
+
+test('coach dock remains stable while viewport changes', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installPlatformApi(page, { browserSession: true, trainerActive: true });
+  await page.goto('/coach?tab=tools');
+  await expect(page.locator('.coach-tools-hub')).toBeVisible();
+  for (const width of [390, 1280, 320, 430, 1440, 360, 1280, 390, 430, 320]) {
+    await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  }
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
