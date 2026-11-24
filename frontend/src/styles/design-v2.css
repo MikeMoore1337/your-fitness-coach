@@ -1704,6 +1704,12 @@ body:has(.app-shell--design-v2) {
   gap: 0;
 }
 
+@media (max-width: 340px) {
+  .today-dashboard--design-v2 .today-progress-grid > .semantic-card--compact {
+    align-self: start;
+  }
+}
+
 .today-dashboard--design-v2 .today-signal {
   min-height: 0;
   gap: var(--v2-space-3);
