@@ -249,6 +249,9 @@ def test_cross_browser_group_migrates_database_for_ready_backend() -> None:
     assert spec.commands[1].argv == ("python", "scripts/run_cross_browser_regression.py")
     assert spec.commands[1].cwd == "."
     assert {"python", "alembic", "DATABASE_URL"} <= set(spec.prerequisites)
+    sweep = ci_contract.COMMAND_GROUPS["frontend-ui-quality-sweep"]
+    assert sweep.commands[0].argv == ("npm", "run", "e2e:ui-audit:sweep")
+    assert ci_contract.GROUP_TO_JOB[sweep.name] == "frontend-cross-browser"
 
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
@@ -258,6 +261,11 @@ def test_cross_browser_group_migrates_database_for_ready_backend() -> None:
     assert "postgres:" in job
     assert 'PW_API_SERVER: "true"' in job
     assert "timeout-minutes: 60" in job
+    assert "max-parallel: 5" in job
+    assert "browser: [chromium, firefox, webkit]" in job
+    assert "shard: [1, 2, 3, 4, 5]" in job
+    assert "matrix.browser == 'chromium' && matrix.shard == 1" in job
+    assert "run-group frontend-ui-quality-sweep" in job
 
 
 def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> None:
@@ -409,7 +417,7 @@ def test_workflow_keeps_frontend_and_python_five_way_shards_independent() -> Non
 
     assert "name: Frontend smoke (${{ matrix.shard }}/5)" in workflow
     assert "name: Python tests (${{ matrix.shard }}/5)" in workflow
-    assert workflow.count("        shard: [1, 2, 3, 4, 5]") == 2
+    assert workflow.count("        shard: [1, 2, 3, 4, 5]") == 3
     assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/5"' in workflow
     assert 'run-group python-tests --shard "${{ matrix.shard }}/5"' in workflow
     assert "name: Frontend (${{ matrix.lane }})" in workflow

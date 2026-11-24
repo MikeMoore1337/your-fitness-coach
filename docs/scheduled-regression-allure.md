@@ -31,18 +31,20 @@ Daily запускает bounded deterministic набор:
 
 - quality;
 - frontend-checks;
-- frontend-e2e (4 shard, Chromium);
+- frontend-e2e (5 shard, Chromium);
 - frontend-mobile-regression (Chromium + WebKit);
-- python-tests (4 shard, PostgreSQL test stack);
+- python-tests (5 shard, PostgreSQL test stack);
 - migrated-stack (Alembic, migrated API и browser smoke);
 - critical-smoke;
 - workflow-config.
 
 Weekly включает Daily и дополнительно запускает policy, dependency audit, расширенный mobile
 набор, frontend-cross-browser (Chromium + Firefox + WebKit), image/deployment/container
-contracts. Cross-browser suite запускается параллельными изолированными browser-процессами с
-разными API/preview ports и передаёт три
-browser-labelled encrypted bundles; каждый upload также содержит privacy-safe size/class evidence.
+contracts. Cross-browser suite разделён на пять Playwright-шардов для каждого из трёх браузеров.
+Не более пяти jobs выполняются одновременно; каждый получает отдельный runner с тестовой базой,
+API и preview. UI quality sweep выполняется один раз в Chromium shard 1. Карантин требует все
+15 зашифрованных browser/shard bundles; каждый upload также содержит обезличенную сводку размеров.
+Счётчики CPU и max RSS дочернего процесса в журнале не измеряют общий пик памяти runner.
 Allure-агрегатор ожидает только suite, которые фактически производят results:
 frontend-checks, frontend-e2e, frontend-mobile-regression, python-tests, migrated-stack, а для
 Weekly также frontend-mobile-regression-extended и frontend-cross-browser. Native policy, audit и

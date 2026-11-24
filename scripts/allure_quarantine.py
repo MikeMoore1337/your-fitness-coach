@@ -9,9 +9,19 @@ import re
 from pathlib import Path
 
 if __package__:
-    from scripts.scheduled_regression import FRONTEND_E2E_SHARD_COUNT, PYTHON_TEST_SHARD_COUNT
+    from scripts.scheduled_regression import (
+        CROSS_BROWSER_PROJECTS,
+        CROSS_BROWSER_SHARD_COUNT,
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
+    )
 else:
-    from scheduled_regression import FRONTEND_E2E_SHARD_COUNT, PYTHON_TEST_SHARD_COUNT
+    from scheduled_regression import (
+        CROSS_BROWSER_PROJECTS,
+        CROSS_BROWSER_SHARD_COUNT,
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
+    )
 
 ENVIRONMENT = "allure-review"
 
@@ -33,7 +43,9 @@ def expected_bundles(kind: str) -> set[str]:
     if kind == "weekly":
         names.add("frontend-mobile-regression-extended.enc")
         names.update(
-            f"frontend-cross-browser-{browser}.enc" for browser in ("chromium", "firefox", "webkit")
+            f"frontend-cross-browser-{browser}-shard-{shard}.enc"
+            for browser in CROSS_BROWSER_PROJECTS
+            for shard in range(1, CROSS_BROWSER_SHARD_COUNT + 1)
         )
     return names
 
