@@ -187,6 +187,8 @@ def encrypt_bundle(
     normalized_suite = _safe_text(suite, field="suite")
     normalized_browser = _safe_text(browser, field="browser")
     files = _source_files(source)
+    if not any(relative.endswith("-result.json") for _, relative, _ in files):
+        raise AllureBundleError("result bundle contains no Allure test results")
     source_bytes = sum(size for _, _, size in files)
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)

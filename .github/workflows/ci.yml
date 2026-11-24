@@ -242,18 +242,65 @@ jobs:
         working-directory: frontend
         shell: bash
         env:
-          ALLURE_RESULTS_DIR: ${{ runner.temp }}/allure-vitest-smoke
+          ALLURE_RESULTS_DIR: ${{ github.workspace }}/.artifacts/runtime/tests/allure-results/pr-vitest-smoke
         run: |
           set -Eeuo pipefail
           npm run test -- tests/unit/shared/numeric/decimalDraft.test.ts tests/unit/features/dashboard/TodayDashboard.test.tsx
           python - <<'PY'
+          import base64
           import json
           import os
           from pathlib import Path
+          from zipfile import ZipFile
 
-          results = list(Path(os.environ['ALLURE_RESULTS_DIR']).glob('*-result.json'))
+          root = Path(os.environ['ALLURE_RESULTS_DIR'])
+          results = list(root.glob('*-result.json'))
           if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
               raise SystemExit('scheduled Allure reporter did not record all 35 successful tests')
+          (root / 'synthetic-attachment.png').write_bytes(base64.b64decode(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC'
+          ))
+          with ZipFile(root / 'synthetic-attachment.zip', 'w') as archive:
+              archive.writestr('trace.trace', 'synthetic test trace')
+          PY
+          key="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          echo "ALLURE_PR_SMOKE_KEY=$key" >> "$GITHUB_ENV"
+      - name: Encrypt synthetic reporter results on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_PR_SMOKE_KEY }}
+        with:
+          enabled: "true"
+          source: .artifacts/runtime/tests/allure-results/pr-vitest-smoke
+          bundle: .artifacts/runtime/tests/allure-bundles/pr-vitest-smoke.enc
+          artifact-name: allure-pr-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          suite: frontend-checks
+          browser: pr-smoke
+      - name: Verify synthetic encrypted results on PRs
+        if: matrix.lane == 'unit' && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_PR_SMOKE_KEY }}
+        run: |
+          set -Eeuo pipefail
+          python scripts/allure_bundle.py decrypt \
+            --source .artifacts/runtime/tests/allure-bundles/pr-vitest-smoke.enc \
+            --output .artifacts/runtime/tests/pr-vitest-smoke-decrypted
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          source = Path('.artifacts/runtime/tests/allure-results/pr-vitest-smoke')
+          target = Path('.artifacts/runtime/tests/pr-vitest-smoke-decrypted')
+          results = list(target.glob('*-result.json'))
+          if len(results) != 35 or any(json.loads(path.read_text(encoding='utf-8')).get('status') != 'passed' for path in results):
+              raise SystemExit('encrypted reporter bundle did not preserve all 35 successful tests')
+          for name in ('synthetic-attachment.png', 'synthetic-attachment.zip'):
+              if hashlib.sha256((source / name).read_bytes()).digest() != hashlib.sha256((target / name).read_bytes()).digest():
+                  raise SystemExit('encrypted reporter bundle did not preserve a synthetic attachment')
           PY
       - name: Sync API schema dependencies
         if: matrix.lane == 'checks'
@@ -277,7 +324,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-checks
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-checks.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-checks
           suite: frontend-checks
@@ -385,7 +432,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-e2e-shard-${{ matrix.shard }}
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-e2e-shard-${{ matrix.shard }}.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-e2e-shard-${{ matrix.shard }}
           suite: frontend-e2e
@@ -465,7 +512,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-mobile-regression
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression
           suite: frontend-mobile-regression
@@ -537,7 +584,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/frontend-mobile-regression-extended
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression-extended.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression-extended
           suite: frontend-mobile-regression-extended
@@ -642,7 +689,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/chromium
+          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/chromium
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-chromium.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-chromium
           suite: frontend-cross-browser
@@ -654,7 +701,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/firefox
+          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/firefox
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-firefox.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-firefox
           suite: frontend-cross-browser
@@ -666,7 +713,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}/webkit
+          source: .artifacts/runtime/tests/allure-results/frontend-cross-browser/webkit
           bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-webkit.enc
           artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-webkit
           suite: frontend-cross-browser
@@ -733,7 +780,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/python-tests-shard-${{ matrix.shard }}
           bundle: .artifacts/runtime/tests/allure-bundles/python-tests-shard-${{ matrix.shard }}.enc
           artifact-name: allure-results-${{ github.run_id }}-python-tests-shard-${{ matrix.shard }}
           suite: python-tests
@@ -837,7 +884,7 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
+          source: .artifacts/runtime/tests/allure-results/migrated-stack
           bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack.enc
           artifact-name: allure-results-${{ github.run_id }}-migrated-stack
           suite: migrated-stack
