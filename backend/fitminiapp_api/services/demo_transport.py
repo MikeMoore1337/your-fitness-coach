@@ -1,14 +1,22 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from math import isfinite
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.workout import ExerciseHistoryResponse
+from fitminiapp_api.schemas.workout_rest import (
+    RestActionRequest,
+    RestRestartRequest,
+    RestSessionResponse,
+    RestStartRequest,
+)
 from fitminiapp_api.services.demo_sessions import (
     DemoActionForbiddenError,
     DemoSessionStore,
@@ -1782,6 +1790,206 @@ def _request_body(body: Any) -> dict[str, Any]:
     return body
 
 
+def _rest_time(value: datetime, now: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise DemoActionForbiddenError
+    value = value.astimezone(UTC)
+    if value > now + timedelta(minutes=1) or value < now - timedelta(days=90):
+        raise DemoActionForbiddenError
+    return value
+
+
+def _rest_response(row: dict[str, Any]) -> dict[str, Any]:
+    return RestSessionResponse.model_validate(row).model_dump(mode="json")
+
+
+def _demo_rest_start(
+    store: DemoSessionStore, session: _DemoSession, body: Any, predecessor_id: int | None = None
+) -> dict[str, Any]:
+    if session.scenario != "self_training":
+        raise DemoActionForbiddenError
+    payload = _request_body(body)
+    expected = {"started_at", "mutation_id"}
+    if predecessor_id is None:
+        expected.add("source_set_id")
+    if set(payload) != expected or isinstance(payload.get("source_set_id"), bool):
+        raise DemoActionForbiddenError
+    try:
+        request = (
+            RestStartRequest.model_validate(payload)
+            if predecessor_id is None
+            else RestRestartRequest.model_validate(payload)
+        )
+    except ValidationError as exc:
+        raise DemoActionForbiddenError from exc
+    started = _rest_time(request.started_at, store._now())
+    rows = session.state.setdefault("rest_sessions", [])
+    predecessor = next((row for row in rows if row["id"] == predecessor_id), None)
+    if predecessor_id is not None and predecessor is None:
+        raise DemoActionForbiddenError
+    if isinstance(request, RestStartRequest):
+        source_id = request.source_set_id
+    elif predecessor is not None:
+        source_id = predecessor["source_set_id"]
+    else:
+        raise DemoActionForbiddenError
+    fingerprint = {
+        "started_at": started.isoformat(),
+        "source_set_id": source_id,
+        "predecessor_id": predecessor_id,
+    }
+    replay = next((row for row in rows if row["start_mutation_id"] == request.mutation_id), None)
+    if replay is not None:
+        if replay["_start"] != fingerprint:
+            raise DemoTransitionError
+        return _rest_response(replay)
+    if predecessor is None:
+        existing = next(
+            (
+                row
+                for row in rows
+                if row["source_set_id"] == source_id and row["_start"]["predecessor_id"] is None
+            ),
+            None,
+        )
+        if existing is not None:
+            return _rest_response(existing)
+    screen = session.state.get("screen")
+    if screen != "active_workout" and (
+        predecessor is not None or screen not in {"summary", "progress"}
+    ):
+        raise DemoTransitionError
+    source = next(
+        (item for item in _workout(session)["exercises"][0]["sets"] if item["id"] == source_id),
+        None,
+    )
+    if source is None:
+        raise DemoActionForbiddenError
+    if not source["is_completed"] or (source["set_kind"] or "working") != "working":
+        raise DemoTransitionError
+    if predecessor is not None:
+        if predecessor["status"] not in {"completed", "skipped"} or predecessor["ended_at"] is None:
+            raise DemoTransitionError
+        if started < datetime.fromisoformat(predecessor["ended_at"]):
+            raise DemoTransitionError
+        if any(row["_start"]["predecessor_id"] == predecessor_id for row in rows):
+            raise DemoTransitionError
+    if len(rows) >= 128 or any(row["status"] == "running" for row in rows):
+        raise DemoTransitionError
+    row = {
+        "id": 80_001 + len(rows),
+        "workout_id": DEMO_WORKOUT_ID,
+        "source_set_id": source_id,
+        "started_at": started.isoformat(),
+        "ended_at": None,
+        "planned_seconds": 90,
+        "adjusted_seconds": 90,
+        "measured_seconds": None,
+        "status": "running",
+        "source": None,
+        "quality": "normal",
+        "version": 1,
+        "start_mutation_id": request.mutation_id,
+        "_start": fingerprint,
+        "_actions": {},
+    }
+    rows.append(row)
+    session.revision += 1
+    return _rest_response(row)
+
+
+def _demo_rest_action(
+    store: DemoSessionStore, session: _DemoSession, rest_id: int, body: Any
+) -> dict[str, Any]:
+    rows = session.state.get("rest_sessions", [])
+    row = next((item for item in rows if item["id"] == rest_id), None)
+    if session.scenario != "self_training" or row is None:
+        raise DemoActionForbiddenError
+    payload = _request_body(body)
+    allowed = {
+        "action",
+        "mutation_id",
+        "expected_version",
+        "ended_at",
+        "occurred_at",
+        "corrected",
+        "corrected_seconds",
+    }
+    if set(payload) - allowed or isinstance(payload.get("expected_version"), bool):
+        raise DemoActionForbiddenError
+    try:
+        request = RestActionRequest.model_validate(payload)
+    except ValidationError as exc:
+        raise DemoActionForbiddenError from exc
+    fingerprint = request.model_dump(mode="json", exclude={"mutation_id"})
+    replay = row["_actions"].get(request.mutation_id)
+    if replay is not None:
+        if replay != fingerprint:
+            raise DemoTransitionError
+        return _rest_response(row)
+    if request.expected_version != row["version"] or row["status"] != "running":
+        raise DemoTransitionError
+    if len(row["_actions"]) >= 256:
+        raise DemoTransitionError
+    now = store._now()
+    started = datetime.fromisoformat(row["started_at"])
+    if request.action in {"add30", "add60"}:
+        if (
+            request.ended_at is not None
+            or request.corrected
+            or request.corrected_seconds is not None
+        ):
+            raise DemoActionForbiddenError
+        occurred = _rest_time(request.occurred_at, now) if request.occurred_at else now
+        if occurred < started:
+            raise DemoActionForbiddenError
+        elapsed = max(0, int((occurred - started).total_seconds()))
+        row["adjusted_seconds"] = max(row["adjusted_seconds"], elapsed) + (
+            30 if request.action == "add30" else 60
+        )
+    else:
+        if request.action == "complete":
+            if request.ended_at is None or request.corrected != (
+                request.corrected_seconds is not None
+            ):
+                raise DemoActionForbiddenError
+            ended = _rest_time(request.ended_at, now)
+            measured = (
+                request.corrected_seconds
+                if request.corrected
+                else max(0, int((ended - started).total_seconds()))
+            )
+            source: str | None = "USER_CORRECTED" if request.corrected else "USER_CONFIRMED"
+            status, quality = "completed", "normal"
+        else:
+            if (
+                request.ended_at is not None
+                or request.corrected
+                or request.corrected_seconds is not None
+            ):
+                raise DemoActionForbiddenError
+            ended = _rest_time(request.occurred_at, now) if request.occurred_at else now
+            measured = None
+            status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
+                request.action
+            ]
+            source = "SYSTEM_RECOVERY" if request.action == "unknown" else None
+            quality = "unknown" if request.action == "unknown" else "normal"
+        if ended < started:
+            raise DemoActionForbiddenError
+        row.update(
+            ended_at=ended.isoformat(),
+            measured_seconds=measured,
+            status=status,
+            source=source,
+            quality=quality,
+        )
+    row["version"] += 1
+    row["_actions"][request.mutation_id] = fingerprint
+    session.revision += 1
+    return _rest_response(row)
+
+
 def _validate_workout_set_payload(payload: dict[str, Any]) -> None:
     allowed = {
         "actual_reps",
@@ -1947,6 +2155,32 @@ def handle_demo_transport(
             return _workout(session)
         if path == "/api/v1/workouts/session-rotation":
             return {"mode": "calendar", "status": "disabled", "days": []}
+        if path == f"/api/v1/workouts/{DEMO_WORKOUT_ID}/set-history":
+            exercise = _workout(session)["exercises"][0]
+            return {
+                "workout_id": DEMO_WORKOUT_ID,
+                "user_program_id": 41_001,
+                "program_revision_number": 1,
+                "sets": [
+                    {
+                        "set_id": item["id"],
+                        "set_number": item["set_number"],
+                        "set_version": item["version"],
+                        "workout_exercise_id": exercise["id"],
+                        "exercise_id": exercise["exercise_id"],
+                        "source_template_exercise_id": None,
+                        "source_assignment_slot_id": None,
+                        "previous_today": None,
+                        "previous_workout": None,
+                        "history_status": "identity_unproven",
+                    }
+                    for item in exercise["sets"]
+                ],
+            }
+        if path == f"/api/v1/workouts/{DEMO_WORKOUT_ID}/rest-sessions":
+            if session.scenario != "self_training":
+                raise DemoActionForbiddenError
+            return [_rest_response(row) for row in session.state.get("rest_sessions", [])]
         if path == "/api/v1/workouts/recovery":
             schedule = _schedule(session)
             return {
@@ -2429,6 +2663,13 @@ def handle_demo_transport(
         raise DemoActionForbiddenError
 
     if method == "POST":
+        if path == f"/api/v1/workouts/{DEMO_WORKOUT_ID}/rest-sessions":
+            return _demo_rest_start(store, session, body)
+        if len(parts) == 4 and parts[:2] == ["workouts", "rest-sessions"] and parts[2].isdigit():
+            if parts[3] == "restart":
+                return _demo_rest_start(store, session, body, int(parts[2]))
+            if parts[3] == "actions":
+                return _demo_rest_action(store, session, int(parts[2]), body)
         if len(parts) == 3 and parts[0] == "workouts" and parts[2] == "start":
             if parts[1] != str(DEMO_WORKOUT_ID):
                 raise DemoActionForbiddenError
