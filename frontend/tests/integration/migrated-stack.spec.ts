@@ -152,6 +152,36 @@ testWithoutServiceWorker(
   },
 );
 
+testWithoutServiceWorker(
+  'real trainer demo navigation avoids unavailable program operations',
+  async ({ page }) => {
+    const forbidden: string[] = [];
+    const transportPaths: string[] = [];
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname !== '/api/v1/demo/sessions/current/transport') return;
+      const path = response.request().postDataJSON()?.path ?? 'unknown';
+      transportPaths.push(path);
+      if (response.status() === 403) forbidden.push(path);
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+    const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+    await dock.getByRole('link', { name: 'Программы', exact: true }).click();
+    const programs = page.locator('details').filter({
+      has: page.getByRole('heading', { name: 'Программы клиентов', exact: true }),
+    });
+    await programs.locator('summary').click();
+    await expect(
+      page.getByText('Изменение этапов программы доступно после входа в рабочий кабинет.').first(),
+    ).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(transportPaths.some((path) => path.startsWith('/api/v1/programs/assigned/'))).toBe(
+      false,
+    );
+    expect(forbidden).toEqual([]);
+  },
+);
+
 testWithoutServiceWorker('real trainer demo follows the connected route', async ({ page }) => {
   const forbidden: string[] = [];
   page.on('response', (response) => {

@@ -141,6 +141,27 @@ describe('Demo cabinet production composition', () => {
     );
   });
 
+  it.each(['clients', 'programs', 'tools'])(
+    'preserves the trainer %s tab in a direct demo route',
+    async (tab) => {
+      renderPage(`/demo?scenario=trainer&section=trainer&tab=${tab}`);
+      await screen.findByTestId('production-coach');
+      await waitFor(() =>
+        expect(window.location.search).toBe(
+          `?cabinet=1&scenario=trainer&section=trainer&tab=${tab}`,
+        ),
+      );
+    },
+  );
+
+  it('drops duplicate trainer tabs instead of selecting an ambiguous destination', async () => {
+    renderPage('/demo?scenario=trainer&section=trainer&tab=clients&tab=tools');
+    await screen.findByTestId('production-coach');
+    await waitFor(() =>
+      expect(window.location.search).toBe('?cabinet=1&scenario=trainer&section=trainer'),
+    );
+  });
+
   it('keeps scenario switching, reset and trainer routing inside the cabinet', async () => {
     const user = userEvent.setup();
     renderPage('/demo?scenario=self_training');

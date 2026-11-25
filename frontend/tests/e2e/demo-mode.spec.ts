@@ -1980,16 +1980,19 @@ test('nutrition and coach scenarios render shared production surfaces with local
     await captureTask291Evidence(trainerPage, `demo-trainer-navigation-${width}-light.png`);
   }
   await captureTask291Evidence(trainerPage, 'demo-trainer-mobile-light.png');
-  await trainerPage.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await trainerPage
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await expect(trainerPage.getByRole('button', { name: /^Алексей/ })).toBeVisible();
   await trainerPage.getByRole('button', { name: /^Алексей/ }).click();
   await captureTask291Evidence(trainerPage, 'demo-trainer-mobile-client-light.png');
   await trainerPage.setViewportSize({ width: 1440, height: 900 });
-  await trainerPage.getByRole('button', { name: 'Сегодня', exact: true }).click();
+  await trainerPage.getByRole('tab', { name: 'Сегодня', exact: true }).click();
   await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
   await assertTrainerCapacityAvailable(trainerPage);
   await captureTask291Evidence(trainerPage, 'demo-trainer-desktop-light.png');
-  await trainerPage.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await trainerPage.getByRole('tab', { name: 'Клиенты', exact: true }).click();
   await trainerPage.getByRole('button', { name: /^Алексей/ }).click();
   await trainerPage.getByLabel('Данные клиента').getByRole('link', { name: 'Прогресс' }).click();
   const progressDisclosure = trainerPage.locator('details#coach-client-progress');
@@ -2006,6 +2009,132 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await trainerPage.getByRole('button', { name: 'Отправить комментарий' }).click();
   await expect(trainerPage.getByText('Хороший контроль темпа.')).toBeVisible();
   await trainerContext.close();
+});
+
+test('trainer demo uses Coach OS navigation and returns from the personal workspace', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+  const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(dock).toHaveAttribute('data-workspace', 'coach');
+  await expect(dock.getByRole('link', { name: 'Сегодня', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page.getByTestId('quick-add-trigger')).toHaveCount(0);
+  await expect(page.locator('.coach-os-nav')).toHaveCount(0);
+
+  for (const [label, tab] of [
+    ['Клиенты', 'clients'],
+    ['Программы', 'programs'],
+    ['Ещё', 'tools'],
+  ]) {
+    await dock.getByRole('link', { name: label, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`tab=${tab}`));
+    await expect(dock.getByRole('link', { name: label, exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  }
+  await page.reload();
+  await expect(dock.getByRole('link', { name: 'Ещё', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await page.goBack();
+  await expect(dock.getByRole('link', { name: 'Программы', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  const programs = dock.getByRole('link', { name: 'Программы', exact: true });
+  await programs.focus();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const desktopTab = page.getByRole('tab', { name: 'Программы', exact: true });
+  await expect(desktopTab).toHaveAttribute('aria-selected', 'true');
+  await expect(desktopTab).toBeFocused();
+  await desktopTab.press('Home');
+  await expect(page.getByRole('tab', { name: 'Сегодня', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole('navigation', { name: 'Режим работы' })
+    .getByRole('link', { name: 'Для себя' })
+    .click();
+  await expect(page).toHaveURL(/scenario=trainer.*section=today/);
+  await expect(page.getByTestId('quick-add-trigger')).toBeVisible();
+  await page.getByRole('link', { name: 'В кабинет тренера' }).click();
+  await expect(page).toHaveURL(/scenario=trainer.*section=trainer/);
+  await expect(page.getByTestId('quick-add-trigger')).toHaveCount(0);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`trainer demo navigation stays usable across viewport sizes (${theme})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installDemoTransport(page);
+    await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+    await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+    for (const width of [320, 360, 390, 393, 430, 768, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: width <= 430 ? 844 : 900 });
+      await expectNoHorizontalOverflow(page);
+      if (width < 900) {
+        await expectDockWithinViewport(page);
+        await expect(
+          page.getByRole('navigation', { name: 'Основная навигация' }).getByRole('link', {
+            name: 'Сегодня',
+            exact: true,
+          }),
+        ).toHaveAttribute('aria-current', 'page');
+      } else {
+        await expect(page.getByRole('tab', { name: 'Сегодня', exact: true })).toHaveAttribute(
+          'aria-selected',
+          'true',
+        );
+      }
+    }
+  });
+}
+
+test('trainer demo navigation keeps Telegram Back and wide layout usable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTelegramHarness(page);
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+  const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+  await dock.getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await page.getByRole('button', { name: /^Алексей/ }).click();
+  await expect(page.getByLabel('Данные клиента')).toBeVisible();
+  const telegram = new TelegramHarness(page);
+  await expect.poll(async () => (await telegram.state()).backButton.visible).toBe(true);
+  await telegram.clickBack();
+  await expect(page.getByLabel('Данные клиента')).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Алексей/ })).toBeVisible();
+  await expect.poll(async () => (await telegram.state()).backButton.visible).toBe(true);
+  await expect(dock.getByRole('link', { name: 'Клиенты', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await telegram.clickBack();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer&tab=clients');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.getByRole('tab', { name: 'Клиенты', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'Программы', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Программы', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 });
 
 test('trainer demo follows the connected Today-to-Today route', async ({ page }) => {

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AppShell, type AppSection, type DemoAppShellConfig } from '../../app/AppShell';
+import {
+  AppShell,
+  TRAINER_DESTINATIONS,
+  type AppSection,
+  type DemoAppShellConfig,
+} from '../../app/AppShell';
 import type { QuickAddAction } from '../../app/QuickAddSheet';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
@@ -25,7 +30,12 @@ import {
   type DemoRouteTarget,
 } from '../../features/demo/demoRoute';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { AppLink, useNavigation } from '../../shared/navigation/router';
+import {
+  AppLink,
+  coachTabFromSearch,
+  useNavigation,
+  type CoachTab,
+} from '../../shared/navigation/router';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import { DemoRuntimeProvider } from '../../shared/runtime/runtime';
 import { Button, ErrorState, LoadingState, Surface } from '../../shared/ui/common';
@@ -141,7 +151,10 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
         if (value && positiveIntegerParam(parsed.searchParams, key) !== null)
           target.searchParams.set(key, value);
       }
-      if (parsed.searchParams.get('tab') === 'tools') target.searchParams.set('tab', 'tools');
+      const tab = parsed.searchParams.getAll('tab');
+      if (tab.length === 1 && ['clients', 'programs', 'tools'].includes(tab[0]!)) {
+        target.searchParams.set('tab', tab[0]!);
+      }
       const tool = parsed.searchParams.get('tool');
       if (
         tool &&
@@ -173,7 +186,9 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
           ? 'progress'
           : requested === 'profile'
             ? 'profile'
-            : startSection(scenario);
+            : requested === 'today'
+              ? 'today'
+              : startSection(scenario);
   const target = new URL(demoCabinetPath(scenario, mapped), window.location.origin);
   copyDemoActionParams(parsed.searchParams, target.searchParams, mapped);
   return `${target.pathname}?${target.searchParams.toString()}`;
@@ -335,6 +350,18 @@ export default function DemoCabinet() {
   const queryClient = useQueryClient();
   const scenario = useMemo(() => scenarioFromSearch(search), [search]);
   const section = useMemo(() => sectionFromSearch(search, scenario), [scenario, search]);
+  const [trainerSelection, setTrainerSelection] = useState<{ search: string; tab: CoachTab }>(
+    () => ({
+      search,
+      tab: coachTabFromSearch(search),
+    }),
+  );
+  const trainerTab =
+    trainerSelection.search === search ? trainerSelection.tab : coachTabFromSearch(search);
+  const setTrainerTab = useCallback(
+    (tab: CoachTab) => setTrainerSelection({ search, tab }),
+    [search],
+  );
   const [snapshot, setSnapshot] = useState<DemoSessionSnapshot | null>(null);
   const [loadedScenario, setLoadedScenario] = useState<DemoScenario | null>(null);
   const [loading, setLoading] = useState(true);
@@ -436,8 +463,11 @@ export default function DemoCabinet() {
         if (value && positiveIntegerParam(current.searchParams, key) !== null)
           normalizedUrl.searchParams.set(key, value);
       }
-      if (current.searchParams.get('tab') === 'tools') {
-        normalizedUrl.searchParams.set('tab', 'tools');
+      const tabs = current.searchParams.getAll('tab');
+      if (tabs.length === 1 && ['clients', 'programs', 'tools'].includes(tabs[0]!)) {
+        normalizedUrl.searchParams.set('tab', tabs[0]!);
+      }
+      if (tabs.length === 1 && tabs[0] === 'tools') {
         const tool = current.searchParams.get('tool');
         if (
           tool &&
@@ -635,6 +665,24 @@ export default function DemoCabinet() {
     onNavigate: markNavigation,
     quickAddLinks: demoQuickAddLinks(scenario),
     resetDisabled: isLoading || !snapshot,
+    ...(scenario === 'trainer' && section === 'trainer'
+      ? {
+          trainerNavigation: {
+            activeTab: trainerTab,
+            destinations: TRAINER_DESTINATIONS.map(({ key, label, icon }) => ({
+              key,
+              label,
+              icon,
+              to: `${demoCabinetPath('trainer', 'trainer')}${key === 'today' ? '' : `&tab=${key}`}`,
+            })),
+          },
+        }
+      : scenario === 'trainer'
+        ? {
+            trainerReturnTo: demoCabinetPath('trainer', 'trainer'),
+            trainerPersonalTo: demoCabinetPath('trainer', 'today'),
+          }
+        : {}),
   };
   const token = getDemoSessionToken(scenario);
   const sectionOverride: AppSection =
@@ -711,7 +759,12 @@ export default function DemoCabinet() {
             >
               <DemoAuthProvider>
                 {section === 'trainer' ? (
-                  <CoachPage key={search} demo={shellDemo} renderShell={false} />
+                  <CoachPage
+                    key={search}
+                    demo={shellDemo}
+                    onDemoTabChange={setTrainerTab}
+                    renderShell={false}
+                  />
                 ) : (
                   <MiniAppPage
                     demo={shellDemo}

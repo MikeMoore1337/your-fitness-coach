@@ -14,6 +14,7 @@ import {
   coachTabFromSearch,
   safeTrainerReturnPath,
   useNavigation,
+  type CoachTab,
 } from '../shared/navigation/router';
 import { AppThemeToggle } from '../shared/ui/AppThemeToggle';
 import { glassProps } from '../shared/ui/Glass';
@@ -56,8 +57,8 @@ const APP_DESTINATIONS: ReadonlyArray<{
   { section: 'progress', label: 'Прогресс', icon: 'progress' },
 ];
 
-const TRAINER_DESTINATIONS: ReadonlyArray<{
-  key: string;
+export const TRAINER_DESTINATIONS: ReadonlyArray<{
+  key: CoachTab;
   label: string;
   icon: AppNavigationIconName;
   to: string;
@@ -101,6 +102,17 @@ export interface DemoAppShellConfig {
   minimalUtility?: boolean;
   moreLinks: ReadonlyArray<{ label: string; to: string; onClick?: () => void }>;
   quickAddLinks?: ReadonlyArray<QuickAddAction>;
+  trainerNavigation?: {
+    activeTab: CoachTab;
+    destinations: ReadonlyArray<{
+      key: CoachTab;
+      label: string;
+      icon: AppNavigationIconName;
+      to: string;
+    }>;
+  };
+  trainerReturnTo?: string;
+  trainerPersonalTo?: string;
   onNavigate?: (to: string) => void;
   onReset(): void;
   resetDisabled?: boolean;
@@ -285,13 +297,16 @@ export function AppShell({
   }, []);
   const mobileNavigation = useMobileNavigation(captureTrainerFocus);
   const renderedMobileNavigation = useRef(mobileNavigation);
-  const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
-  const desktopTrainerNavigation = trainerWorkspace && !mobileNavigation && !isMiniApp;
+  const trainerWorkspace = Boolean(
+    demo?.trainerNavigation || (!demo && user?.is_coach && path === '/coach'),
+  );
+  const desktopTrainerNavigation =
+    trainerWorkspace && !mobileNavigation && (!isMiniApp || Boolean(demo?.trainerNavigation));
   const currentTrainerTab = useRef(coachTabFromSearch(search));
   useLayoutEffect(() => {
     renderedMobileNavigation.current = mobileNavigation;
-    currentTrainerTab.current = coachTabFromSearch(search);
-  }, [mobileNavigation, search]);
+    currentTrainerTab.current = demo?.trainerNavigation?.activeTab ?? coachTabFromSearch(search);
+  }, [demo?.trainerNavigation?.activeTab, mobileNavigation, search]);
   useEffect(() => {
     if (!trainerWorkspace || isMiniApp) return;
     const trackFocus = (event: FocusEvent) => {
@@ -335,13 +350,16 @@ export function AppShell({
     target?.focus({ preventScroll: true });
     pendingTrainerFocus.current = null;
   }, [isMiniApp, mobileNavigation, trainerWorkspace]);
-  const personalWorkspace = Boolean(!demo && user?.is_coach && path === '/app' && section);
+  const personalWorkspace = Boolean(
+    demo?.trainerReturnTo || (!demo && user?.is_coach && path === '/app' && section),
+  );
   const trainerReturnTo = personalWorkspace
     ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
     : null;
   const shellDestinations =
-    demo?.destinations ??
-    (trainerWorkspace && !desktopTrainerNavigation ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
+    trainerWorkspace && !desktopTrainerNavigation
+      ? (demo?.trainerNavigation?.destinations ?? TRAINER_DESTINATIONS)
+      : (demo?.destinations ?? APP_DESTINATIONS);
   const personalSearch = desktopTrainerNavigation
     ? `?trainer_return=${encodeURIComponent(coachPathForTab(coachTabFromSearch(search)))}`
     : search;
@@ -353,6 +371,7 @@ export function AppShell({
   const shellVisible = Boolean(user || demo);
   const quickAddVisible =
     shellVisible &&
+    !demo?.trainerNavigation &&
     (Boolean(demo) || section !== undefined || (mobileNavigation && path === '/admin'));
   const embeddedQuickAddVisible = quickAddVisible && mobileNavigation;
   const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
@@ -701,7 +720,12 @@ export function AppShell({
         )}
         <main id="appContent" className={`container app-shell__content${narrow ? ' narrow' : ''}`}>
           {personalWorkspace && (
-            <TrainerModeSwitch mode="personal" returnTo={trainerReturnTo ?? undefined} />
+            <TrainerModeSwitch
+              mode="personal"
+              personalDestination={demo?.trainerPersonalTo}
+              returnTo={trainerReturnTo ?? undefined}
+              trainerDestination={demo?.trainerReturnTo}
+            />
           )}
           <QuickAddPlacementContext.Provider value={demo ? null : registerQuickAddTarget}>
             {children}
@@ -712,7 +736,7 @@ export function AppShell({
             <nav
               id="appBottomNav"
               {...(embeddedQuickAddVisible ? {} : glassProps('regular', true))}
-              className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
+              className={`app-bottom-nav${demo && !demo.trainerNavigation ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
               data-workspace={trainerWorkspace && mobileNavigation ? 'coach' : undefined}
             >
@@ -787,7 +811,9 @@ export function AppShell({
                     ? rawDestinationTo
                     : personalDestinationWithTrainerReturn(rawDestinationTo, personalSearch);
                   const active = demo
-                    ? demo.activeSection === destinationKey
+                    ? (demo.trainerNavigation && !desktopTrainerNavigation
+                        ? demo.trainerNavigation.activeTab
+                        : demo.activeSection) === destinationKey
                     : trainerWorkspace && !desktopTrainerNavigation
                       ? path === '/coach' && coachTabFromSearch(search) === destinationKey
                       : path === '/app' && section === destinationKey;
