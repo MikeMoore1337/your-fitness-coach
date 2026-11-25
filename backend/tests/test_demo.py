@@ -18,7 +18,7 @@ from fitminiapp_api.schemas.coach_crm import (
 )
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
-from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
+from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse, FoodDiaryEntryResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
 from fitminiapp_api.schemas.nutrition import NutritionResolvedTargetResponse
 from fitminiapp_api.schemas.program import (
@@ -493,6 +493,124 @@ def test_demo_rest_and_set_history_are_session_scoped_and_idempotent(client) -> 
     assert _transport(client, offline, path, "POST", start).status_code == 200
 
 
+@pytest.mark.parametrize("scenario", ["self_training", "nutrition", "trainer"])
+def test_demo_quick_food_preserves_entered_values_and_session_isolation(client, scenario) -> None:
+    token, _ = _create_session(client, scenario)
+    other, _ = _create_session(client, scenario)
+    date = "2026-09-15"
+    payload = {
+        "diary_date": date,
+        "meal_type": "lunch",
+        "amount": 1,
+        "amount_unit": "serving",
+        "quick_add": {"name": "Тестовый приём пищи", "energy_kcal": 420, "protein_g": 17},
+        "_demo_food_retry_key": "synthetic-food-retry-key",
+        "_demo_food_generation": 0,
+    }
+    response = _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload)
+    assert response.status_code == 200
+    assert float(response.json()["nutrition"]["energy_kcal"]) == 420
+    assert FoodDiaryEntryResponse.model_validate(response.json()).nutrition_confidence == "partial"
+    diary = _transport(client, token, f"/api/v1/nutrition/diary?diary_date={date}").json()
+    other_diary = _transport(client, other, f"/api/v1/nutrition/diary?diary_date={date}").json()
+    assert any(
+        entry["food_name"] == "Тестовый приём пищи"
+        for meal in diary["meals"]
+        for entry in meal["entries"]
+    )
+    assert all(
+        entry["food_name"] != "Тестовый приём пищи"
+        for meal in other_diary["meals"]
+        for entry in meal["entries"]
+    )
+    retry = _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload)
+    assert retry.json() == response.json()
+    changed = {**payload, "quick_add": {"energy_kcal": 421}}
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", changed).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 409
+    )
+
+
+def test_demo_food_rejects_unknown_resources_and_missing_retry_guards(client) -> None:
+    token, _ = _create_session(client, "self_training")
+    payload = {
+        "diary_date": "2026-09-15",
+        "meal_type": "breakfast",
+        "amount": 100,
+        "amount_unit": "g",
+        "food_id": 1,
+        "_demo_food_retry_key": "key",
+        "_demo_food_generation": 0,
+    }
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 403
+    )
+    assert (
+        _transport(
+            client,
+            token,
+            "/api/v1/nutrition/diary/entries",
+            "POST",
+            {**payload, "food_id": 80001, "_demo_food_generation": None},
+        ).status_code
+        == 403
+    )
+
+
+def test_trainer_demo_rejects_non_fixture_clients_and_external_actions(client) -> None:
+    token, _ = _create_session(client, "trainer")
+    for path in (
+        "/api/v1/coach/clients/1/operations",
+        "/api/v1/coach/clients/1/analytics",
+        "/api/v1/coach/clients/1/workouts",
+        "/api/v1/coach/invitations",
+        "/api/v1/users/1",
+    ):
+        assert _transport(client, token, path).status_code == 403
+    assert _transport(client, token, "/api/v1/coach/invitations", "POST", {}).status_code == 403
+    assert _transport(client, token, "/api/v1/notifications").json() == []
+    assert _transport(client, token, "/api/v1/notifications", "POST", {}).status_code == 403
+
+
+def test_demo_food_preserves_unknown_nutrients_in_day_and_snapshot(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    today = datetime.now(UTC).date().isoformat()
+    payload = {
+        "diary_date": today,
+        "meal_type": "lunch",
+        "amount": 1,
+        "amount_unit": "serving",
+        "quick_add": {"energy_kcal": 420},
+        "_demo_food_retry_key": "unknown-nutrients",
+        "_demo_food_generation": 0,
+    }
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 200
+    )
+    day = _transport(client, token, "/api/v1/nutrition/diary").json()
+    assert day["totals"]["protein_g"] is None
+    assert day["totals"]["fat_g"] is None
+    assert day["remaining"]["protein_g"] is None
+    snapshot = client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token})
+    assert snapshot.status_code == 200
+    assert snapshot.json()["state"]["protein_g"] is None
+    report = _transport(client, token, "/api/v1/workouts/progress/nutrition-report").json()
+    assert report["daily"][0]["protein_g"] is None
+
+
 def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
     token, _ = _create_session(client, "trainer")
 
@@ -519,12 +637,47 @@ def test_demo_transport_exposes_synthetic_coach_inbox_without_account_access(cli
 
     assert response.status_code == 200, response.text
     inbox = CoachInboxResponse.model_validate(response.json())
-    assert inbox.total == 1
+    tasks = _transport(client, trainer_token, "/api/v1/coach/tasks").json()
+    open_tasks = [task for task in tasks if task["state"] == "open"]
+    assert inbox.total == 1 + len(open_tasks)
+    assert inbox.counts.tasks == len(open_tasks)
+    assert {item.source_id for item in inbox.items if item.kind == "task"} == {
+        task["id"] for task in open_tasks
+    }
     assert inbox.items[0].client.id == 51_003
     assert inbox.items[0].action == "assign_program"
+    limited = CoachInboxResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/inbox?limit=1").json()
+    )
+    assert len(limited.items) == 1
+    assert limited.total == inbox.total
+    assert limited.counts.tasks == inbox.counts.tasks
+    assert (
+        _transport(client, trainer_token, "/api/v1/coach/inbox?limit=1&limit=2").status_code == 403
+    )
+    task_id = open_tasks[0]["id"]
+    changed = _transport(
+        client,
+        trainer_token,
+        f"/api/v1/coach/tasks/{task_id}/state",
+        "PATCH",
+        {"state": "completed"},
+    )
+    assert changed.status_code == 200
+    after = CoachInboxResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/inbox").json()
+    )
+    assert after.counts.tasks == len(open_tasks) - 1
+    assert task_id not in {item.source_id for item in after.items if item.kind == "task"}
 
     self_token, _ = _create_session(client, "self_training")
     assert _transport(client, self_token, "/api/v1/coach/inbox?limit=50").status_code == 403
+    for path in (
+        "/api/v1/coach/capacity",
+        "/api/v1/coach/tasks",
+        "/api/v1/coach/clients/51001/operations",
+    ):
+        assert _transport(client, self_token, path).status_code == 403
 
     with get_session_context() as db:
         assert db.query(User).count() == users_before
@@ -711,7 +864,15 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
         nutrition_token,
         "/api/v1/nutrition/diary/entries",
         "POST",
-        {"diary_date": "2026-09-15", "meal_type": "breakfast"},
+        {
+            "diary_date": datetime.now(UTC).date().isoformat(),
+            "meal_type": "breakfast",
+            "amount": 1,
+            "amount_unit": "serving",
+            "quick_add": {"energy_kcal": 428, "protein_g": 24},
+            "_demo_food_retry_key": "nutrition-test-key",
+            "_demo_food_generation": 0,
+        },
     )
     assert added_food.status_code == 200
     FoodDiaryDayResponse.model_validate(

@@ -41,7 +41,7 @@ class DemoNutritionState(BaseModel):
     recent_item: DemoNutritionItem
     calories: int = Field(ge=0)
     calorie_target: int = Field(gt=0)
-    protein_g: float = Field(ge=0)
+    protein_g: float | None = Field(ge=0)
     protein_target_g: float = Field(gt=0)
     meals_logged: int = Field(ge=0)
 
@@ -118,7 +118,7 @@ class DemoCabinetToday(BaseModel):
 class DemoCabinetNutrition(BaseModel):
     calories: int = Field(ge=0)
     calorie_target: int = Field(gt=0)
-    protein_g: float = Field(ge=0)
+    protein_g: float | None = Field(ge=0)
     protein_target_g: float = Field(gt=0)
     meals_logged: int = Field(ge=0)
     item_added: bool

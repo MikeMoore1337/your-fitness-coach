@@ -11382,7 +11382,7 @@ export interface components {
             /** Calorie Target */
             calorie_target: number;
             /** Protein G */
-            protein_g: number;
+            protein_g: number | null;
             /** Protein Target G */
             protein_target_g: number;
             /** Meals Logged */
@@ -11509,7 +11509,7 @@ export interface components {
             /** Calorie Target */
             calorie_target: number;
             /** Protein G */
-            protein_g: number;
+            protein_g: number | null;
             /** Protein Target G */
             protein_target_g: number;
             /** Meals Logged */

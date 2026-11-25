@@ -581,6 +581,7 @@ export function FoodPickerDialog({
   initialView = 'browse',
   disabled = false,
   demoSafeMode = false,
+  demoGeneration,
   onAdded,
   onClose,
 }: {
@@ -590,6 +591,7 @@ export function FoodPickerDialog({
   initialView?: 'browse' | 'quick-add';
   disabled?: boolean;
   demoSafeMode?: boolean;
+  demoGeneration?: number;
   onAdded?: (entry: FoodDiaryEntry) => void;
   onClose: () => void;
 }) {
@@ -613,6 +615,7 @@ export function FoodPickerDialog({
       quick: emptyQuickAdd,
       requestId: newEntryRequestId(),
     },
+    !demoSafeMode,
   );
   const [view, setView] = useState<PickerView>(() => (draft.editor ? 'food-editor' : initialView));
   const [editingFood, setEditingFood] = useState<Food | undefined>(() => draft.editor?.food);
@@ -628,11 +631,11 @@ export function FoodPickerDialog({
   const selectedRecipe = draft.recipe ?? null;
   const recipeAmount = draft.recipeAmount ?? '100';
   const batchStorageKey = `${foodDraftStorageKey(user?.id ?? 'anonymous', diaryDate, mealType)}_batch`;
-  const [batch, setBatch, clearBatch] = usePersistentState<BatchDraft>(batchStorageKey, {
-    items: [],
-    requestId: newEntryRequestId(),
-    pending: false,
-  });
+  const [batch, setBatch, clearBatch] = usePersistentState<BatchDraft>(
+    batchStorageKey,
+    { items: [], requestId: newEntryRequestId(), pending: false },
+    !demoSafeMode,
+  );
   const batchInFlight = useRef(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [importedExternal, setImportedExternal] = useState<Record<string, Food>>({});
@@ -934,10 +937,20 @@ export function FoodPickerDialog({
       if (!selected) throw new Error('Сначала выберите продукт или рецепт');
       if (!Number.isFinite(selected.amount) || selected.amount <= 0)
         throw new Error('Введите количество больше нуля');
+      if (demoSafeMode && demoGeneration === undefined)
+        throw new Error('Демо-сессия обновляется. Попробуйте ещё раз.');
+      const requestId = draft.requestId ?? newEntryRequestId();
       return api<FoodDiaryEntry>('/api/v1/nutrition/diary/entries', {
         method: 'POST',
-        body: { ...selected, diary_date: diaryDate, meal_type: mealType },
-        headers: { 'Idempotency-Key': draft.requestId ?? newEntryRequestId() },
+        body: {
+          ...selected,
+          diary_date: diaryDate,
+          meal_type: mealType,
+          ...(demoSafeMode
+            ? { _demo_food_retry_key: requestId, _demo_food_generation: demoGeneration }
+            : {}),
+        },
+        headers: { 'Idempotency-Key': requestId },
       });
     },
     onSuccess: async (entry, variables) => {

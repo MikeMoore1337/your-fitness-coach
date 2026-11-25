@@ -1,5 +1,7 @@
 import { createHash, createHmac } from 'node:crypto';
-import { expect, test as base } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { chromium, expect, test as base } from '@playwright/test';
 import { installTelegramHarness } from '../e2e/fixtures/mobile-tma';
 
 const test = base.extend({
@@ -15,6 +17,257 @@ const test = base.extend({
 
 // WebKit service workers intercept requests before Playwright can hold the response.
 const testWithoutServiceWorker = test.extend({ serviceWorkers: 'block' });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`real demo remains usable at actual Chromium zoom 200% (${theme})`, async ({
+    browserName,
+    baseURL,
+  }, info) => {
+    test.skip(browserName !== 'chromium', 'Browser zoom uses a Chromium extension');
+    test.setTimeout(90_000);
+    const extension = info.outputPath('demo-zoom-extension');
+    await mkdir(extension, { recursive: true });
+    await writeFile(
+      resolve(extension, 'manifest.json'),
+      JSON.stringify({
+        manifest_version: 3,
+        name: 'YFC demo zoom test',
+        version: '1.0',
+        permissions: ['tabs'],
+        background: { service_worker: 'background.js' },
+      }),
+    );
+    await writeFile(
+      resolve(extension, 'background.js'),
+      'chrome.runtime.onInstalled.addListener(() => {});',
+    );
+    const context = await chromium.launchPersistentContext('', {
+      channel: 'chromium',
+      headless: true,
+      viewport: { width: 1024, height: 768 },
+      ignoreDefaultArgs: ['--disable-extensions'],
+      args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`],
+    });
+    try {
+      const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+      const page = context.pages()[0] ?? (await context.newPage());
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      for (const scenario of ['self_training', 'trainer'] as const) {
+        const section = scenario === 'trainer' ? 'trainer' : 'today';
+        await page.goto(
+          new URL(`/demo?cabinet=1&scenario=${scenario}&section=${section}`, baseURL!).toString(),
+        );
+        await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+        const zoom = await worker.evaluate<number>(
+          `(async () => { const [tab] = await chrome.tabs.query({active: true, currentWindow: true}); await chrome.tabs.setZoom(tab.id, 2); return chrome.tabs.getZoom(tab.id); })()`,
+        );
+        expect(zoom).toBe(2);
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+            ),
+          )
+          .toBe(true);
+        if (scenario === 'trainer') {
+          await expect(page.getByTestId('quick-add-trigger')).toHaveCount(0);
+          const clients = page
+            .getByRole('navigation', { name: 'Основная навигация' })
+            .getByRole('link', { name: 'Клиенты', exact: true });
+          await clients.click();
+          await expect(clients).toHaveAttribute('aria-current', 'page');
+          await page
+            .getByRole('navigation', { name: 'Режим работы' })
+            .getByRole('link', { name: 'Для себя' })
+            .click();
+        }
+        const trigger = page.getByTestId('quick-add-trigger');
+        await trigger.click();
+        await expect(page.getByTestId('quick-add-sheet')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(trigger).toBeFocused();
+      }
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+testWithoutServiceWorker(
+  'real demo Quick Add saves entered food only in its session',
+  async ({ page, browser }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+    await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+    await page.getByTestId('quick-add-trigger').click();
+    await page
+      .getByTestId('quick-add-sheet')
+      .getByRole('link', { name: /Добавить еду/ })
+      .click();
+    const calories = page.getByRole('dialog').getByRole('spinbutton', { name: 'Калории' });
+    await calories.fill('420');
+    const keys = await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) => key.startsWith('fit_food_draft_')),
+    );
+    expect(keys).toEqual([]);
+    const responsePromise = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === 'POST' &&
+        request.postDataJSON()?.path === '/api/v1/nutrition/diary/entries'
+      );
+    });
+    await page.getByRole('button', { name: 'Сохранить Quick Add' }).click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const savedEntry = await response.json();
+    expect(Number(savedEntry.nutrition.energy_kcal)).toBe(420);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Питание', level: 1 })).toBeVisible();
+    const readDiary = (target: typeof page) =>
+      target.evaluate(async (diaryDate) => {
+        const token = JSON.parse(
+          sessionStorage.getItem('fit_demo_sessions_v1') || '{}',
+        ).self_training;
+        const result = await fetch('/api/v1/demo/sessions/current/transport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Demo-Session': token },
+          body: JSON.stringify({
+            path: `/api/v1/nutrition/diary?diary_date=${encodeURIComponent(diaryDate)}`,
+            method: 'GET',
+          }),
+        });
+        if (!result.ok) throw new Error(`Demo diary returned ${result.status}`);
+        return result.json();
+      }, savedEntry.diary_date);
+    const diary = await readDiary(page);
+    expect(
+      diary.meals
+        .flatMap((meal: { entries: Array<{ nutrition: { energy_kcal: number } }> }) => meal.entries)
+        .some(
+          (entry: { nutrition: { energy_kcal: number } }) =>
+            Number(entry.nutrition.energy_kcal) === 420,
+        ),
+    ).toBe(true);
+    const otherContext = await browser.newContext({
+      serviceWorkers: 'block',
+      baseURL: new URL(page.url()).origin,
+    });
+    const otherPage = await otherContext.newPage();
+    await otherPage.goto('/demo?cabinet=1&scenario=self_training&section=nutrition');
+    await expect(otherPage.getByRole('heading', { name: 'Питание', level: 1 })).toBeVisible();
+    const otherDiary = await readDiary(otherPage);
+    expect(otherDiary.meals.flatMap((meal: { entries: unknown[] }) => meal.entries)).toEqual([]);
+    await otherContext.close();
+  },
+);
+
+testWithoutServiceWorker(
+  'real trainer demo navigation avoids unavailable program operations',
+  async ({ page }) => {
+    const forbidden: string[] = [];
+    const transportPaths: string[] = [];
+    page.on('response', (response) => {
+      if (new URL(response.url()).pathname !== '/api/v1/demo/sessions/current/transport') return;
+      const path = response.request().postDataJSON()?.path ?? 'unknown';
+      transportPaths.push(path);
+      if (response.status() === 403) forbidden.push(path);
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+    const dock = page.getByRole('navigation', { name: 'Основная навигация' });
+    await dock.getByRole('link', { name: 'Программы', exact: true }).click();
+    const programs = page.locator('details').filter({
+      has: page.getByRole('heading', { name: 'Программы клиентов', exact: true }),
+    });
+    await programs.locator('summary').click();
+    await expect(
+      page.getByText('Изменение этапов программы доступно после входа в рабочий кабинет.').first(),
+    ).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    expect(transportPaths.some((path) => path.startsWith('/api/v1/programs/assigned/'))).toBe(
+      false,
+    );
+    expect(forbidden).toEqual([]);
+  },
+);
+
+testWithoutServiceWorker('real trainer demo follows the connected route', async ({ page }) => {
+  const forbidden: string[] = [];
+  page.on('response', (response) => {
+    if (
+      response.status() === 403 &&
+      new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport'
+    ) {
+      forbidden.push(response.request().postDataJSON()?.path ?? 'unknown');
+    }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+  await expect(page.getByRole('heading', { name: 'Следующий шаг по клиентам' })).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page.getByRole('link', { name: 'Назначить программу', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Иван', level: 2 })).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page.getByRole('link', { name: 'Последние события', exact: true }).click();
+  await page
+    .getByLabel('Данные клиента')
+    .getByRole('link', { name: 'Прогресс', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Алексей' })
+    .getByRole('link', { name: 'Открыть задачи', exact: true })
+    .click();
+  await expect(page.locator('#coach-tasks-title')).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.getByText('Основной сценарий завершён')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(forbidden).toEqual([]);
+});
+
+testWithoutServiceWorker(
+  'demo explains unavailable wellbeing and cardio without protected mutations',
+  async ({ page }) => {
+    const forbidden: string[] = [];
+    page.on('response', (response) => {
+      if (
+        response.status() === 403 &&
+        new URL(response.url()).pathname === '/api/v1/demo/sessions/current/transport'
+      ) {
+        forbidden.push(response.request().postDataJSON()?.path ?? 'unknown');
+      }
+    });
+    await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+    await page.getByTestId('quick-add-trigger').click();
+    await page
+      .getByTestId('quick-add-sheet')
+      .getByRole('link', { name: /Отметить самочувствие/ })
+      .click();
+    const wellbeingNotice = page.getByText(
+      'Отметка самочувствия доступна после входа. В демо ответы не отправляются.',
+    );
+    await expect(wellbeingNotice).toBeVisible();
+    await expect(wellbeingNotice).toBeInViewport();
+    await expect(wellbeingNotice).toBeFocused();
+    await page.getByTestId('quick-add-trigger').click();
+    await page
+      .getByTestId('quick-add-sheet')
+      .getByRole('link', { name: /Добавить кардио/ })
+      .click();
+    const cardioNotice = page.getByText('Добавление кардио доступно после входа.');
+    await expect(cardioNotice).toBeVisible();
+    await expect(cardioNotice).toBeInViewport();
+    await expect(cardioNotice).toBeFocused();
+    await page.waitForLoadState('networkidle');
+    expect(forbidden).toEqual([]);
+  },
+);
 
 testWithoutServiceWorker(
   'real demo transport opens a workout and resolves nutrition goals',

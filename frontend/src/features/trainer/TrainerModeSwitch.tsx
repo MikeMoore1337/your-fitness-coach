@@ -5,11 +5,15 @@ export function TrainerModeSwitch({
   clientName,
   mode,
   returnTo,
+  personalDestination,
+  trainerDestination,
   sticky = false,
 }: {
   clientName?: string;
   mode: 'personal' | 'clients';
   returnTo?: string;
+  personalDestination?: string;
+  trainerDestination?: string;
   sticky?: boolean;
 }) {
   const safeReturnTo = safeTrainerReturnPath(returnTo) ?? '/coach';
@@ -26,7 +30,7 @@ export function TrainerModeSwitch({
           className={mode === 'personal' ? 'is-active' : ''}
           aria-current={mode === 'personal' ? 'page' : undefined}
           data-yfc-choice="capsule"
-          to={mode === 'personal' ? '/app?section=today' : personalPath}
+          to={personalDestination ?? (mode === 'personal' ? '/app?section=today' : personalPath)}
         >
           Для себя
         </AppLink>
@@ -34,7 +38,7 @@ export function TrainerModeSwitch({
           className={mode === 'clients' ? 'is-active' : ''}
           aria-current={mode === 'clients' ? 'page' : undefined}
           data-yfc-choice="capsule"
-          to={mode === 'personal' ? safeReturnTo : '/coach'}
+          to={mode === 'personal' ? (trainerDestination ?? safeReturnTo) : '/coach'}
         >
           {mode === 'personal' ? 'В кабинет тренера' : 'Клиенты'}
         </AppLink>

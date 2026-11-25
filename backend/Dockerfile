@@ -29,6 +29,7 @@ RUN apt-get update \
         libk5crypto3=1.21.3-5+deb13u2 \
         libkrb5-3=1.21.3-5+deb13u2 \
         libkrb5support0=1.21.3-5+deb13u2 \
+        libzstd1=1.5.7+dfsg-1+deb13u1 \
         libseccomp2 \
         libgl1 \
         tesseract-ocr \
