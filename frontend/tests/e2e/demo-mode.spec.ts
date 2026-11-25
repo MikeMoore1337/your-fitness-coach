@@ -17,6 +17,8 @@ const DEMO_VIEWPORTS = [
     ...viewport,
     mobile: viewport.width <= 900,
   })),
+  { name: 'phone-393', width: 393, height: 852, mobile: true },
+  { name: 'desktop-1024', width: 1024, height: 768, mobile: false },
   { name: 'desktop-1366', width: 1366, height: 768, mobile: false },
 ] as const;
 
@@ -482,6 +484,7 @@ function nutritionDay(snapshot: DemoSessionSnapshot) {
     },
     status: added ? 'complete' : 'incomplete',
     status_is_explicit: false,
+    demo_generation: 0,
   };
 }
 
@@ -1198,6 +1201,29 @@ test('#1500 desktop Quick Add restores focus and can reopen during exit', async 
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('quick-add-layer')).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test('demo Quick Add opens food entry from Today', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+  await page.getByTestId('quick-add-trigger').click();
+  await page
+    .getByTestId('quick-add-sheet')
+    .getByRole('link', { name: /Добавить еду/ })
+    .click();
+  await expect(page.getByRole('dialog').getByRole('spinbutton', { name: 'Калории' })).toBeVisible();
+  await page.getByRole('button', { name: 'Закрыть добавление' }).click();
+  await expect(page.getByRole('dialog').getByRole('spinbutton', { name: 'Калории' })).toHaveCount(
+    0,
+  );
+  await page.getByTestId('quick-add-trigger').click();
+  await page
+    .getByTestId('quick-add-sheet')
+    .getByRole('link', { name: /Добавить еду/ })
+    .click();
+  await expect(page.getByRole('dialog').getByRole('spinbutton', { name: 'Калории' })).toBeVisible();
 });
 
 test('#1500 Today header adapts without changing the mobile composition', async ({ page }) => {

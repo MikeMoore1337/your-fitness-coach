@@ -34,7 +34,7 @@ class DemoTransitionError(Exception):
 class _DemoCabinetNutritionPayload(TypedDict):
     calories: int
     calorie_target: int
-    protein_g: float
+    protein_g: float | None
     protein_target_g: float
     meals_logged: int
     item_added: bool

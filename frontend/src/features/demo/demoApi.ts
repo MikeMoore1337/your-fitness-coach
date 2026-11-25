@@ -32,7 +32,7 @@ export interface DemoNutritionState {
   };
   calories: number;
   calorie_target: number;
-  protein_g: number;
+  protein_g: number | null;
   protein_target_g: number;
   meals_logged: number;
 }
@@ -74,7 +74,7 @@ export interface DemoCabinetState {
   nutrition: {
     calories: number;
     calorie_target: number;
-    protein_g: number;
+    protein_g: number | null;
     protein_target_g: number;
     meals_logged: number;
     item_added: boolean;

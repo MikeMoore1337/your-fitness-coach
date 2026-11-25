@@ -110,6 +110,37 @@ describe('Demo cabinet production composition', () => {
     expect(mocks.apply).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['nutrition', 'quick_add=food'],
+    ['nutrition', 'hydration=quick'],
+    ['progress', 'focus=measurements'],
+    ['today', 'cardio=1'],
+    ['today', 'wellbeing=1'],
+  ])('preserves a supported %s action during route normalization', async (section, action) => {
+    renderPage(`/demo?scenario=self_training&section=${section}&${action}`);
+    await screen.findByTestId('production-mini-app');
+    await waitFor(() => expect(window.location.search).toContain(action));
+    expect(window.location.search).toContain('cabinet=1');
+  });
+
+  it('drops duplicate or wrong-section action parameters', async () => {
+    renderPage(
+      '/demo?scenario=self_training&section=progress&hydration=quick&focus=measurements&focus=measurements',
+    );
+    await screen.findByTestId('production-mini-app');
+    await waitFor(() =>
+      expect(window.location.search).toBe('?cabinet=1&scenario=self_training&section=progress'),
+    );
+  });
+
+  it('drops conflicting actions rather than opening two controls at once', async () => {
+    renderPage('/demo?scenario=self_training&section=nutrition&quick_add=food&hydration=quick');
+    await screen.findByTestId('production-mini-app');
+    await waitFor(() =>
+      expect(window.location.search).toBe('?cabinet=1&scenario=self_training&section=nutrition'),
+    );
+  });
+
   it('keeps scenario switching, reset and trainer routing inside the cabinet', async () => {
     const user = userEvent.setup();
     renderPage('/demo?scenario=self_training');
@@ -126,6 +157,9 @@ describe('Demo cabinet production composition', () => {
       expect(window.location.search).toBe('?cabinet=1&scenario=trainer&section=trainer'),
     );
     expect(await screen.findByRole('heading', { name: 'Production coach' })).toBeVisible();
+    const navigation = screen.getByRole('navigation', { name: 'Основная навигация' });
+    expect(navigation.querySelector('a[aria-current="page"]')).toHaveTextContent('Работа тренера');
+    expect(document.querySelector('.app-desktop-header__workspace')).toHaveTextContent('Клиенты');
 
     await user.click(screen.getByRole('button', { name: 'Начать заново' }));
     await waitFor(() => expect(mocks.reset).toHaveBeenCalledWith('trainer'));

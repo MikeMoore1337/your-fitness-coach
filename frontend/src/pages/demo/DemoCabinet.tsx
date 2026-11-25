@@ -95,6 +95,32 @@ function loginPath(scenario: DemoScenario, section: DemoCabinetSection): string 
   return `/login?${params.toString()}`;
 }
 
+function copyDemoActionParams(
+  source: URLSearchParams,
+  target: URLSearchParams,
+  section: DemoCabinetSection,
+): void {
+  const allowed: ReadonlyArray<readonly [string, string]> =
+    section === 'nutrition'
+      ? [
+          ['quick_add', 'food'],
+          ['hydration', 'quick'],
+        ]
+      : section === 'progress'
+        ? [['focus', 'measurements']]
+        : section === 'today'
+          ? [
+              ['cardio', '1'],
+              ['wellbeing', '1'],
+            ]
+          : [];
+  const requested = allowed.filter(([key]) => source.has(key));
+  if (requested.length !== 1) return;
+  const [key, value] = requested[0]!;
+  const values = source.getAll(key);
+  if (values.length === 1 && values[0] === value) target.set(key, value);
+}
+
 function productionPathInDemo(to: string, scenario: DemoScenario): string {
   let parsed: URL;
   try {
@@ -148,7 +174,9 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
           : requested === 'profile'
             ? 'profile'
             : startSection(scenario);
-  return demoCabinetPath(scenario, mapped);
+  const target = new URL(demoCabinetPath(scenario, mapped), window.location.origin);
+  copyDemoActionParams(parsed.searchParams, target.searchParams, mapped);
+  return `${target.pathname}?${target.searchParams.toString()}`;
 }
 
 function isCurrentDemoLocation(scenario: DemoScenario): boolean {
@@ -174,9 +202,9 @@ function demoQuickAddLinks(scenario: DemoScenario): ReadonlyArray<QuickAddAction
     {
       key: 'cardio',
       label: 'Добавить кардио',
-      detail: 'Демо показывает подготовленную активность',
+      detail: 'Доступно после входа',
       icon: 'week-cardio',
-      to: demoCabinetPath(scenario, 'today'),
+      to: `${demoCabinetPath(scenario, 'today')}&cardio=1`,
     },
     {
       key: 'measurement',
@@ -188,9 +216,9 @@ function demoQuickAddLinks(scenario: DemoScenario): ReadonlyArray<QuickAddAction
     {
       key: 'wellbeing',
       label: 'Отметить самочувствие',
-      detail: 'Открыть сегодняшний экран',
+      detail: 'Доступно после входа',
       icon: 'checklist',
-      to: demoCabinetPath(scenario, 'today'),
+      to: `${demoCabinetPath(scenario, 'today')}&wellbeing=1`,
     },
   ];
 }
@@ -400,6 +428,7 @@ export default function DemoCabinet() {
 
   useEffect(() => {
     const normalizedUrl = new URL(demoCabinetPath(scenario, section), window.location.origin);
+    copyDemoActionParams(new URLSearchParams(search), normalizedUrl.searchParams, section);
     if (scenario === 'trainer') {
       const current = new URL(window.location.href);
       for (const key of ['client_id', 'workout_id'] as const) {
@@ -585,7 +614,7 @@ export default function DemoCabinet() {
       : []),
   ];
   const shellDemo: DemoAppShellConfig = {
-    activeSection: section === 'trainer' ? 'today' : section,
+    activeSection: section,
     brandTo: demoCabinetPath(scenario),
     destinations,
     displayName: 'Демо',

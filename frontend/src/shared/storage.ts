@@ -29,30 +29,35 @@ export function removeStorage(key: string): void {
 export function usePersistentState<T>(
   key: string,
   initial: T | (() => T),
+  enabled = true,
 ): [T, Dispatch<SetStateAction<T>>, (nextValue?: T) => void] {
   const resolveInitial = () => (typeof initial === 'function' ? (initial as () => T)() : initial);
-  const [value, setValue] = useState<T>(() => readStorage(key, resolveInitial()));
+  const [value, setValue] = useState<T>(() =>
+    enabled ? readStorage(key, resolveInitial()) : resolveInitial(),
+  );
   const skipNextWrite = useRef(false);
   const keyRef = useRef(key);
+  const enabledRef = useRef(enabled);
 
   useEffect(() => {
-    if (keyRef.current === key) return;
+    if (keyRef.current === key && enabledRef.current === enabled) return;
     keyRef.current = key;
+    enabledRef.current = enabled;
     const fallback = typeof initial === 'function' ? (initial as () => T)() : initial;
     skipNextWrite.current = true;
-    setValue(readStorage(key, fallback));
-  }, [initial, key]);
+    setValue(enabled ? readStorage(key, fallback) : fallback);
+  }, [enabled, initial, key]);
 
   useEffect(() => {
     if (skipNextWrite.current) {
       skipNextWrite.current = false;
       return;
     }
-    writeStorage(key, value);
-  }, [key, value]);
+    if (enabled) writeStorage(key, value);
+  }, [enabled, key, value]);
 
   const clear = (nextValue?: T) => {
-    removeStorage(key);
+    if (enabled) removeStorage(key);
     if (nextValue !== undefined) {
       skipNextWrite.current = true;
       setValue(nextValue);

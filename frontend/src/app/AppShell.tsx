@@ -677,7 +677,7 @@ export function AppShell({
             <div className="app-desktop-header__workspace">
               <span>Рабочее пространство</span>
               <strong>
-                {trainerWorkspace
+                {trainerWorkspace || demo?.activeSection === 'trainer'
                   ? 'Клиенты'
                   : path === '/admin'
                     ? 'Администрирование'
