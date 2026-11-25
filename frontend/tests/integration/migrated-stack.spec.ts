@@ -71,6 +71,18 @@ for (const theme of ['light', 'dark'] as const) {
             ),
           )
           .toBe(true);
+        if (scenario === 'trainer') {
+          await expect(page.getByTestId('quick-add-trigger')).toHaveCount(0);
+          const clients = page
+            .getByRole('navigation', { name: 'Основная навигация' })
+            .getByRole('link', { name: 'Клиенты', exact: true });
+          await clients.click();
+          await expect(clients).toHaveAttribute('aria-current', 'page');
+          await page
+            .getByRole('navigation', { name: 'Режим работы' })
+            .getByRole('link', { name: 'Для себя' })
+            .click();
+        }
         const trigger = page.getByTestId('quick-add-trigger');
         await trigger.click();
         await expect(page.getByTestId('quick-add-sheet')).toBeVisible();
