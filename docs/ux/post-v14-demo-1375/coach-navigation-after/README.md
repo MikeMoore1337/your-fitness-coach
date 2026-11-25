@@ -13,3 +13,5 @@
 | Ещё | [mobile light](mobile-light-tools.png) | [mobile dark](mobile-dark-tools.png) | [desktop light](desktop-light-tools.png) | [desktop dark](desktop-dark-tools.png) |
 
 Демо-версия раздела программ показывает доступную сводку и ограничение редактирования без обращения к недоступным операциям. Действия, фокус, адаптивность и ограничения проверяются отдельно тестами; снимки не являются визуальной приёмкой владельца.
+
+[Парные BEFORE / AFTER личных разделов и переключателя возврата](../personal-navigation-comparison/README.md).
