@@ -302,13 +302,15 @@ export function AppShell({
   );
   const desktopTrainerNavigation =
     trainerWorkspace && !mobileNavigation && (!isMiniApp || Boolean(demo?.trainerNavigation));
+  const demoTrainerWorkspace = Boolean(demo?.trainerNavigation);
+  const preserveTrainerFocus = trainerWorkspace && (!isMiniApp || demoTrainerWorkspace);
   const currentTrainerTab = useRef(coachTabFromSearch(search));
   useLayoutEffect(() => {
     renderedMobileNavigation.current = mobileNavigation;
     currentTrainerTab.current = demo?.trainerNavigation?.activeTab ?? coachTabFromSearch(search);
   }, [demo?.trainerNavigation?.activeTab, mobileNavigation, search]);
   useEffect(() => {
-    if (!trainerWorkspace || isMiniApp) return;
+    if (!preserveTrainerFocus) return;
     const trackFocus = (event: FocusEvent) => {
       const focused = event.target instanceof Element ? event.target : null;
       if (
@@ -339,17 +341,29 @@ export function AppShell({
       focusedTrainerTab.current = null;
       pendingTrainerFocus.current = null;
     };
-  }, [isMiniApp, trainerWorkspace]);
+  }, [preserveTrainerFocus]);
   useLayoutEffect(() => {
     const key = pendingTrainerFocus.current;
-    if (!trainerWorkspace || isMiniApp || !key) return;
+    if (!preserveTrainerFocus || !key) return;
     const index = ['today', 'clients', 'programs', 'tools'].indexOf(key);
     const target = mobileNavigation
       ? document.querySelector<HTMLElement>(`[data-trainer-tab="${key}"]`)
       : document.querySelectorAll<HTMLElement>('.coach-os-desktop-nav [role="tab"]')[index];
-    target?.focus({ preventScroll: true });
+    if (!target) return;
     pendingTrainerFocus.current = null;
-  }, [isMiniApp, mobileNavigation, trainerWorkspace]);
+    if (!demoTrainerWorkspace) {
+      target?.focus({ preventScroll: true });
+      return;
+    }
+    const previousFocus = document.activeElement;
+    const frame = requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (active === document.body || active === previousFocus || active === target) {
+        target?.focus({ preventScroll: true });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [demo?.trainerNavigation, demoTrainerWorkspace, mobileNavigation, preserveTrainerFocus]);
   const personalWorkspace = Boolean(
     demo?.trainerReturnTo || (!demo && user?.is_coach && path === '/app' && section),
   );

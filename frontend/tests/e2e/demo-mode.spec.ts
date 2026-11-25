@@ -2050,6 +2050,7 @@ test('trainer demo uses Coach OS navigation and returns from the personal worksp
   );
   const programs = dock.getByRole('link', { name: 'Программы', exact: true });
   await programs.focus();
+  await expect(programs).toBeFocused();
   await page.setViewportSize({ width: 1440, height: 900 });
   const desktopTab = page.getByRole('tab', { name: 'Программы', exact: true });
   await expect(desktopTab).toHaveAttribute('aria-selected', 'true');
@@ -2125,11 +2126,16 @@ test('trainer demo navigation keeps Telegram Back and wide layout usable', async
   await telegram.clickBack();
   await expect(page).toHaveURL(/\/$/);
   await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer&tab=clients');
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .focus();
   await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.getByRole('tab', { name: 'Клиенты', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
+  await expect(page.getByRole('tab', { name: 'Клиенты', exact: true })).toBeFocused();
   await page.getByRole('tab', { name: 'Программы', exact: true }).click();
   await expect(page.getByRole('tab', { name: 'Программы', exact: true })).toHaveAttribute(
     'aria-selected',
