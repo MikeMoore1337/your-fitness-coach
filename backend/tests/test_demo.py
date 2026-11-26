@@ -1,3 +1,5 @@
+import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
@@ -18,7 +20,7 @@ from fitminiapp_api.schemas.coach_crm import (
 )
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
-from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
+from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse, FoodDiaryEntryResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
 from fitminiapp_api.schemas.nutrition import NutritionResolvedTargetResponse
 from fitminiapp_api.schemas.program import (
@@ -39,7 +41,11 @@ from fitminiapp_api.schemas.workout import (
     WorkoutTodayResponse,
 )
 from fitminiapp_api.schemas.workout_rest import RestSessionResponse
-from fitminiapp_api.services.demo_sessions import DemoSessionExpiredError, DemoSessionStore
+from fitminiapp_api.services.demo_sessions import (
+    DemoSessionExpiredError,
+    DemoSessionStore,
+    DemoTransitionError,
+)
 
 
 def _create_session(client, scenario: str) -> tuple[str, dict]:
@@ -215,6 +221,53 @@ def test_demo_token_is_not_an_authenticated_account_credential(client) -> None:
 
     assert header_only.status_code == 401
     assert bearer_attempt.status_code == 401
+
+
+def test_demo_session_creation_is_rate_limited(client, monkeypatch) -> None:
+    from fitminiapp_api.api.v1 import demo
+
+    monkeypatch.setattr(demo, "demo_session_store", DemoSessionStore())
+    for _ in range(20):
+        assert client.post("/api/v1/demo/sessions", json={"scenario": "trainer"}).status_code == 201
+    assert client.post("/api/v1/demo/sessions", json={"scenario": "trainer"}).status_code == 429
+
+
+def test_demo_errors_are_not_cached_and_logs_do_not_contain_credentials(client, caplog) -> None:
+    caplog.set_level(logging.INFO, logger="app.http")
+    token, _ = _create_session(client, "trainer")
+    invalid = "A" * 43
+    response = client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": invalid})
+    assert response.status_code == 410
+    assert "no-store" in response.headers["cache-control"]
+    assert (
+        client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token}).status_code
+        == 200
+    )
+    records = [record for record in caplog.records if record.name == "app.http"]
+    assert records
+    assert all(
+        token not in repr(record.__dict__) and invalid not in repr(record.__dict__)
+        for record in records
+    )
+
+
+def test_demo_transport_rejects_oversized_request_body_without_mutation(client) -> None:
+    token, before = _create_session(client, "trainer")
+    payload = {
+        "path": "/api/v1/coach/sessions",
+        "method": "POST",
+        "body": {"private_note": "x" * (1024 * 1024)},
+    }
+    response = client.post(
+        "/api/v1/demo/sessions/current/transport",
+        headers={"X-Demo-Session": token, "Content-Type": "application/json"},
+        content=json.dumps(payload),
+    )
+    assert response.status_code == 413
+    assert (
+        client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token}).json()
+        == before
+    )
 
 
 def test_missing_and_unknown_demo_sessions_have_safe_errors(client) -> None:
@@ -493,6 +546,376 @@ def test_demo_rest_and_set_history_are_session_scoped_and_idempotent(client) -> 
     assert _transport(client, offline, path, "POST", start).status_code == 200
 
 
+@pytest.mark.parametrize("scenario", ["self_training", "nutrition", "trainer"])
+def test_demo_quick_food_preserves_entered_values_and_session_isolation(client, scenario) -> None:
+    token, _ = _create_session(client, scenario)
+    other, _ = _create_session(client, scenario)
+    date = "2026-09-15"
+    payload = {
+        "diary_date": date,
+        "meal_type": "lunch",
+        "amount": 1,
+        "amount_unit": "serving",
+        "quick_add": {"name": "Тестовый приём пищи", "energy_kcal": 420, "protein_g": 17},
+        "_demo_food_retry_key": "synthetic-food-retry-key",
+        "_demo_food_generation": 0,
+    }
+    response = _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload)
+    assert response.status_code == 200
+    assert float(response.json()["nutrition"]["energy_kcal"]) == 420
+    assert FoodDiaryEntryResponse.model_validate(response.json()).nutrition_confidence == "partial"
+    diary = _transport(client, token, f"/api/v1/nutrition/diary?diary_date={date}").json()
+    other_diary = _transport(client, other, f"/api/v1/nutrition/diary?diary_date={date}").json()
+    assert any(
+        entry["food_name"] == "Тестовый приём пищи"
+        for meal in diary["meals"]
+        for entry in meal["entries"]
+    )
+    assert all(
+        entry["food_name"] != "Тестовый приём пищи"
+        for meal in other_diary["meals"]
+        for entry in meal["entries"]
+    )
+    retry = _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload)
+    assert retry.json() == response.json()
+    changed = {**payload, "quick_add": {"energy_kcal": 421}}
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", changed).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            "/api/v1/demo/sessions/current/reset", headers={"X-Demo-Session": token}
+        ).status_code
+        == 200
+    )
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 409
+    )
+
+
+def test_demo_food_rejects_unknown_resources_and_missing_retry_guards(client) -> None:
+    token, _ = _create_session(client, "self_training")
+    payload = {
+        "diary_date": "2026-09-15",
+        "meal_type": "breakfast",
+        "amount": 100,
+        "amount_unit": "g",
+        "food_id": 1,
+        "_demo_food_retry_key": "key",
+        "_demo_food_generation": 0,
+    }
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 403
+    )
+    assert (
+        _transport(
+            client,
+            token,
+            "/api/v1/nutrition/diary/entries",
+            "POST",
+            {**payload, "food_id": 80001, "_demo_food_generation": None},
+        ).status_code
+        == 403
+    )
+
+
+def test_trainer_demo_rejects_non_fixture_clients_and_external_actions(client) -> None:
+    token, _ = _create_session(client, "trainer")
+    for path in (
+        "/api/v1/coach/clients/1/operations",
+        "/api/v1/coach/clients/1/analytics",
+        "/api/v1/coach/clients/1/workouts",
+        "/api/v1/coach/invitations",
+        "/api/v1/users/1",
+    ):
+        assert _transport(client, token, path).status_code == 403
+    assert _transport(client, token, "/api/v1/coach/invitations", "POST", {}).status_code == 403
+    assert _transport(client, token, "/api/v1/notifications").json() == []
+    assert _transport(client, token, "/api/v1/notifications", "POST", {}).status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "/api/v1/coach/sessions",
+            {
+                "client_id": 51001,
+                "starts_at": "2026-09-20T18:00:00",
+                "timezone": "Europe/Moscow",
+                "private_note": "x" * 2001,
+            },
+        ),
+        ("/api/v1/coach/packages", {"client_id": 51001, "name": "x" * 129, "included_sessions": 1}),
+        (
+            "/api/v1/coach/payments",
+            {
+                "client_id": 51001,
+                "expected_amount_minor": 100,
+                "currency": "RUB",
+                "note": "x" * 1001,
+            },
+        ),
+        (
+            "/api/v1/coach/tasks",
+            {
+                "client_id": 51001,
+                "title": "x" * 241,
+                "due_at": "2026-09-20T18:00:00",
+                "timezone": "Europe/Moscow",
+            },
+        ),
+        ("/api/v1/coach/clients/51002/workouts/50011/comments", {"body": "x" * 2001}),
+    ],
+)
+def test_demo_coach_rejects_oversized_payloads_without_mutation(client, path, payload) -> None:
+    token, _ = _create_session(client, "trainer")
+    headers = {"X-Demo-Session": token}
+    before = client.get("/api/v1/demo/sessions/current", headers=headers).json()
+    assert _transport(client, token, path, "POST", payload).status_code == 403
+    assert client.get("/api/v1/demo/sessions/current", headers=headers).json() == before
+
+
+def test_demo_coach_rejects_oversized_session_update_without_mutation(client) -> None:
+    token, _ = _create_session(client, "trainer")
+    before = _transport(client, token, "/api/v1/coach/sessions").json()
+    response = _transport(
+        client, token, "/api/v1/coach/sessions/71001", "PATCH", {"private_note": "x" * 2001}
+    )
+    assert response.status_code == 403
+    assert _transport(client, token, "/api/v1/coach/sessions").json() == before
+
+
+@pytest.mark.parametrize(
+    ("scenario", "path", "method", "payload"),
+    [
+        (
+            "nutrition",
+            "/api/v1/nutrition/hydration/entries/v2",
+            "POST",
+            {"volume_ml": 200, "beverage_type": []},
+        ),
+        (
+            "nutrition",
+            "/api/v1/nutrition/hydration/entries/v2",
+            "POST",
+            {"volume_ml": 200, "beverage_type": "water", "source": {}},
+        ),
+        ("nutrition", "/api/v1/nutrition/hydration/goal", "POST", {"source": []}),
+        (
+            "nutrition",
+            "/api/v1/nutrition/hydration/goal",
+            "POST",
+            {"source": "national_academies_beverages", "sex": {}, "adult_confirmed": True},
+        ),
+        (
+            "nutrition",
+            "/api/v1/nutrition/hydration/presets",
+            "POST",
+            {"label": "Стакан", "volume_ml": 200, "beverage_type": []},
+        ),
+        ("trainer", "/api/v1/coach/packages/72001/state", "PATCH", {"state": []}),
+        ("trainer", "/api/v1/coach/tasks/74001/state", "PATCH", {"state": {}}),
+        (
+            "trainer",
+            "/api/v1/coach/clients/51001/operational-status",
+            "PATCH",
+            {"operational_status": []},
+        ),
+        (
+            "trainer",
+            "/api/v1/coach/program-rollouts/apply",
+            "POST",
+            {
+                "template_id": 1,
+                "template_fingerprint": "0" * 64,
+                "reason": "Тест",
+                "targets": [{"client_id": [], "program_id": 1, "expected_revision_number": 0}],
+            },
+        ),
+    ],
+)
+def test_demo_malformed_json_types_are_rejected(client, scenario, path, method, payload) -> None:
+    token, _ = _create_session(client, scenario)
+    before = client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token}).json()
+    assert _transport(client, token, path, method, payload).status_code == 403
+    assert (
+        client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token}).json()
+        == before
+    )
+
+
+@pytest.mark.parametrize("field", ["rir", "set_kind"])
+def test_demo_workout_rejects_unhashable_enum_values(client, field) -> None:
+    token, _ = _create_session(client, "self_training")
+    assert _transport(client, token, "/api/v1/workouts/50001/start", "POST").status_code == 200
+    assert (
+        _transport(client, token, "/api/v1/workouts/sets/60004", "PATCH", {field: []}).status_code
+        == 403
+    )
+
+
+def test_demo_rollout_valid_contract_stays_non_mutating(client) -> None:
+    token, _ = _create_session(client, "trainer")
+    preview = _transport(
+        client,
+        token,
+        "/api/v1/coach/program-rollouts/preview",
+        "POST",
+        {"template_id": 1, "client_ids": [51001]},
+    )
+    assert preview.status_code == 200
+    applied = _transport(
+        client,
+        token,
+        "/api/v1/coach/program-rollouts/apply",
+        "POST",
+        {
+            "template_id": 1,
+            "template_fingerprint": "0" * 64,
+            "targets": [{"client_id": 51001, "program_id": 51001, "expected_revision_number": 0}],
+            "confirmed": True,
+            "reason": "Демо",
+        },
+    )
+    assert applied.status_code == 200
+    assert applied.json()["applied_count"] == 0
+    assert applied.json()["failed_count"] == 1
+    assert (
+        _transport(
+            client,
+            token,
+            "/api/v1/coach/program-rollouts/apply",
+            "POST",
+            {
+                "template_id": True,
+                "template_fingerprint": "0" * 64,
+                "targets": [
+                    {"client_id": 51001, "program_id": 51001, "expected_revision_number": 0}
+                ],
+                "confirmed": True,
+                "reason": "Демо",
+            },
+        ).status_code
+        == 403
+    )
+
+
+def test_demo_hydration_limit_keeps_retry_idempotent(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    path = "/api/v1/nutrition/hydration/entries/v2"
+    payload = {"volume_ml": 200, "beverage_type": "water", "_hydration_retry_key": "first"}
+    first = _transport(client, token, path, "POST", payload)
+    assert first.status_code == 200
+    for index in range(99):
+        assert (
+            _transport(
+                client, token, path, "POST", {**payload, "_hydration_retry_key": f"key-{index}"}
+            ).status_code
+            == 200
+        )
+    assert _transport(client, token, path, "POST", payload).json() == first.json()
+    assert (
+        _transport(
+            client, token, path, "POST", {**payload, "_hydration_retry_key": "overflow"}
+        ).status_code
+        == 409
+    )
+
+
+def test_demo_coach_session_collection_is_bounded() -> None:
+    store = DemoSessionStore()
+    token, _ = store.create("trainer")
+    payload = {
+        "client_id": 51001,
+        "starts_at": "2026-09-20T18:00:00",
+        "timezone": "Europe/Moscow",
+        "private_note": "x" * 2000,
+    }
+    for _ in range(96):
+        store.transport(token, "/api/v1/coach/sessions", "POST", payload)
+    before = store.get(token)
+    with pytest.raises(DemoTransitionError):
+        store.transport(token, "/api/v1/coach/sessions", "POST", payload)
+    assert store.get(token) == before
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "/api/v1/coach/sessions",
+            {"client_id": 51001, "starts_at": "2026-09-20T18:00:00", "timezone": "Europe/Moscow"},
+        ),
+        ("/api/v1/coach/packages", {"client_id": 51001, "name": "Пакет", "included_sessions": 1}),
+        (
+            "/api/v1/coach/payments",
+            {"client_id": 51001, "expected_amount_minor": 100, "currency": "RUB"},
+        ),
+        (
+            "/api/v1/coach/tasks",
+            {
+                "client_id": 51001,
+                "title": "Задача",
+                "due_at": "2026-09-20T18:00:00",
+                "timezone": "Europe/Moscow",
+            },
+        ),
+        ("/api/v1/nutrition/hydration/presets", {"label": "Стакан", "volume_ml": 250}),
+    ],
+)
+def test_demo_collection_limit_does_not_affect_other_sessions(monkeypatch, path, payload) -> None:
+    from fitminiapp_api.services import demo_transport
+
+    monkeypatch.setattr(demo_transport, "MAX_DEMO_COLLECTION_SIZE", 5)
+    store = DemoSessionStore()
+    token, _ = store.create("trainer")
+    other, _ = store.create("trainer")
+    created = 0
+    for _ in range(6):
+        try:
+            store.transport(token, path, "POST", payload)
+            created += 1
+        except DemoTransitionError:
+            break
+    assert 1 <= created <= 5
+    before = store.get(token)
+    with pytest.raises(DemoTransitionError):
+        store.transport(token, path, "POST", payload)
+    assert store.get(token) == before
+    assert store.transport(other, path, "POST", payload)
+
+
+def test_demo_food_preserves_unknown_nutrients_in_day_and_snapshot(client) -> None:
+    token, _ = _create_session(client, "nutrition")
+    today = datetime.now(UTC).date().isoformat()
+    payload = {
+        "diary_date": today,
+        "meal_type": "lunch",
+        "amount": 1,
+        "amount_unit": "serving",
+        "quick_add": {"energy_kcal": 420},
+        "_demo_food_retry_key": "unknown-nutrients",
+        "_demo_food_generation": 0,
+    }
+    assert (
+        _transport(client, token, "/api/v1/nutrition/diary/entries", "POST", payload).status_code
+        == 200
+    )
+    day = _transport(client, token, "/api/v1/nutrition/diary").json()
+    assert day["totals"]["protein_g"] is None
+    assert day["totals"]["fat_g"] is None
+    assert day["remaining"]["protein_g"] is None
+    snapshot = client.get("/api/v1/demo/sessions/current", headers={"X-Demo-Session": token})
+    assert snapshot.status_code == 200
+    assert snapshot.json()["state"]["protein_g"] is None
+    report = _transport(client, token, "/api/v1/workouts/progress/nutrition-report").json()
+    assert report["daily"][0]["protein_g"] is None
+
+
 def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
     token, _ = _create_session(client, "trainer")
 
@@ -519,12 +942,47 @@ def test_demo_transport_exposes_synthetic_coach_inbox_without_account_access(cli
 
     assert response.status_code == 200, response.text
     inbox = CoachInboxResponse.model_validate(response.json())
-    assert inbox.total == 1
+    tasks = _transport(client, trainer_token, "/api/v1/coach/tasks").json()
+    open_tasks = [task for task in tasks if task["state"] == "open"]
+    assert inbox.total == 1 + len(open_tasks)
+    assert inbox.counts.tasks == len(open_tasks)
+    assert {item.source_id for item in inbox.items if item.kind == "task"} == {
+        task["id"] for task in open_tasks
+    }
     assert inbox.items[0].client.id == 51_003
     assert inbox.items[0].action == "assign_program"
+    limited = CoachInboxResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/inbox?limit=1").json()
+    )
+    assert len(limited.items) == 1
+    assert limited.total == inbox.total
+    assert limited.counts.tasks == inbox.counts.tasks
+    assert (
+        _transport(client, trainer_token, "/api/v1/coach/inbox?limit=1&limit=2").status_code == 403
+    )
+    task_id = open_tasks[0]["id"]
+    changed = _transport(
+        client,
+        trainer_token,
+        f"/api/v1/coach/tasks/{task_id}/state",
+        "PATCH",
+        {"state": "completed"},
+    )
+    assert changed.status_code == 200
+    after = CoachInboxResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/inbox").json()
+    )
+    assert after.counts.tasks == len(open_tasks) - 1
+    assert task_id not in {item.source_id for item in after.items if item.kind == "task"}
 
     self_token, _ = _create_session(client, "self_training")
     assert _transport(client, self_token, "/api/v1/coach/inbox?limit=50").status_code == 403
+    for path in (
+        "/api/v1/coach/capacity",
+        "/api/v1/coach/tasks",
+        "/api/v1/coach/clients/51001/operations",
+    ):
+        assert _transport(client, self_token, path).status_code == 403
 
     with get_session_context() as db:
         assert db.query(User).count() == users_before
@@ -711,7 +1169,15 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
         nutrition_token,
         "/api/v1/nutrition/diary/entries",
         "POST",
-        {"diary_date": "2026-09-15", "meal_type": "breakfast"},
+        {
+            "diary_date": datetime.now(UTC).date().isoformat(),
+            "meal_type": "breakfast",
+            "amount": 1,
+            "amount_unit": "serving",
+            "quick_add": {"energy_kcal": 428, "protein_g": 24},
+            "_demo_food_retry_key": "nutrition-test-key",
+            "_demo_food_generation": 0,
+        },
     )
     assert added_food.status_code == 200
     FoodDiaryDayResponse.model_validate(

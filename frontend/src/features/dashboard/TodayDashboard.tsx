@@ -1103,6 +1103,7 @@ export function TodayDashboard({
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [cardioOpenRequest, setCardioOpenRequest] = useState(initialCardioOpen ? 1 : 0);
   const wellbeingRequested = Boolean(initialWellbeingOpen || initialWellbeingDate);
+  const noticeUserId = user?.id;
   const timeZone = user?.profile?.timezone || 'UTC';
   const today = useCalendarDay(timeZone);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -1150,6 +1151,22 @@ export function TodayDashboard({
     }
     previousCardioOpenRef.current = initialCardioOpen;
   }, [initialCardioOpen]);
+
+  useEffect(() => {
+    if (capabilities.canMutateProgress || !noticeUserId) return;
+    const id = wellbeingRequested
+      ? 'demo-wellbeing-unavailable'
+      : cardioOpenRequest > 0
+        ? 'demo-cardio-unavailable'
+        : null;
+    if (!id) return;
+    const frame = window.requestAnimationFrame(() => {
+      const notice = document.getElementById(id);
+      notice?.scrollIntoView({ block: 'center', behavior: 'instant' });
+      notice?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [capabilities.canMutateProgress, cardioOpenRequest, noticeUserId, wellbeingRequested]);
 
   const dismissCardioRequest = () => {
     const params = new URLSearchParams(search);
@@ -1753,14 +1770,16 @@ export function TodayDashboard({
           {user && wellbeingRequested && (
             <>
               {!capabilities.canMutateProgress && (
-                <p className="muted demo-capability-notice" role="status">
+                <p
+                  id="demo-wellbeing-unavailable"
+                  tabIndex={-1}
+                  className="muted demo-capability-notice"
+                  role="status"
+                >
                   Отметка самочувствия доступна после входа. В демо ответы не отправляются.
                 </p>
               )}
-              <fieldset
-                className="demo-capability-fieldset"
-                disabled={!capabilities.canMutateProgress}
-              >
+              {capabilities.canMutateProgress && (
                 <DailyWellbeingCheckIn
                   autoFocus={initialWellbeingOpen}
                   initialDate={initialWellbeingDate || selectedDate}
@@ -1771,7 +1790,7 @@ export function TodayDashboard({
                   timeZone={timeZone}
                   userId={user.id}
                 />
-              </fieldset>
+              )}
             </>
           )}
         </div>
@@ -1786,8 +1805,13 @@ export function TodayDashboard({
             today={selectedDate}
           />
         ) : (
-          <p className="muted demo-capability-notice" role="status">
-            Добавление cardio-активности доступно после входа.
+          <p
+            id="demo-cardio-unavailable"
+            tabIndex={-1}
+            className="muted demo-capability-notice"
+            role="status"
+          >
+            Добавление кардио доступно после входа.
           </p>
         ))}
     </div>

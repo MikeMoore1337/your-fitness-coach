@@ -991,7 +991,10 @@ export function NutritionDiary({
   const queryClient = useQueryClient();
   const diary = useQuery({
     queryKey: queryKeys.nutrition.diaryDate(selectedDate),
-    queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${selectedDate}`),
+    queryFn: () =>
+      api<FoodDiaryDay & { demo_generation?: number }>(
+        `/api/v1/nutrition/diary?diary_date=${selectedDate}`,
+      ),
   });
   const dateLabel = formatDate(selectedDate, today);
   const meals = useMemo(() => normalizeMeals(diary.data?.meals ?? []), [diary.data?.meals]);
@@ -1417,6 +1420,7 @@ export function NutritionDiary({
           initialView={addingTo.initialView}
           disabled={diary.data?.status === 'fasted'}
           demoSafeMode={demoSafeMode}
+          demoGeneration={diary.data?.demo_generation}
           onAdded={(entry) => {
             setLastAddedEntryId(entry.id);
             setMealExpansion((current) => ({
@@ -1424,7 +1428,21 @@ export function NutritionDiary({
               [addingTo.mealType]: true,
             }));
           }}
-          onClose={() => setAddingTo(null)}
+          onClose={() => {
+            setAddingTo(null);
+            if (demoSafeMode && initialFoodQuickAdd) {
+              const url = new URL(window.location.href);
+              if (url.searchParams.get('quick_add') === 'food') {
+                url.searchParams.delete('quick_add');
+                window.history.replaceState(
+                  window.history.state,
+                  '',
+                  `${url.pathname}${url.search}${url.hash}`,
+                );
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }
+            }
+          }}
         />
       )}
       {copySubject && !readOnlyEntries && (

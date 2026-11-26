@@ -4,8 +4,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { usePersistentState } from '../../../src/shared/storage';
 import { clearSensitiveUserScopedStorage } from '../../../src/shared/userScopedStorage';
 
-function Harness({ storageKey, initial }: { storageKey: string; initial: string }) {
-  const [value, setValue] = usePersistentState(storageKey, initial);
+function Harness({
+  storageKey,
+  initial,
+  enabled = true,
+}: {
+  storageKey: string;
+  initial: string;
+  enabled?: boolean;
+}) {
+  const [value, setValue] = usePersistentState(storageKey, initial, enabled);
   return (
     <label>
       Черновик
@@ -21,6 +29,18 @@ function Harness({ storageKey, initial }: { storageKey: string; initial: string 
 describe('usePersistentState account scope', () => {
   beforeEach(() => localStorage.clear());
   afterEach(cleanup);
+
+  it('does not read or write browser storage when persistence is disabled', async () => {
+    localStorage.setItem('demo-draft', '"previous session"');
+    const view = render(<Harness storageKey="demo-draft" initial="empty" enabled={false} />);
+    const input = screen.getByRole('textbox', { name: 'Черновик' });
+    expect(input).toHaveValue('empty');
+    await userEvent.type(input, ' synthetic');
+    expect(localStorage.getItem('demo-draft')).toBe('"previous session"');
+    view.rerender(<Harness storageKey="new-demo-draft" initial="fresh" enabled={false} />);
+    await waitFor(() => expect(input).toHaveValue('fresh'));
+    expect(localStorage.getItem('new-demo-draft')).toBeNull();
+  });
 
   it('does not copy the previous account value when its storage key changes', async () => {
     const view = render(<Harness storageKey="fit_profile_draft_7" initial="Профиль 7" />);

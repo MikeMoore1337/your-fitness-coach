@@ -6,10 +6,24 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachPackageCreate,
+    CoachPaymentCreate,
+    CoachPaymentUpdate,
+    CoachSessionCreate,
+    CoachSessionUpdate,
+    CoachTaskCreate,
+)
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.coach_program_rollout import (
+    CoachProgramRolloutApplyRequest,
+    CoachProgramRolloutPreviewRequest,
+)
+from fitminiapp_api.schemas.feedback import WorkoutCommentCreate
+from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate
 from fitminiapp_api.schemas.workout import ExerciseHistoryResponse
 from fitminiapp_api.schemas.workout_rest import (
     RestActionRequest,
@@ -23,6 +37,21 @@ from fitminiapp_api.services.demo_sessions import (
     DemoTransitionError,
     _DemoSession,
 )
+
+MAX_DEMO_COLLECTION_SIZE = 100
+
+
+def _validate_demo_payload(schema: type[BaseModel], payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return schema.model_validate(payload).model_dump(mode="json", exclude_unset=True)
+    except ValidationError as exc:
+        raise DemoActionForbiddenError from exc
+
+
+def _ensure_demo_capacity(items: list[Any]) -> None:
+    if len(items) >= MAX_DEMO_COLLECTION_SIZE:
+        raise DemoTransitionError
+
 
 DEMO_WORKOUT_ID = 50_001
 DEMO_CLIENT_IDS = {"alexey": 51_001, "maria": 51_002, "ivan": 51_003}
@@ -46,10 +75,11 @@ def _query(path: str, key: str, default: str | None = None) -> str | None:
 
 
 def _coach_capacity(session: _DemoSession) -> dict[str, Any]:
+    open_tasks = sum(task["state"] == "open" for task in _crm_state(session)["tasks"])
     return CoachCapacityResponse(
         active_client_count=3,
         pending_invite_count=1,
-        open_task_count=0,
+        open_task_count=open_tasks,
         attention_item_count=1,
         attention_client_count=1,
         attention_items_returned=1,
@@ -64,10 +94,29 @@ def _coach_capacity(session: _DemoSession) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
-def _coach_inbox(session: _DemoSession) -> dict[str, Any]:
+def _coach_inbox(session: _DemoSession, limit: int = 50) -> dict[str, Any]:
     if session.scenario != "trainer":
         raise DemoActionForbiddenError
     now = _now(session)
+    tasks = [task for task in _crm_state(session)["tasks"] if task["state"] == "open"]
+    task_items = [
+        {
+            "key": f"task:{task['client_id']}:{task['id']}",
+            "kind": "task",
+            "client": {"id": task["client_id"], "name": task["client_name"]},
+            "title": str(task["title"])[:240],
+            "reason": str(task.get("reason") or "Проверьте задачу клиента.")[:240],
+            "source_kind": "task",
+            "source_id": task["id"],
+            "action": "open_task",
+            "destination": "/coach?tab=tools&tool=tasks",
+            "priority": "soon",
+            "created_at": task["created_at"],
+            "due_at": task["due_at_utc"],
+            "evidence": [],
+        }
+        for task in tasks[: limit - 1]
+    ]
     return CoachInboxResponse.model_validate(
         {
             "date": _today(session),
@@ -87,13 +136,14 @@ def _coach_inbox(session: _DemoSession) -> dict[str, Any]:
                     "created_at": now,
                     "due_at": None,
                     "evidence": [],
-                }
+                },
+                *task_items,
             ],
-            "total": 1,
+            "total": 1 + len(tasks),
             "counts": {
                 "attention": 1,
                 "pending_reviews": 0,
-                "tasks": 0,
+                "tasks": len(tasks),
                 "sessions": 0,
                 "packages": 0,
                 "payments": 0,
@@ -542,24 +592,48 @@ def _recent_item(session: _DemoSession) -> dict[str, Any]:
 def _nutrition_day(session: _DemoSession, diary_date: str | None = None) -> dict[str, Any]:
     selected = diary_date or _iso(_today(session))
     state = session.state
-    added = session.scenario == "nutrition" and bool(state.get("item_added"))
-    base_entry = _nutrition_entry(session, selected, "breakfast")
-    entries = [base_entry] if added else []
+    entries = [
+        item["response"]
+        for item in state.get("food_diary_entries", [])
+        if item["response"]["diary_date"] == selected
+    ]
+    added = bool(entries)
+    legacy_added = (
+        session.scenario == "nutrition"
+        and bool(state.get("item_added"))
+        and not state.get("food_diary_entries")
+    )
+    if legacy_added:
+        entries = [_nutrition_entry(session, selected, "breakfast")]
+        added = True
+    base_calories = 1_160 if session.scenario == "nutrition" else 1_580
+    base_protein = 82.0 if session.scenario == "nutrition" else 104.0
+    if legacy_added:
+        base_calories = 1_160
+        base_protein = 82.0
+
+    def optional_total(items: list[dict[str, Any]], name: str, base: float = 0) -> float | None:
+        values = [item["nutrition"][name] for item in items]
+        if any(value is None for value in values):
+            return None
+        return base + sum(float(value) for value in values)
+
     totals = {
-        "energy_kcal": state.get("calories", 1_160) if session.scenario == "nutrition" else 1_580,
-        "protein_g": state.get("protein_g", 82.0) if session.scenario == "nutrition" else 104.0,
-        "fat_g": 48,
-        "carbs_g": 180,
-        "fiber_g": 22,
+        "energy_kcal": base_calories
+        + sum(float(item["nutrition"]["energy_kcal"]) for item in entries),
+        "protein_g": optional_total(entries, "protein_g", base_protein),
+        "fat_g": optional_total(entries, "fat_g", 48),
+        "carbs_g": optional_total(entries, "carbs_g", 180),
+        "fiber_g": optional_total(entries, "fiber_g", 22),
     }
     target = {"energy_kcal": 2_150, "protein_g": 145, "fat_g": 70, "carbs_g": 245}
-    remaining = {
-        key: max(0, target[key] - totals[key]) if totals[key] is not None else None
-        for key in target
-    }
+    remaining = {}
+    for key, target_value in target.items():
+        total = totals[key]
+        remaining[key] = max(0, target_value - total) if total is not None else None
     meals = []
     for meal_type in ("breakfast", "lunch", "dinner", "snacks"):
-        meal_entries = entries if meal_type == "breakfast" else []
+        meal_entries = [item for item in entries if item["meal_type"] == meal_type]
         meals.append(
             {
                 "meal_type": meal_type,
@@ -568,12 +642,10 @@ def _nutrition_day(session: _DemoSession, diary_date: str | None = None) -> dict
                     "energy_kcal": sum(
                         float(item["nutrition"]["energy_kcal"]) for item in meal_entries
                     ),
-                    "protein_g": sum(
-                        float(item["nutrition"]["protein_g"]) for item in meal_entries
-                    ),
-                    "fat_g": sum(float(item["nutrition"]["fat_g"]) for item in meal_entries),
-                    "carbs_g": sum(float(item["nutrition"]["carbs_g"]) for item in meal_entries),
-                    "fiber_g": sum(float(item["nutrition"]["fiber_g"]) for item in meal_entries),
+                    "protein_g": optional_total(meal_entries, "protein_g"),
+                    "fat_g": optional_total(meal_entries, "fat_g"),
+                    "carbs_g": optional_total(meal_entries, "carbs_g"),
+                    "fiber_g": optional_total(meal_entries, "fiber_g"),
                 },
             }
         )
@@ -586,7 +658,114 @@ def _nutrition_day(session: _DemoSession, diary_date: str | None = None) -> dict
         "remaining": remaining,
         "status": "complete" if added else "incomplete",
         "status_is_explicit": False,
+        "demo_generation": session.hydration_generation,
     }
+
+
+def _add_demo_food(session: _DemoSession, body: Any) -> dict[str, Any]:
+    payload = dict(_request_body(body))
+    key = payload.pop("_demo_food_retry_key", None)
+    generation = payload.pop("_demo_food_generation", None)
+    if not isinstance(key, str) or not key or len(key) > 128:
+        raise DemoActionForbiddenError
+    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 0:
+        raise DemoActionForbiddenError
+    if generation != session.hydration_generation:
+        raise DemoTransitionError
+    if set(payload) - {
+        "food_id",
+        "recipe_id",
+        "quick_add",
+        "diary_date",
+        "meal_type",
+        "logged_at",
+        "amount",
+        "amount_unit",
+    }:
+        raise DemoActionForbiddenError
+    quick_payload = payload.get("quick_add")
+    if quick_payload is not None and (
+        not isinstance(quick_payload, dict)
+        or set(quick_payload)
+        - {"name", "nutrition_source", "energy_kcal", "protein_g", "fat_g", "carbs_g"}
+    ):
+        raise DemoActionForbiddenError
+    try:
+        request = FoodDiaryEntryCreate.model_validate(payload)
+    except ValidationError as exc:
+        raise DemoActionForbiddenError from exc
+    if request.recipe_id is not None or (request.food_id is not None and request.food_id != 80_001):
+        raise DemoActionForbiddenError
+    canonical = request.model_dump(mode="json")
+    entries = session.state.setdefault("food_diary_entries", [])
+    previous = next((item for item in entries if item["key"] == key), None)
+    if previous is not None:
+        if previous["request"] != canonical:
+            raise DemoTransitionError
+        return previous["response"]
+    _ensure_demo_capacity(entries)
+    response = _nutrition_entry(session, request.diary_date.isoformat(), request.meal_type)
+    response["id"] = 80_101 + len(entries)
+    response["logged_at"] = request.logged_at.isoformat() if request.logged_at else None
+    if request.quick_add is not None:
+        quick = request.quick_add
+        response["food_name"] = quick.name or "Быстрый ввод"
+        response["nutrition_source"] = quick.nutrition_source
+        response["nutrition_confidence"] = (
+            "approximate"
+            if all(value is not None for value in (quick.protein_g, quick.fat_g, quick.carbs_g))
+            else "partial"
+        )
+        response["serving_weight_g"] = None
+        response["nutrition"] = {
+            "energy_kcal": float(quick.energy_kcal),
+            "protein_g": float(quick.protein_g) if quick.protein_g is not None else None,
+            "fat_g": float(quick.fat_g) if quick.fat_g is not None else None,
+            "carbs_g": float(quick.carbs_g) if quick.carbs_g is not None else None,
+            "fiber_g": None,
+        }
+    else:
+        item = _nutrition_item(session)
+        if request.amount_unit == "ml":
+            raise DemoActionForbiddenError
+        factor = float(request.amount) * (3.2 if request.amount_unit == "serving" else 0.01)
+        response.update(
+            {
+                "entry_kind": "food",
+                "nutrition_source": "catalog",
+                "nutrition_confidence": "exact",
+                "food_id": 80_001,
+                "food_name": item["name"],
+                "amount": float(request.amount),
+                "amount_unit": request.amount_unit,
+                "weight_g": factor * 100,
+                "nutrition_basis_kind": "per_100_g",
+                "nutrition_basis_amount": 100,
+                "nutrition_basis_unit": "g",
+            }
+        )
+        response["nutrition"] = {
+            "energy_kcal": item["energy_kcal_per_100g"] * factor,
+            "protein_g": item["protein_g_per_100g"] * factor,
+            "fat_g": item["fat_g_per_100g"] * factor,
+            "carbs_g": item["carbs_g_per_100g"] * factor,
+            "fiber_g": item["fiber_g_per_100g"] * factor,
+        }
+    entries.append({"key": key, "request": canonical, "response": response})
+    session.revision += 1
+    if session.scenario == "nutrition" and request.diary_date == _today(session):
+        day = _nutrition_day(session)
+        session.state["item_added"] = True
+        session.state["calories"] = round(day["totals"]["energy_kcal"])
+        session.state["protein_g"] = day["totals"]["protein_g"]
+        session.state["meals_logged"] = 2 + len(
+            {
+                item["response"]["meal_type"]
+                for item in entries
+                if item["response"]["diary_date"] == _iso(_today(session))
+            }
+        )
+    return response
 
 
 def _hydration_day(session: _DemoSession, diary_date: str | None = None) -> dict[str, Any]:
@@ -692,11 +871,11 @@ def _validate_hydration_payload(payload: dict[str, Any], *, update: bool = False
     volume = payload.get("volume_ml")
     if isinstance(volume, bool) or not isinstance(volume, int) or not 1 <= volume <= 5_000:
         raise DemoActionForbiddenError
-    if payload.get("beverage_type") not in {"water", "tea", "coffee", "milk", "juice", "other"}:
+    if payload.get("beverage_type") not in ("water", "tea", "coffee", "milk", "juice", "other"):
         raise DemoActionForbiddenError
     if update and not isinstance(payload.get("occurred_at"), str):
         raise DemoActionForbiddenError
-    if not update and payload.get("source", "manual") not in {"quick_preset", "manual"}:
+    if not update and payload.get("source", "manual") not in ("quick_preset", "manual"):
         raise DemoActionForbiddenError
 
 
@@ -727,6 +906,7 @@ def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict
             if previous.get("_hydration_retry_payload") != payload:
                 raise DemoTransitionError
             return _hydration_entry(session, previous)
+    _ensure_demo_capacity(session.state.setdefault("hydration_entries", []))
     occurred_at = payload.get("occurred_at") or _iso(_now(session))
     if not isinstance(occurred_at, str):
         raise DemoActionForbiddenError
@@ -784,10 +964,10 @@ def _update_hydration_entry(
 
 def _hydration_goal(session: _DemoSession, payload: dict[str, Any]) -> dict[str, Any] | None:
     allowed = {"enabled", "target_ml", "source", "sex", "adult_confirmed", "save_sex_to_profile"}
-    if set(payload) - allowed or payload.get("source") not in {
+    if set(payload) - allowed or payload.get("source") not in (
         "manual",
         "national_academies_beverages",
-    }:
+    ):
         raise DemoActionForbiddenError
     enabled = payload.get("enabled", True)
     if not isinstance(enabled, bool):
@@ -803,7 +983,7 @@ def _hydration_goal(session: _DemoSession, payload: dict[str, Any]) -> dict[str,
             raise DemoActionForbiddenError
     else:
         if (
-            payload.get("sex") not in {"male", "female"}
+            payload.get("sex") not in ("male", "female")
             or payload.get("adult_confirmed") is not True
         ):
             raise DemoActionForbiddenError
@@ -829,15 +1009,16 @@ def _hydration_preset(session: _DemoSession, payload: dict[str, Any]) -> dict[st
         raise DemoActionForbiddenError
     if isinstance(volume, bool) or not isinstance(volume, int) or not 1 <= volume <= 5_000:
         raise DemoActionForbiddenError
-    if payload.get("beverage_type", "water") not in {
+    if payload.get("beverage_type", "water") not in (
         "water",
         "tea",
         "coffee",
         "milk",
         "juice",
         "other",
-    }:
+    ):
         raise DemoActionForbiddenError
+    _ensure_demo_capacity(session.state.setdefault("hydration_presets", []))
     stored = {
         "id": max(
             [
@@ -1040,43 +1221,58 @@ def _progress_summary(
 def _nutrition_report(session: _DemoSession, client_id: int | None = None) -> dict[str, Any]:
     end = _today(session)
     start = end - timedelta(days=29)
-    nutrition_added = session.scenario == "nutrition" and bool(session.state.get("item_added"))
-    daily = []
+    today_entries = [
+        item
+        for item in session.state.get("food_diary_entries", [])
+        if item["response"]["diary_date"] == _iso(end)
+    ]
+    nutrition_added = client_id is None and (
+        bool(today_entries)
+        or (session.scenario == "nutrition" and bool(session.state.get("item_added")))
+    )
+    today_totals = _nutrition_day(session)["totals"] if nutrition_added else None
+    daily: list[dict[str, Any]] = []
     for offset in range(5):
         current = end - timedelta(days=offset)
         calories = (
-            int(session.state.get("calories", 2_010))
-            if nutrition_added and offset == 0
+            today_totals["energy_kcal"]
+            if today_totals is not None and offset == 0
             else 1_160
             if offset == 2
             else 2_010
         )
         protein = (
-            float(session.state.get("protein_g", 132))
-            if nutrition_added and offset == 0
+            today_totals["protein_g"]
+            if today_totals is not None and offset == 0
             else 82.0
             if offset == 2
             else 132.0
         )
+        fat = today_totals["fat_g"] if today_totals is not None and offset == 0 else 68
+        carbs = today_totals["carbs_g"] if today_totals is not None and offset == 0 else 230
+        status = (
+            "incomplete" if offset == 2 or (offset == 0 and not nutrition_added) else "complete"
+        )
+        logged = status == "complete"
         daily.append(
             {
                 "diary_date": _iso(current),
-                "status": "complete" if offset != 2 else "incomplete",
+                "status": status,
                 "is_current_day": offset == 0,
                 "calories": calories,
                 "protein_g": protein,
-                "fat_g": 68,
-                "carbs_g": 230,
+                "fat_g": fat,
+                "carbs_g": carbs,
                 "target_calories": 2_150,
                 "target_protein_g": 145,
                 "target_fat_g": 70,
                 "target_carbs_g": 245,
-                "calorie_deviation": -140,
-                "protein_deviation_g": -13,
-                "fat_deviation_g": -2,
-                "carbs_deviation_g": -15,
-                "within_calorie_tolerance": True,
-                "meets_protein_target": False,
+                "calorie_deviation": calories - 2_150 if logged else None,
+                "protein_deviation_g": protein - 145 if logged and protein is not None else None,
+                "fat_deviation_g": fat - 70 if logged and fat is not None else None,
+                "carbs_deviation_g": carbs - 245 if logged and carbs is not None else None,
+                "within_calorie_tolerance": abs(calories - 2_150) <= 215 if logged else None,
+                "meets_protein_target": protein >= 145 if logged and protein is not None else None,
                 "target_changed": False,
                 "hydration_ml": 1_800,
                 "hydration_target_ml": 2_200,
@@ -1084,20 +1280,25 @@ def _nutrition_report(session: _DemoSession, client_id: int | None = None) -> di
             }
         )
 
-    def metric(average: int) -> dict[str, Any]:
+    logged_points = [point for point in daily if point["status"] == "complete"]
+
+    def metric(name: str) -> dict[str, Any]:
+        values = [float(point[name]) for point in logged_points if point[name] is not None]
         return {
-            "average": average,
-            "minimum": average - 100,
-            "maximum": average + 100,
-            "sample_days": 5,
+            "average": sum(values) / len(values) if values else None,
+            "minimum": min(values) if values else None,
+            "maximum": max(values) if values else None,
+            "sample_days": len(values),
         }
 
-    def comparison(average: int, target: int) -> dict[str, Any]:
+    def comparison(name: str, target: int) -> dict[str, Any]:
+        values = [float(point[name]) for point in logged_points if point[name] is not None]
+        average = sum(values) / len(values) if values else None
         return {
             "average_actual": average,
-            "average_target": target,
-            "average_deviation": average - target,
-            "evaluated_days": 5,
+            "average_target": target if values else None,
+            "average_deviation": average - target if average is not None else None,
+            "evaluated_days": len(values),
         }
 
     return {
@@ -1106,26 +1307,34 @@ def _nutrition_report(session: _DemoSession, client_id: int | None = None) -> di
         "period_end": _iso(end),
         "timezone": "Europe/Moscow",
         "summary": {
-            "logged_days": 5,
+            "logged_days": len(logged_points),
             "eligible_days": 30,
-            "coverage_percent": 16.7,
-            "complete_days": 5 if nutrition_added else 4,
-            "incomplete_days": 0 if nutrition_added else 1,
+            "coverage_percent": round(len(logged_points) * 100 / 30, 1),
+            "complete_days": len(logged_points),
+            "incomplete_days": len(daily) - len(logged_points),
             "fasted_days": 0,
             "missing_days": 25,
             "current_day_status": "complete" if nutrition_added else "incomplete",
-            "calories": metric(2_010),
-            "protein_g": metric(132),
-            "fat_g": metric(68),
-            "carbs_g": metric(230),
-            "calorie_comparison": comparison(2_010, 2_150),
-            "protein_comparison": comparison(132, 145),
-            "fat_comparison": comparison(68, 70),
-            "carbs_comparison": comparison(230, 245),
-            "days_within_calorie_tolerance": 4,
-            "calorie_tolerance_evaluated_days": 5,
-            "days_meeting_protein_target": 2,
-            "protein_target_evaluated_days": 5,
+            "calories": metric("calories"),
+            "protein_g": metric("protein_g"),
+            "fat_g": metric("fat_g"),
+            "carbs_g": metric("carbs_g"),
+            "calorie_comparison": comparison("calories", 2_150),
+            "protein_comparison": comparison("protein_g", 145),
+            "fat_comparison": comparison("fat_g", 70),
+            "carbs_comparison": comparison("carbs_g", 245),
+            "days_within_calorie_tolerance": sum(
+                point["within_calorie_tolerance"] is True for point in logged_points
+            ),
+            "calorie_tolerance_evaluated_days": sum(
+                point["within_calorie_tolerance"] is not None for point in logged_points
+            ),
+            "days_meeting_protein_target": sum(
+                point["meets_protein_target"] is True for point in logged_points
+            ),
+            "protein_target_evaluated_days": sum(
+                point["meets_protein_target"] is not None for point in logged_points
+            ),
         },
         "daily": daily,
         "target_changes": [],
@@ -1480,14 +1689,14 @@ def _crm_task(
         "id": task_id,
         "client_id": client_id,
         "client_name": _crm_client_name(client_id),
-        "title": "Отправить короткий комментарий по технике",
+        "title": "Проверить технику и подготовить комментарий",
         "due_at": _iso(due_at),
         "due_at_utc": _iso(due_at - timedelta(hours=3)),
         "timezone": "Europe/Moscow",
         "kind": "review_technique",
         "source_kind": "manual",
         "source_id": None,
-        "reason": "Демо follow-up для проверки техники.",
+        "reason": "Демо-задача для проверки техники.",
         "state": state,
         "completed_at": _iso(_now(session)) if state == "completed" else None,
         "created_at": _iso(_now(session) - timedelta(days=1)),
@@ -2032,9 +2241,9 @@ def _validate_workout_set_payload(payload: dict[str, Any]) -> None:
         value = payload.get(key)
         if value is not None and not isinstance(value, bool):
             raise DemoActionForbiddenError
-    if payload.get("rir") not in {None, "0", "1", "2", "3", "4+"}:
+    if payload.get("rir") not in (None, "0", "1", "2", "3", "4+"):
         raise DemoActionForbiddenError
-    if payload.get("set_kind") not in {None, "warmup", "working", "drop"}:
+    if payload.get("set_kind") not in (None, "warmup", "working", "drop"):
         raise DemoActionForbiddenError
     mutation_id = payload.get("mutation_id")
     if mutation_id is not None and (
@@ -2144,6 +2353,10 @@ def handle_demo_transport(
     if parsed.scheme or parsed.netloc or parsed.fragment or not parsed.path.startswith("/api/v1/"):
         raise DemoActionForbiddenError
     path = parsed.path
+    if (
+        path == "/api/v1/coach" or path.startswith("/api/v1/coach/")
+    ) and session.scenario != "trainer":
+        raise DemoActionForbiddenError
     parts = path.removeprefix("/api/v1/").strip("/").split("/")
     if not parts or any(not part or len(part) > 96 for part in parts):
         raise DemoActionForbiddenError
@@ -2399,7 +2612,13 @@ def handle_demo_transport(
                 "generated_at": _iso(_now(session)),
             }
         if path == "/api/v1/coach/inbox":
-            return _coach_inbox(session)
+            values = parse_qs(parsed.query, keep_blank_values=True).get("limit", ["50"])
+            if len(values) != 1 or not values[0].isdigit() or len(values[0]) > 3:
+                raise DemoActionForbiddenError
+            limit = int(values[0])
+            if not 1 <= limit <= 100:
+                raise DemoActionForbiddenError
+            return _coach_inbox(session, limit)
         if path == "/api/v1/coach/workflow-automation/preview":
             return {
                 "ruleset_version": "coach-workflow-v1",
@@ -2681,17 +2900,7 @@ def handle_demo_transport(
             _finish_workout(store, session, body)
             return _workout(session)
         if path == "/api/v1/nutrition/diary/entries":
-            payload = _request_body(body)
-            if session.scenario != "nutrition":
-                raise DemoActionForbiddenError
-            changed = store._apply_allowed_action(session, "add_recent", None, None)
-            if changed:
-                session.revision += 1
-            return _nutrition_entry(
-                session,
-                str(payload.get("diary_date") or _iso(_today(session))),
-                str(payload.get("meal_type") or "breakfast"),
-            )
+            return _add_demo_food(session, body)
         if path == "/api/v1/nutrition/hydration/entries":
             raise DemoTransitionError
         if path == "/api/v1/nutrition/hydration/entries/v2":
@@ -2702,6 +2911,7 @@ def handle_demo_transport(
             return _hydration_preset(session, _request_body(body))
         if path == "/api/v1/coach/sessions":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachSessionCreate, payload)
             session_client_id = payload.get("client_id")
             starts_at = payload.get("starts_at")
             if (
@@ -2711,7 +2921,9 @@ def handle_demo_transport(
                 or not isinstance(starts_at, str)
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["sessions"])
             next_id = max([71000, *(int(item["id"]) for item in state["sessions"])]) + 1
             created = _crm_session(
                 session,
@@ -2733,6 +2945,7 @@ def handle_demo_transport(
             return [created]
         if path == "/api/v1/coach/packages":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachPackageCreate, payload)
             package_client_id = payload.get("client_id")
             name = payload.get("name")
             if (
@@ -2743,7 +2956,9 @@ def handle_demo_transport(
                 or not name.strip()
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["packages"])
             next_id = max([72000, *(int(item["id"]) for item in state["packages"])]) + 1
             created = _crm_package(
                 session,
@@ -2759,6 +2974,7 @@ def handle_demo_transport(
             return created
         if path == "/api/v1/coach/payments":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachPaymentCreate, payload)
             payment_client_id = payload.get("client_id")
             expected = payload.get("expected_amount_minor")
             paid = payload.get("paid_amount_minor", 0)
@@ -2775,7 +2991,9 @@ def handle_demo_transport(
                 or paid > expected
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["payments"])
             next_id = max([73000, *(int(item["id"]) for item in state["payments"])]) + 1
             payment = _crm_payment(session, next_id, payment_client_id)
             payment.update(
@@ -2803,6 +3021,7 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/program-rollouts/preview":
             payload = _request_body(body)
+            _validate_demo_payload(CoachProgramRolloutPreviewRequest, payload)
             template_id = payload.get("template_id")
             if isinstance(template_id, bool) or not isinstance(template_id, int):
                 raise DemoActionForbiddenError
@@ -2835,6 +3054,9 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/program-rollouts/apply":
             payload = _request_body(body)
+            if isinstance(payload.get("template_id"), bool):
+                raise DemoActionForbiddenError
+            payload = _validate_demo_payload(CoachProgramRolloutApplyRequest, payload)
             template_id = payload.get("template_id")
             targets = payload.get("targets")
             if (
@@ -2869,6 +3091,7 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/tasks":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachTaskCreate, payload)
             task_client_id = payload.get("client_id")
             title = payload.get("title")
             due_at = payload.get("due_at")
@@ -2881,7 +3104,9 @@ def handle_demo_transport(
                 or not isinstance(due_at, str)
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["tasks"])
             next_id = max([74000, *(int(item["id"]) for item in state["tasks"])]) + 1
             task = _crm_task(session, next_id, task_client_id, 0)
             task["title"] = title.strip()
@@ -2902,7 +3127,7 @@ def handle_demo_transport(
             and parts[4].isdigit()
             and parts[5] == "comments"
         ):
-            payload = _request_body(body)
+            payload = _validate_demo_payload(WorkoutCommentCreate, _request_body(body))
             comment = payload.get("body")
             if not isinstance(comment, str) or not comment.strip():
                 raise DemoActionForbiddenError
@@ -2949,7 +3174,7 @@ def handle_demo_transport(
         stored = next((item for item in state["sessions"] if int(item["id"]) == session_id), None)
         if stored is None:
             raise DemoActionForbiddenError
-        payload = _request_body(body)
+        payload = _validate_demo_payload(CoachSessionUpdate, _request_body(body))
         for key in ("starts_at", "timezone", "location", "private_note", "status", "format"):
             if key in payload:
                 stored[key] = payload[key]
@@ -2974,7 +3199,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
-        if payload.get("state") not in {"active", "finished", "cancelled"}:
+        if payload.get("state") not in ("active", "finished", "cancelled"):
             raise DemoActionForbiddenError
         stored["state"] = payload["state"]
         stored["updated_at"] = _iso(_now(session))
@@ -2995,6 +3220,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
+        validated = _validate_demo_payload(CoachPaymentUpdate, payload)
         expected = payload.get("expected_amount_minor", stored["expected_amount_minor"])
         paid = payload.get("paid_amount_minor", stored["paid_amount_minor"])
         if (
@@ -3007,6 +3233,7 @@ def handle_demo_transport(
             or paid > expected
         ):
             raise DemoActionForbiddenError
+        payload = validated
         stored["expected_amount_minor"] = expected
         stored["paid_amount_minor"] = paid
         if "currency" in payload:
@@ -3042,7 +3269,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
-        if payload.get("state") not in {"open", "completed"}:
+        if payload.get("state") not in ("open", "completed"):
             raise DemoActionForbiddenError
         stored["state"] = payload["state"]
         stored["completed_at"] = _iso(_now(session)) if payload["state"] == "completed" else None
@@ -3060,7 +3287,7 @@ def handle_demo_transport(
         client_id = int(parts[2])
         slug = _client_slug(client_id)
         payload = _request_body(body)
-        if payload.get("operational_status") not in {"active", "paused", "archived"}:
+        if payload.get("operational_status") not in ("active", "paused", "archived"):
             raise DemoActionForbiddenError
         session.state.setdefault("crm_operational_status", {})[slug] = payload["operational_status"]
         session.revision += 1

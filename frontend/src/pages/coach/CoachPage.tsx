@@ -872,6 +872,7 @@ function CoachClientDetail({
   summary?: TrainerClientProgressSummary;
 }) {
   const capabilities = useRuntimeCapabilities();
+  const isDemo = useRuntime().kind === 'demo';
   const [timelineRequest, setTimelineRequest] = useState<number | null>(null);
   const [programRequest, setProgramRequest] = useState<number | null>(null);
   const [progressRequest, setProgressRequest] = useState<number | null>(null);
@@ -1145,17 +1146,19 @@ function CoachClientDetail({
                         Изменение этапов программы доступно после входа в рабочий кабинет.
                       </p>
                     )}
-                    <fieldset
-                      className="demo-capability-fieldset"
-                      disabled={!capabilities.canMutatePrograms}
-                    >
-                      <AssignedProgramDetails
-                        programId={program.id}
-                        currentRevisionNumber={program.current_revision_number}
-                        startDate={program.start_date}
-                        durationWeeks={program.duration_weeks}
-                      />
-                    </fieldset>
+                    {!isDemo && (
+                      <fieldset
+                        className="demo-capability-fieldset"
+                        disabled={!capabilities.canMutatePrograms}
+                      >
+                        <AssignedProgramDetails
+                          programId={program.id}
+                          currentRevisionNumber={program.current_revision_number}
+                          startDate={program.start_date}
+                          durationWeeks={program.duration_weeks}
+                        />
+                      </fieldset>
+                    )}
                   </>
                 )}
               </article>
@@ -1272,9 +1275,11 @@ function CoachClientDetail({
 export default function CoachPage({
   demo,
   renderShell = true,
+  onDemoTabChange,
 }: {
   demo?: DemoAppShellConfig;
   renderShell?: boolean;
+  onDemoTabChange?: (tab: CoachTab) => void;
 } = {}) {
   const { user } = useAuth();
   const { navigate, path, search } = useNavigation();
@@ -1290,6 +1295,9 @@ export default function CoachPage({
   const [localTab, setLocalTab] = useState<CoachTab>(routeTab);
   const [localTool, setLocalTool] = useState<CoachTool | null>(routeTool);
   const tab = runtime.kind === 'demo' ? localTab : routeTab;
+  useEffect(() => {
+    if (runtime.kind === 'demo') onDemoTabChange?.(tab);
+  }, [onDemoTabChange, runtime.kind, tab]);
   const activeTool = runtime.kind === 'demo' ? localTool : routeTool;
   const initialWorkoutId = positiveIntegerParam(searchParams, 'workout_id');
   const initialAttentionFocus =
@@ -1588,7 +1596,7 @@ export default function CoachPage({
           </Button>
         </div>
       </header>
-      {!demo && !isMiniApp && (
+      {((!demo && !isMiniApp) || demo?.trainerNavigation) && (
         <nav className="coach-os-desktop-nav" aria-label="Разделы тренера">
           <SegmentedControl
             ariaLabel="Разделы тренера"
@@ -1611,7 +1619,7 @@ export default function CoachPage({
           />
         </nav>
       )}
-      {demo && (
+      {demo && !demo.trainerNavigation && (
         <nav className="coach-os-nav" aria-label="Разделы тренера">
           {(
             [
@@ -1943,17 +1951,19 @@ export default function CoachPage({
                             Изменение этапов программы доступно после входа в рабочий кабинет.
                           </p>
                         )}
-                        <fieldset
-                          className="demo-capability-fieldset"
-                          disabled={!capabilities.canMutatePrograms}
-                        >
-                          <AssignedProgramDetails
-                            programId={item.id}
-                            currentRevisionNumber={item.current_revision_number}
-                            startDate={item.start_date}
-                            durationWeeks={item.duration_weeks}
-                          />
-                        </fieldset>
+                        {runtime.kind !== 'demo' && (
+                          <fieldset
+                            className="demo-capability-fieldset"
+                            disabled={!capabilities.canMutatePrograms}
+                          >
+                            <AssignedProgramDetails
+                              programId={item.id}
+                              currentRevisionNumber={item.current_revision_number}
+                              startDate={item.start_date}
+                              durationWeeks={item.duration_weeks}
+                            />
+                          </fieldset>
+                        )}
                       </>
                     )}
                   </article>
