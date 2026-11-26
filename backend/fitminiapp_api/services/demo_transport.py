@@ -6,10 +6,23 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachPackageCreate,
+    CoachPaymentCreate,
+    CoachPaymentUpdate,
+    CoachSessionCreate,
+    CoachSessionUpdate,
+    CoachTaskCreate,
+)
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.coach_program_rollout import (
+    CoachProgramRolloutApplyRequest,
+    CoachProgramRolloutPreviewRequest,
+)
+from fitminiapp_api.schemas.feedback import WorkoutCommentCreate
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate
 from fitminiapp_api.schemas.workout import ExerciseHistoryResponse
 from fitminiapp_api.schemas.workout_rest import (
@@ -24,6 +37,21 @@ from fitminiapp_api.services.demo_sessions import (
     DemoTransitionError,
     _DemoSession,
 )
+
+MAX_DEMO_COLLECTION_SIZE = 100
+
+
+def _validate_demo_payload(schema: type[BaseModel], payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return schema.model_validate(payload).model_dump(mode="json", exclude_unset=True)
+    except ValidationError as exc:
+        raise DemoActionForbiddenError from exc
+
+
+def _ensure_demo_capacity(items: list[Any]) -> None:
+    if len(items) >= MAX_DEMO_COLLECTION_SIZE:
+        raise DemoTransitionError
+
 
 DEMO_WORKOUT_ID = 50_001
 DEMO_CLIENT_IDS = {"alexey": 51_001, "maria": 51_002, "ivan": 51_003}
@@ -675,8 +703,7 @@ def _add_demo_food(session: _DemoSession, body: Any) -> dict[str, Any]:
         if previous["request"] != canonical:
             raise DemoTransitionError
         return previous["response"]
-    if len(entries) >= 100:
-        raise DemoTransitionError
+    _ensure_demo_capacity(entries)
     response = _nutrition_entry(session, request.diary_date.isoformat(), request.meal_type)
     response["id"] = 80_101 + len(entries)
     response["logged_at"] = request.logged_at.isoformat() if request.logged_at else None
@@ -844,11 +871,11 @@ def _validate_hydration_payload(payload: dict[str, Any], *, update: bool = False
     volume = payload.get("volume_ml")
     if isinstance(volume, bool) or not isinstance(volume, int) or not 1 <= volume <= 5_000:
         raise DemoActionForbiddenError
-    if payload.get("beverage_type") not in {"water", "tea", "coffee", "milk", "juice", "other"}:
+    if payload.get("beverage_type") not in ("water", "tea", "coffee", "milk", "juice", "other"):
         raise DemoActionForbiddenError
     if update and not isinstance(payload.get("occurred_at"), str):
         raise DemoActionForbiddenError
-    if not update and payload.get("source", "manual") not in {"quick_preset", "manual"}:
+    if not update and payload.get("source", "manual") not in ("quick_preset", "manual"):
         raise DemoActionForbiddenError
 
 
@@ -879,6 +906,7 @@ def _add_hydration_entry(session: _DemoSession, payload: dict[str, Any]) -> dict
             if previous.get("_hydration_retry_payload") != payload:
                 raise DemoTransitionError
             return _hydration_entry(session, previous)
+    _ensure_demo_capacity(session.state.setdefault("hydration_entries", []))
     occurred_at = payload.get("occurred_at") or _iso(_now(session))
     if not isinstance(occurred_at, str):
         raise DemoActionForbiddenError
@@ -936,10 +964,10 @@ def _update_hydration_entry(
 
 def _hydration_goal(session: _DemoSession, payload: dict[str, Any]) -> dict[str, Any] | None:
     allowed = {"enabled", "target_ml", "source", "sex", "adult_confirmed", "save_sex_to_profile"}
-    if set(payload) - allowed or payload.get("source") not in {
+    if set(payload) - allowed or payload.get("source") not in (
         "manual",
         "national_academies_beverages",
-    }:
+    ):
         raise DemoActionForbiddenError
     enabled = payload.get("enabled", True)
     if not isinstance(enabled, bool):
@@ -955,7 +983,7 @@ def _hydration_goal(session: _DemoSession, payload: dict[str, Any]) -> dict[str,
             raise DemoActionForbiddenError
     else:
         if (
-            payload.get("sex") not in {"male", "female"}
+            payload.get("sex") not in ("male", "female")
             or payload.get("adult_confirmed") is not True
         ):
             raise DemoActionForbiddenError
@@ -981,15 +1009,16 @@ def _hydration_preset(session: _DemoSession, payload: dict[str, Any]) -> dict[st
         raise DemoActionForbiddenError
     if isinstance(volume, bool) or not isinstance(volume, int) or not 1 <= volume <= 5_000:
         raise DemoActionForbiddenError
-    if payload.get("beverage_type", "water") not in {
+    if payload.get("beverage_type", "water") not in (
         "water",
         "tea",
         "coffee",
         "milk",
         "juice",
         "other",
-    }:
+    ):
         raise DemoActionForbiddenError
+    _ensure_demo_capacity(session.state.setdefault("hydration_presets", []))
     stored = {
         "id": max(
             [
@@ -2212,9 +2241,9 @@ def _validate_workout_set_payload(payload: dict[str, Any]) -> None:
         value = payload.get(key)
         if value is not None and not isinstance(value, bool):
             raise DemoActionForbiddenError
-    if payload.get("rir") not in {None, "0", "1", "2", "3", "4+"}:
+    if payload.get("rir") not in (None, "0", "1", "2", "3", "4+"):
         raise DemoActionForbiddenError
-    if payload.get("set_kind") not in {None, "warmup", "working", "drop"}:
+    if payload.get("set_kind") not in (None, "warmup", "working", "drop"):
         raise DemoActionForbiddenError
     mutation_id = payload.get("mutation_id")
     if mutation_id is not None and (
@@ -2882,6 +2911,7 @@ def handle_demo_transport(
             return _hydration_preset(session, _request_body(body))
         if path == "/api/v1/coach/sessions":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachSessionCreate, payload)
             session_client_id = payload.get("client_id")
             starts_at = payload.get("starts_at")
             if (
@@ -2891,7 +2921,9 @@ def handle_demo_transport(
                 or not isinstance(starts_at, str)
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["sessions"])
             next_id = max([71000, *(int(item["id"]) for item in state["sessions"])]) + 1
             created = _crm_session(
                 session,
@@ -2913,6 +2945,7 @@ def handle_demo_transport(
             return [created]
         if path == "/api/v1/coach/packages":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachPackageCreate, payload)
             package_client_id = payload.get("client_id")
             name = payload.get("name")
             if (
@@ -2923,7 +2956,9 @@ def handle_demo_transport(
                 or not name.strip()
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["packages"])
             next_id = max([72000, *(int(item["id"]) for item in state["packages"])]) + 1
             created = _crm_package(
                 session,
@@ -2939,6 +2974,7 @@ def handle_demo_transport(
             return created
         if path == "/api/v1/coach/payments":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachPaymentCreate, payload)
             payment_client_id = payload.get("client_id")
             expected = payload.get("expected_amount_minor")
             paid = payload.get("paid_amount_minor", 0)
@@ -2955,7 +2991,9 @@ def handle_demo_transport(
                 or paid > expected
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["payments"])
             next_id = max([73000, *(int(item["id"]) for item in state["payments"])]) + 1
             payment = _crm_payment(session, next_id, payment_client_id)
             payment.update(
@@ -2983,6 +3021,7 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/program-rollouts/preview":
             payload = _request_body(body)
+            _validate_demo_payload(CoachProgramRolloutPreviewRequest, payload)
             template_id = payload.get("template_id")
             if isinstance(template_id, bool) or not isinstance(template_id, int):
                 raise DemoActionForbiddenError
@@ -3015,6 +3054,9 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/program-rollouts/apply":
             payload = _request_body(body)
+            if isinstance(payload.get("template_id"), bool):
+                raise DemoActionForbiddenError
+            payload = _validate_demo_payload(CoachProgramRolloutApplyRequest, payload)
             template_id = payload.get("template_id")
             targets = payload.get("targets")
             if (
@@ -3049,6 +3091,7 @@ def handle_demo_transport(
             }
         if path == "/api/v1/coach/tasks":
             payload = _request_body(body)
+            validated = _validate_demo_payload(CoachTaskCreate, payload)
             task_client_id = payload.get("client_id")
             title = payload.get("title")
             due_at = payload.get("due_at")
@@ -3061,7 +3104,9 @@ def handle_demo_transport(
                 or not isinstance(due_at, str)
             ):
                 raise DemoActionForbiddenError
+            payload = validated
             state = _crm_state(session)
+            _ensure_demo_capacity(state["tasks"])
             next_id = max([74000, *(int(item["id"]) for item in state["tasks"])]) + 1
             task = _crm_task(session, next_id, task_client_id, 0)
             task["title"] = title.strip()
@@ -3082,7 +3127,7 @@ def handle_demo_transport(
             and parts[4].isdigit()
             and parts[5] == "comments"
         ):
-            payload = _request_body(body)
+            payload = _validate_demo_payload(WorkoutCommentCreate, _request_body(body))
             comment = payload.get("body")
             if not isinstance(comment, str) or not comment.strip():
                 raise DemoActionForbiddenError
@@ -3129,7 +3174,7 @@ def handle_demo_transport(
         stored = next((item for item in state["sessions"] if int(item["id"]) == session_id), None)
         if stored is None:
             raise DemoActionForbiddenError
-        payload = _request_body(body)
+        payload = _validate_demo_payload(CoachSessionUpdate, _request_body(body))
         for key in ("starts_at", "timezone", "location", "private_note", "status", "format"):
             if key in payload:
                 stored[key] = payload[key]
@@ -3154,7 +3199,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
-        if payload.get("state") not in {"active", "finished", "cancelled"}:
+        if payload.get("state") not in ("active", "finished", "cancelled"):
             raise DemoActionForbiddenError
         stored["state"] = payload["state"]
         stored["updated_at"] = _iso(_now(session))
@@ -3175,6 +3220,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
+        validated = _validate_demo_payload(CoachPaymentUpdate, payload)
         expected = payload.get("expected_amount_minor", stored["expected_amount_minor"])
         paid = payload.get("paid_amount_minor", stored["paid_amount_minor"])
         if (
@@ -3187,6 +3233,7 @@ def handle_demo_transport(
             or paid > expected
         ):
             raise DemoActionForbiddenError
+        payload = validated
         stored["expected_amount_minor"] = expected
         stored["paid_amount_minor"] = paid
         if "currency" in payload:
@@ -3222,7 +3269,7 @@ def handle_demo_transport(
         if stored is None:
             raise DemoActionForbiddenError
         payload = _request_body(body)
-        if payload.get("state") not in {"open", "completed"}:
+        if payload.get("state") not in ("open", "completed"):
             raise DemoActionForbiddenError
         stored["state"] = payload["state"]
         stored["completed_at"] = _iso(_now(session)) if payload["state"] == "completed" else None
@@ -3240,7 +3287,7 @@ def handle_demo_transport(
         client_id = int(parts[2])
         slug = _client_slug(client_id)
         payload = _request_body(body)
-        if payload.get("operational_status") not in {"active", "paused", "archived"}:
+        if payload.get("operational_status") not in ("active", "paused", "archived"):
             raise DemoActionForbiddenError
         session.state.setdefault("crm_operational_status", {})[slug] = payload["operational_status"]
         session.revision += 1
