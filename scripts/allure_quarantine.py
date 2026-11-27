@@ -98,14 +98,34 @@ def verify_environment(environment: object, owner: str) -> int:
     ):
         raise QuarantineError("repository owner is not a required reviewer")
     policy = environment.get("deployment_branch_policy")
-    if not isinstance(policy, dict) or not (
-        policy.get("protected_branches") is True or policy.get("custom_branch_policies") is True
+    if (
+        not isinstance(policy, dict)
+        or policy.get("custom_branch_policies") is not True
+        or policy.get("protected_branches") is not False
     ):
-        raise QuarantineError("review environment must restrict branches")
+        raise QuarantineError("review environment must use explicit branch policies")
     env_id = environment.get("id")
     if isinstance(env_id, bool) or not isinstance(env_id, int) or env_id <= 0:
         raise QuarantineError("review environment identity is invalid")
     return env_id
+
+
+def verify_branch_policies(policies: object) -> None:
+    if (
+        not isinstance(policies, dict)
+        or type(policies.get("total_count")) is not int
+        or policies["total_count"] != 1
+    ):
+        raise QuarantineError("review environment must allow only the master branch")
+    branches = policies.get("branch_policies")
+    if (
+        not isinstance(branches, list)
+        or len(branches) != 1
+        or not isinstance(branches[0], dict)
+        or branches[0].get("name") != "master"
+        or branches[0].get("type") != "branch"
+    ):
+        raise QuarantineError("review environment must allow only the master branch")
 
 
 def verify_approval(
@@ -145,6 +165,7 @@ def main() -> int:
     parser.add_argument("--sha")
     parser.add_argument("--digest")
     parser.add_argument("--json", type=Path)
+    parser.add_argument("--branch-policies", type=Path)
     parser.add_argument("--owner")
     parser.add_argument("--environment-id", type=int)
     args = parser.parse_args()
@@ -160,6 +181,9 @@ def main() -> int:
             elif args.manifest.read_bytes() != data or value != args.digest:
                 raise QuarantineError("quarantine manifest or bundle changed")
         elif args.mode == "environment":
+            if args.branch_policies is None:
+                raise QuarantineError("review branch policies are missing")
+            verify_branch_policies(json.loads(args.branch_policies.read_text(encoding="utf-8")))
             print(verify_environment(json.loads(args.json.read_text(encoding="utf-8")), args.owner))
         else:
             verify_approval(
