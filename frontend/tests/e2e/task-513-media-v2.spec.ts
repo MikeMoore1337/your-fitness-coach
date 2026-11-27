@@ -539,22 +539,22 @@ test('Task 513 owner visual package covers catalog and exercise media states', a
   });
 });
 
-test('Issue 1186 fills wide technique media in guide and lightbox with source-aware cover', async ({
-  page,
-}) => {
-  await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
-  const telegramHarness = new TelegramHarness(page);
-  await installPlatformApi(page, { browserSession: true });
-  await installWideMediaRoutes(page);
-  await installWideCatalogRoutes(page);
+for (const colorScheme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 393, 430]) {
+    test(`Issue 1186 fills wide technique media in guide and lightbox with source-aware cover: ${colorScheme} ${width}px`, async ({
+      page,
+    }) => {
+      await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
+      const telegramHarness = new TelegramHarness(page);
+      await installPlatformApi(page, { browserSession: true });
+      await installWideMediaRoutes(page);
+      await installWideCatalogRoutes(page);
 
-  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
-  if (afterDir) await mkdir(afterDir, { recursive: true });
+      const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+      if (afterDir) await mkdir(afterDir, { recursive: true });
 
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
 
-    for (const width of [320, 360, 393, 430]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
       const dialog = await openWideCatalogDetail(page, colorScheme);
       await telegramHarness.setTheme(colorScheme);
@@ -594,9 +594,9 @@ test('Issue 1186 fills wide technique media in guide and lightbox with source-aw
       }
       await lightbox.locator('.exercise-lightbox__close').click();
       await expect(lightbox).not.toBeVisible();
-    }
+    });
   }
-});
+}
 
 test('Issue 1186 keeps a wide poster square in Active Workout', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -719,21 +719,21 @@ for (const colorScheme of ['light', 'dark'] as const) {
   }
 }
 
-test('Issue 1186 keeps the native square GIF in Guide, lightbox and Active Workout', async ({
-  page,
-}) => {
-  await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
-  const telegramHarness = new TelegramHarness(page);
-  await installPlatformApi(page, { browserSession: true });
-  await installMediaRoutes(page);
-  await installCatalogRoutes(page);
-  await installWideActiveWorkoutRoutes(page, 'gif');
-  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
-  if (afterDir) await mkdir(afterDir, { recursive: true });
+for (const colorScheme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 393, 430]) {
+    test(`Issue 1186 keeps the native square GIF in Guide, lightbox and Active Workout: ${colorScheme} ${width}px`, async ({
+      page,
+    }) => {
+      await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
+      const telegramHarness = new TelegramHarness(page);
+      await installPlatformApi(page, { browserSession: true });
+      await installMediaRoutes(page);
+      await installCatalogRoutes(page);
+      await installWideActiveWorkoutRoutes(page, 'gif');
+      const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+      if (afterDir) await mkdir(afterDir, { recursive: true });
 
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
-    for (const width of [320, 360, 393, 430]) {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
       await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
       await page.goto('/app?section=catalog');
       await page.evaluate((theme) => localStorage.setItem('app-theme', theme), colorScheme);
@@ -782,9 +782,9 @@ test('Issue 1186 keeps the native square GIF in Guide, lightbox and Active Worko
           path: resolve(afterDir, `${colorScheme}-${width}-active-workout-gif.png`),
         });
       }
-    }
+    });
   }
-});
+}
 
 test('Task 513 Active Workout keeps technique access beside set logging', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

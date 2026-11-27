@@ -1035,48 +1035,48 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   });
 });
 
-test('program history visual evidence covers compact Mobile Web, dark TMA and desktop', async ({
-  browser,
-}) => {
-  const cases = [
-    {
-      surface: 'mobile-web',
-      viewport: MOBILE_CONTEXTS.compact,
-      theme: 'light' as const,
-      telegram: false,
-      screenshot: true,
-    },
-    {
-      surface: 'tma',
-      viewport: MOBILE_CONTEXTS.baseline,
-      theme: 'dark' as const,
-      telegram: true,
-      screenshot: true,
-    },
-    {
-      surface: 'mobile-web',
-      viewport: MOBILE_CONTEXTS.large,
-      theme: 'light' as const,
-      telegram: false,
-      screenshot: false,
-    },
-    {
-      surface: 'tablet',
-      viewport: { width: 768, height: 900 },
-      theme: 'light' as const,
-      telegram: false,
-      screenshot: false,
-    },
-    {
-      surface: 'desktop',
-      viewport: { width: 1280, height: 900 },
-      theme: 'light' as const,
-      telegram: false,
-      screenshot: true,
-    },
-  ];
+const programHistoryVisualCases = [
+  {
+    surface: 'mobile-web',
+    viewport: MOBILE_CONTEXTS.compact,
+    theme: 'light' as const,
+    telegram: false,
+    screenshot: true,
+  },
+  {
+    surface: 'tma',
+    viewport: MOBILE_CONTEXTS.baseline,
+    theme: 'dark' as const,
+    telegram: true,
+    screenshot: true,
+  },
+  {
+    surface: 'mobile-web',
+    viewport: MOBILE_CONTEXTS.large,
+    theme: 'light' as const,
+    telegram: false,
+    screenshot: false,
+  },
+  {
+    surface: 'tablet',
+    viewport: { width: 768, height: 900 },
+    theme: 'light' as const,
+    telegram: false,
+    screenshot: false,
+  },
+  {
+    surface: 'desktop',
+    viewport: { width: 1280, height: 900 },
+    theme: 'light' as const,
+    telegram: false,
+    screenshot: true,
+  },
+];
 
-  for (const current of cases) {
+for (const current of programHistoryVisualCases) {
+  test(`program history visual evidence covers ${current.surface} ${current.viewport.width}px ${current.theme}`, async ({
+    browser,
+  }) => {
     const page = await browser.newPage({
       viewport: current.viewport,
       hasTouch: current.telegram,
@@ -1227,8 +1227,8 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       });
     }
     await page.close();
-  }
-});
+  });
+}
 
 test('nutrition report keeps period analytics and diary return aligned in Mobile Web and TMA', async ({
   mobilePage,
