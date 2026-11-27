@@ -1273,11 +1273,23 @@ test('local Progress swipe respects the scroll boundary and changes only one vie
   await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
   await tabs.evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
+    element.addEventListener(
+      'pointerdown',
+      (event) =>
+        element.setAttribute('data-test-pointer-id', String((event as PointerEvent).pointerId)),
+      { once: true, capture: true },
+    );
   });
   await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
   await page.mouse.down();
   await page.mouse.move(bounds.x + 45, bounds.y + bounds.height / 2, { steps: 8 });
-  await tabs.dispatchEvent('pointercancel', { pointerId: 1, isPrimary: true, button: 0 });
+  const pointerId = await tabs.getAttribute('data-test-pointer-id');
+  expect(pointerId).not.toBeNull();
+  await tabs.dispatchEvent('pointercancel', {
+    pointerId: Number(pointerId),
+    isPrimary: true,
+    button: 0,
+  });
   await page.mouse.up();
   await expect(tabs.getByRole('tab', { name: 'Обзор' })).toHaveAttribute('aria-selected', 'true');
   await page.mouse.move(bounds.x + bounds.width - 45, bounds.y + bounds.height / 2);
