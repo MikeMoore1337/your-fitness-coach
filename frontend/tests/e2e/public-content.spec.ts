@@ -365,29 +365,32 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
   expect(analyticsEvents.every((event) => !('url' in event))).toBe(true);
 });
 
-test('публичные страницы сохраняют hierarchy и не создают overflow', async ({ page, baseURL }) => {
-  await page.route('**/api/v1/public/exercises', async (route) => {
-    await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(
-        ['bench-press', 'lat-pulldown', 'squat', 'deadlift', 'overhead-press'].map((slug) => ({
-          slug,
-          title: slug,
-          primary_muscle: 'Группа мышц',
-          secondary_muscles: [],
-          equipment: 'Штанга',
-          difficulty_level: 'intermediate',
-        })),
-      ),
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 768, height: 900 },
+  { width: 430, height: 932 },
+  { width: 390, height: 844 },
+  { width: 360, height: 800 },
+]) {
+  test(`публичные страницы сохраняют hierarchy и не создают overflow — ${viewport.width}px`, async ({
+    page,
+    baseURL,
+  }) => {
+    await page.route('**/api/v1/public/exercises', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(
+          ['bench-press', 'lat-pulldown', 'squat', 'deadlift', 'overhead-press'].map((slug) => ({
+            slug,
+            title: slug,
+            primary_muscle: 'Группа мышц',
+            secondary_muscles: [],
+            equipment: 'Штанга',
+            difficulty_level: 'intermediate',
+          })),
+        ),
+      });
     });
-  });
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 768, height: 900 },
-    { width: 430, height: 932 },
-    { width: 390, height: 844 },
-    { width: 360, height: 800 },
-  ]) {
     await page.setViewportSize(viewport);
     for (const publicPage of representativePages) {
       await page.goto(publicPage.path);
@@ -433,8 +436,8 @@ test('публичные страницы сохраняют hierarchy и не �
         expect(heroGutters.right).toBeGreaterThanOrEqual(40);
       }
     }
-  }
-});
+  });
+}
 
 test('related materials use one editorial measure and compact inline CTAs', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
