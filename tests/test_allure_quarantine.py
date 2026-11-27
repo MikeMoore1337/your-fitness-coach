@@ -16,7 +16,7 @@ def _environment():
         "id": 123,
         "name": "allure-review",
         "can_admins_bypass": False,
-        "deployment_branch_policy": {"protected_branches": True, "custom_branch_policies": False},
+        "deployment_branch_policy": {"protected_branches": False, "custom_branch_policies": True},
         "protection_rules": [
             {
                 "type": "required_reviewers",
@@ -112,6 +112,7 @@ def test_review_environment_requires_owner_no_bypass_and_branch_policy() -> None
     for field, value in (
         ("can_admins_bypass", True),
         ("deployment_branch_policy", None),
+        ("deployment_branch_policy", {"protected_branches": True, "custom_branch_policies": False}),
         ("protection_rules", []),
         ("name", "production"),
     ):
@@ -121,6 +122,22 @@ def test_review_environment_requires_owner_no_bypass_and_branch_policy() -> None
             quarantine.verify_environment(altered, OWNER)
     with pytest.raises(quarantine.QuarantineError):
         quarantine.verify_environment(_environment(), "another-owner")
+
+
+def test_branch_policies_allow_only_master_branch() -> None:
+    policies = {"total_count": 1, "branch_policies": [{"name": "master", "type": "branch"}]}
+    quarantine.verify_branch_policies(policies)
+    for bad in (
+        {"total_count": 0, "branch_policies": []},
+        {"total_count": 1, "branch_policies": [{"name": "*", "type": "branch"}]},
+        {"total_count": 1, "branch_policies": [{"name": "master", "type": "tag"}]},
+        {"total_count": 2, "branch_policies": policies["branch_policies"]},
+        {"total_count": 2, "branch_policies": policies["branch_policies"] * 2},
+        {"total_count": True, "branch_policies": policies["branch_policies"]},
+        None,
+    ):
+        with pytest.raises(quarantine.QuarantineError):
+            quarantine.verify_branch_policies(bad)
 
 
 def test_approval_must_match_owner_environment_run_attempt_and_digest() -> None:
@@ -162,9 +179,11 @@ def test_scheduled_publication_requires_quarantine_and_verified_approval() -> No
     )[0]
     assert "retention-days: 3" in quarantine_job
     assert "scripts/allure_quarantine.py environment" in quarantine_job
+    assert "deployment-branch-policies?per_page=100" in quarantine_job
     assert "name: ${{ needs.allure-quarantine.outputs.environment_name }}" in publisher_job
     assert "needs.allure-quarantine.result == 'success'" in publisher_job
     assert "scripts/allure_quarantine.py approval" in publisher_job
+    assert "deployment-branch-policies?per_page=100" in publisher_job
     assert "scripts/allure_quarantine.py verify" in publisher_job
     decrypt_step = publisher_job.split("- name: Decrypt only current-run result bundles", 1)[
         1
