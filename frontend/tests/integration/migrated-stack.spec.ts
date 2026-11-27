@@ -1709,6 +1709,7 @@ testWithoutServiceWorker(
   'PostgreSQL nutrition preview matches confirmation and refreshed report',
   async ({ page }, info) => {
     info.setTimeout(60_000);
+    const scenarioStartedAt = Date.now();
     await page.setViewportSize({ width: 320, height: 720 });
     const userId = Date.now() * 10 + info.workerIndex;
     const login = await page.request.post('/api/v1/auth/dev-login', {
@@ -2053,6 +2054,13 @@ testWithoutServiceWorker(
     expect(emptyLogin.status()).toBe(200);
     const emptyToken = (await emptyLogin.json()).access_token as string;
     const emptyPage = await page.context().newPage();
+    const emptyPageApiErrors: number[] = [];
+    emptyPage.on('response', (response) => {
+      if (new URL(response.url()).pathname.startsWith('/api/') && response.status() >= 400) {
+        emptyPageApiErrors.push(response.status());
+        console.log('CI_NUTRITION_EMPTY_API_ERROR', response.status());
+      }
+    });
     await emptyPage.setViewportSize({ width: 320, height: 720 });
     await emptyPage.addInitScript(
       (value) => sessionStorage.setItem('fit_access_token', value),
@@ -2060,7 +2068,17 @@ testWithoutServiceWorker(
     );
     await emptyPage.goto(`/app?section=nutrition&date=${today}`);
     const emptySuggestions = emptyPage.getByRole('region', { name: 'Варианты из вашей еды' });
+    console.log(
+      'CI_NUTRITION_EMPTY_PAGE',
+      JSON.stringify({
+        elapsedMs: Date.now() - scenarioStartedAt,
+        onAppRoute: new URL(emptyPage.url()).pathname === '/app',
+        suggestionRegions: await emptySuggestions.count(),
+        apiErrorStatuses: emptyPageApiErrors,
+      }),
+    );
     await emptySuggestions.getByRole('button', { name: 'Варианты из вашей еды' }).click();
+    console.log('CI_NUTRITION_EMPTY_READY_MS', Date.now() - scenarioStartedAt);
     await expect(emptySuggestions.getByText('Нет цели КБЖУ на эту дату')).toBeVisible();
     const emptyTarget = await emptyPage.request.post('/api/v1/nutrition/targets/manual', {
       headers: { Authorization: `Bearer ${emptyToken}` },
