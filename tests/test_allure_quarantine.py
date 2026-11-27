@@ -140,6 +140,32 @@ def test_branch_policies_allow_only_master_branch() -> None:
             quarantine.verify_branch_policies(bad)
 
 
+def test_environment_cli_fails_closed_without_valid_branch_policies(tmp_path: Path) -> None:
+    environment = tmp_path / "environment.json"
+    environment.write_text(json.dumps(_environment()), encoding="utf-8")
+    policies = tmp_path / "policies.json"
+    policies.write_text(
+        json.dumps({"total_count": 1, "branch_policies": [{"name": "master", "type": "branch"}]}),
+        encoding="utf-8",
+    )
+    command = [
+        sys.executable,
+        str(Path(__file__).parents[1] / "scripts" / "allure_quarantine.py"),
+        "environment",
+        "--json",
+        str(environment),
+        "--owner",
+        OWNER,
+    ]
+    assert subprocess.run(command, capture_output=True, check=False).returncode != 0
+    checked = [*command, "--branch-policies", str(policies)]
+    result = subprocess.run(checked, capture_output=True, text=True, check=False)
+    assert result.returncode == 0
+    assert result.stdout.strip() == "123"
+    policies.write_text('{"total_count": 1, "branch_policies": [{"name": "*", "type": "branch"}]}')
+    assert subprocess.run(checked, capture_output=True, check=False).returncode != 0
+
+
 def test_approval_must_match_owner_environment_run_attempt_and_digest() -> None:
     checksum = "b" * 64
     review = {
