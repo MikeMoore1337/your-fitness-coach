@@ -1309,7 +1309,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
-          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review/deployment-branch-policies?per_page=100" > "$RUNNER_TEMP/allure-branch-policies.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --branch-policies "$RUNNER_TEMP/allure-branch-policies.json" --owner "$REVIEW_OWNER")"
           echo "id=$id" >> "$GITHUB_OUTPUT"
           echo "name=allure-review" >> "$GITHUB_OUTPUT"
 
@@ -1386,13 +1387,14 @@ jobs:
         run: |
           set -Eeuo pipefail
           gh api "repos/$GITHUB_REPOSITORY/environments/allure-review" > "$RUNNER_TEMP/allure-environment.json"
-          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --owner "$REVIEW_OWNER")"
+          gh api "repos/$GITHUB_REPOSITORY/environments/allure-review/deployment-branch-policies?per_page=100" > "$RUNNER_TEMP/allure-branch-policies.json"
+          id="$(python scripts/allure_quarantine.py environment --json "$RUNNER_TEMP/allure-environment.json" --branch-policies "$RUNNER_TEMP/allure-branch-policies.json" --owner "$REVIEW_OWNER")"
           test "$id" = "$REVIEW_ENVIRONMENT_ID"
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/approvals" > "$RUNNER_TEMP/allure-approvals.json"
           python scripts/allure_quarantine.py approval --json "$RUNNER_TEMP/allure-approvals.json" --owner "$REVIEW_OWNER" --environment-id "$id" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --digest "$REVIEW_MANIFEST_DIGEST"
           python scripts/allure_quarantine.py verify --root "$BUNDLE_DOWNLOAD_ROOT" --manifest .artifacts/runtime/tests/quarantine-manifest/allure-quarantine.json --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA" --digest "$REVIEW_MANIFEST_DIGEST"
       - name: Decrypt only current-run result bundles
-        if: always()
+        if: always() && steps.quarantine-verified.outcome == 'success'
         continue-on-error: true
         env:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
