@@ -25,7 +25,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # A scheduled report can await owner review for days. Do not let it hold
+  # the group needed by post-merge push CI; keep each event lane serialized.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && 'pr' || github.event_name == 'push' && 'push' || 'scheduled' }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

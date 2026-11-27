@@ -920,6 +920,12 @@ def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
 
     assert "scripts/ci_contract.py route" in workflow
     assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
+    assert (
+        "group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && 'pr' || "
+        "github.event_name == 'push' && 'push' || 'scheduled' }}-"
+        "${{ github.event.pull_request.number || github.ref }}"
+    ) in workflow
+    assert "group: yfc-scheduled-allure-publication\n      cancel-in-progress: false" in workflow
     assert "schedule:" in workflow
     assert "workflow_dispatch:" in workflow
     assert 'if [ "$EVENT_NAME" = schedule ]; then' in workflow
