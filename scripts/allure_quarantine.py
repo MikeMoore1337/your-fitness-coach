@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 
 if __package__:
@@ -194,8 +195,11 @@ def main() -> int:
                 attempt=args.attempt,
                 manifest_digest=args.digest,
             )
-    except (QuarantineError, OSError, ValueError, TypeError) as error:
-        print(f"allure quarantine: {error}")
+    except QuarantineError as error:
+        print(f"allure quarantine: {error}", file=sys.stderr)
+        return 1
+    except OSError, ValueError, TypeError:
+        print("allure quarantine: input unavailable or malformed", file=sys.stderr)
         return 1
     return 0
 

@@ -31,6 +31,11 @@ def _bundles(root: Path, kind: str = "weekly") -> None:
         (root / name).write_bytes(("encrypted fixture " + name).encode())
 
 
+def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    script = Path(__file__).parents[1] / "scripts" / "allure_quarantine.py"
+    return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True)
+
+
 def test_manifest_binds_every_bundle_to_commit_run_and_attempt(tmp_path: Path) -> None:
     _bundles(tmp_path)
     manifest = quarantine.make_manifest(tmp_path, kind="weekly", run_id="42", attempt="1", sha=SHA)
@@ -71,6 +76,74 @@ def test_weekly_quarantine_requires_every_browser_shard(tmp_path: Path) -> None:
     (tmp_path / "frontend-cross-browser-webkit-shard-5.enc").unlink()
     with pytest.raises(quarantine.QuarantineError, match="bundle set"):
         quarantine.make_manifest(tmp_path, kind="weekly", run_id="42", attempt="1", sha=SHA)
+
+
+def test_cli_manifest_reports_incomplete_set_on_stderr_without_bundle_content(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "sensitive-name.enc").write_text("private fixture content")
+    result = _run_cli(
+        "manifest",
+        "--root",
+        str(tmp_path),
+        "--manifest",
+        str(tmp_path / "manifest.json"),
+        "--kind",
+        "daily",
+        "--run-id",
+        "42",
+        "--attempt",
+        "1",
+        "--sha",
+        SHA,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert (
+        result.stderr.strip()
+        == "allure quarantine: encrypted bundle set is incomplete or unexpected"
+    )
+    assert not (tmp_path / "manifest.json").exists()
+
+
+def test_cli_manifest_success_prints_only_digest(tmp_path: Path) -> None:
+    _bundles(tmp_path, "daily")
+    manifest = tmp_path / "manifest.json"
+    result = _run_cli(
+        "manifest",
+        "--root",
+        str(tmp_path),
+        "--manifest",
+        str(manifest),
+        "--kind",
+        "daily",
+        "--run-id",
+        "42",
+        "--attempt",
+        "1",
+        "--sha",
+        SHA,
+    )
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert result.stdout.strip() == hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+
+def test_cli_malformed_input_does_not_echo_its_content(tmp_path: Path) -> None:
+    invalid = tmp_path / "invalid.json"
+    invalid.write_text("private fixture content", encoding="utf-8")
+    result = _run_cli(
+        "environment",
+        "--json",
+        str(invalid),
+        "--branch-policies",
+        str(invalid),
+        "--owner",
+        OWNER,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert result.stderr.strip() == "allure quarantine: input unavailable or malformed"
 
 
 def test_cli_rejects_changed_bundle_before_decryption(tmp_path: Path) -> None:
