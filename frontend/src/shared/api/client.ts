@@ -622,6 +622,7 @@ function authSessionSnapshot() {
     boundaryRevision: authBoundaryRevision,
     loginRevision: authLoginRevision,
     verifiedLogin: verifiedLoginGeneration(),
+    userId: Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)),
   };
 }
 
@@ -645,8 +646,72 @@ function assertCurrentAuthSession(session: ReturnType<typeof authSessionSnapshot
   if (authSessionChanged(session)) throw new DOMException('Сессия изменилась', 'AbortError');
 }
 
+function verifiedSameAccountLogin(
+  session: ReturnType<typeof authSessionSnapshot>,
+  discard: ReturnType<typeof authDiscardSnapshot>,
+): boolean {
+  try {
+    const currentMarker = verifiedLoginGeneration();
+    if (
+      !Number.isSafeInteger(session.userId) ||
+      session.userId <= 0 ||
+      !session.token ||
+      !getAccessToken() ||
+      Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY)) !== session.userId ||
+      !session.verifiedLogin ||
+      !currentMarker ||
+      currentMarker === session.verifiedLogin ||
+      authDiscardChanged({ ...discard, userId: session.userId })
+    )
+      return false;
+    const before = JSON.parse(session.verifiedLogin) as { id?: unknown; userId?: unknown };
+    const after = JSON.parse(currentMarker) as { id?: unknown; userId?: unknown };
+    return (
+      typeof before.id === 'string' &&
+      before.id.length > 0 &&
+      before.userId === session.userId &&
+      typeof after.id === 'string' &&
+      after.id.length > 0 &&
+      after.userId === session.userId
+    );
+  } catch {
+    return false;
+  }
+}
+
+function waitForCrossTabToken(
+  session: ReturnType<typeof authSessionSnapshot>,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.removeEventListener(AUTH_TOKEN_RECEIVED_EVENT, finish);
+      window.removeEventListener(AUTH_LOGOUT_EVENT, finish);
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, finish);
+      window.removeEventListener(AUTH_ACCOUNT_SWITCH_EVENT, finish);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    window.addEventListener(AUTH_TOKEN_RECEIVED_EVENT, finish);
+    window.addEventListener(AUTH_LOGOUT_EVENT, finish);
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, finish);
+    window.addEventListener(AUTH_ACCOUNT_SWITCH_EVENT, finish);
+    signal.addEventListener('abort', finish);
+    if (signal.aborted || authRevision !== session.revision) finish();
+  });
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  return apiAttempt<T>(path, options, false);
+}
+
+async function apiAttempt<T>(
+  path: string,
+  options: ApiOptions,
+  retriedSameAccount: boolean,
+): Promise<T> {
   const { body, timeoutMs = 15_000, retryAuth = true, headers, signal, ...init } = options;
+  const startedAt = performance.now();
   const discard = authDiscardSnapshot();
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -703,7 +768,8 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
       const refreshed = await refreshAccessToken();
       if (authDiscardChanged(discard) || authLoginChanged(session))
         throw new DOMException('Сессия изменилась', 'AbortError');
-      if (refreshed) return api<T>(path, { ...options, retryAuth: false });
+      if (refreshed)
+        return apiAttempt<T>(path, { ...options, retryAuth: false }, retriedSameAccount);
       if (session.boundaryRevision !== authBoundaryRevision)
         throw new DOMException('Сессия изменилась', 'AbortError');
     }
@@ -720,6 +786,32 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     return (text ? JSON.parse(text) : null) as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      if (
+        !retriedSameAccount &&
+        runtime.kind !== 'demo' &&
+        (init.method ?? 'GET').toUpperCase() === 'GET' &&
+        body === undefined &&
+        headers === undefined &&
+        retryAuth &&
+        !controller.signal.aborted &&
+        !signal?.aborted &&
+        authSessionChanged(session) &&
+        verifiedSameAccountLogin(session, discard)
+      ) {
+        // Shared storage can announce a verified login before its token arrives.
+        if (authRevision === session.revision)
+          await waitForCrossTabToken(session, controller.signal);
+        const remaining = timeoutMs - (performance.now() - startedAt);
+        if (
+          !controller.signal.aborted &&
+          !signal?.aborted &&
+          remaining > 0 &&
+          authRevision === session.revision + 1 &&
+          verifiedSameAccountLogin(session, discard)
+        ) {
+          return apiAttempt<T>(path, { ...options, timeoutMs: remaining }, true);
+        }
+      }
       if (signal?.aborted || authSessionChanged(session)) throw error;
       throw new ApiError('Сервер не ответил вовремя. Попробуйте снова.', 0);
     }
