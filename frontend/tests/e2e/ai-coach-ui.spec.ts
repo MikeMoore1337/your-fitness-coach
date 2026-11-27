@@ -921,25 +921,25 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   await context.close();
 });
 
-test('AI Coach desktop workspace resizes through all eight invisible edge and corner zones', async ({
-  browser,
-}) => {
-  const directions = [
-    'top',
-    'right',
-    'bottom',
-    'left',
-    'top-left',
-    'top-right',
-    'bottom-left',
-    'bottom-right',
-  ] as const;
+const resizeDirections = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+] as const;
 
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 1920, height: 1080 },
-  ]) {
-    for (const direction of directions) {
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
+]) {
+  for (const direction of resizeDirections) {
+    test(`AI Coach desktop workspace resizes through ${direction} at ${viewport.width}px`, async ({
+      browser,
+    }) => {
       const context = await browser.newContext({ viewport });
       const page = await context.newPage();
       await page.addInitScript(() => {
@@ -976,6 +976,7 @@ test('AI Coach desktop workspace resizes through all eight invisible edge and co
       expect(decoration.backgroundColor).toBe('rgba(0, 0, 0, 0)');
       expect(decoration.borderTopWidth).toBe('0px');
       expect(decoration.width).toBeGreaterThanOrEqual(direction.includes('-') ? 16 : 8);
+      await expect(workspace.getByRole('button', { name: 'Закрыть AI Coach' })).toBeFocused();
       const keyboardResize = workspace.getByTestId('ai-coach-workspace-resize');
       await keyboardResize.focus();
       await expect(keyboardResize).toBeFocused();
@@ -1019,17 +1020,17 @@ test('AI Coach desktop workspace resizes through all eight invisible edge and co
       expect(after.x + after.width).toBeLessThanOrEqual(viewport.width - 16);
       expect(after.y + after.height).toBeLessThanOrEqual(viewport.height - 88);
       await context.close();
-    }
+    });
   }
-});
+}
 
-test('AI Coach history supports switching, scoped deletion, and clear-all confirmations', async ({
-  browser,
-}) => {
-  for (const [label, viewport, hasTouch] of [
-    ['desktop', { width: 1440, height: 900 }, false],
-    ['mobile-light', { width: 390, height: 844 }, true],
-  ] as const) {
+for (const [label, viewport, hasTouch] of [
+  ['desktop', { width: 1440, height: 900 }, false],
+  ['mobile-light', { width: 390, height: 844 }, true],
+] as const) {
+  test(`AI Coach history supports switching, scoped deletion, and clear-all confirmations: ${label}`, async ({
+    browser,
+  }) => {
     const context = await browser.newContext({ viewport, hasTouch });
     const page = await context.newPage();
     await openAiCoachSurface(page, 'light', viewport);
@@ -1153,8 +1154,8 @@ test('AI Coach history supports switching, scoped deletion, and clear-all confir
     await expect(workspace.getByTestId('ai-coach-memory')).toBeVisible();
     await expect(workspace.getByTestId('ai-coach-personal-settings')).toBeVisible();
     await context.close();
-  }
-});
+  });
+}
 
 test('AI Coach history remains touch-friendly in dark TMA and uses the shared confirmation', async ({
   browser,
