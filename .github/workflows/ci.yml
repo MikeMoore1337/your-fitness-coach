@@ -1392,7 +1392,7 @@ jobs:
           python scripts/allure_quarantine.py approval --json "$RUNNER_TEMP/allure-approvals.json" --owner "$REVIEW_OWNER" --environment-id "$id" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --digest "$REVIEW_MANIFEST_DIGEST"
           python scripts/allure_quarantine.py verify --root "$BUNDLE_DOWNLOAD_ROOT" --manifest .artifacts/runtime/tests/quarantine-manifest/allure-quarantine.json --kind "$RUN_KIND" --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --sha "$GITHUB_SHA" --digest "$REVIEW_MANIFEST_DIGEST"
       - name: Decrypt only current-run result bundles
-        if: always()
+        if: always() && steps.quarantine-verified.outcome == 'success'
         continue-on-error: true
         env:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}

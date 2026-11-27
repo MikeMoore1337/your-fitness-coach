@@ -166,5 +166,9 @@ def test_scheduled_publication_requires_quarantine_and_verified_approval() -> No
     assert "needs.allure-quarantine.result == 'success'" in publisher_job
     assert "scripts/allure_quarantine.py approval" in publisher_job
     assert "scripts/allure_quarantine.py verify" in publisher_job
+    decrypt_step = publisher_job.split("- name: Decrypt only current-run result bundles", 1)[
+        1
+    ].split("- name: Aggregate and enrich Allure results", 1)[0]
+    assert "if: always() && steps.quarantine-verified.outcome == 'success'" in decrypt_step
     assert "if: always() && steps.quarantine-verified.outcome == 'success'" in publisher_job
     assert "python scripts/publish_allure_report.py publish" not in quarantine_job
