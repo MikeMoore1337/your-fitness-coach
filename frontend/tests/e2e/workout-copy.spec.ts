@@ -181,9 +181,10 @@ async function expectButtonGeometry(page: Page, buttonName: string) {
   const button = page.getByRole('button', { name: buttonName, exact: true });
   await button.scrollIntoViewIfNeeded();
   await expect(button).toBeVisible();
-  const box = await button.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  // Read the DOM's own height: Firefox's protocol boundingBox calculation can
+  // lose precision when it subtracts fractional top and bottom coordinates.
+  const height = await button.evaluate((element) => element.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(44);
   await expectNoHorizontalOverflow(page);
 }
 
