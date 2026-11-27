@@ -484,6 +484,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let sessionExpired = false;
+    const markSessionExpired = () => {
+      sessionExpired = true;
+    };
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, markSessionExpired);
     const discard = authDiscardSnapshot();
     void (async () => {
       try {
@@ -507,10 +512,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const tg = window.Telegram?.WebApp;
         if (tg?.initData?.trim()) {
+          const previousUserId = previousAuthenticatedUserId();
+          const loginDiscard = authDiscardSnapshot();
           try {
             await telegramLogin(tg);
           } catch (reason) {
             if (!cancelled) {
+              if (reason instanceof DOMException && reason.name === 'AbortError') {
+                if (
+                  previousUserId &&
+                  !sessionExpired &&
+                  !authDiscardChanged({ ...loginDiscard, userId: previousUserId }) &&
+                  getAccessToken() &&
+                  !userIdRef.current
+                ) {
+                  await reloadUser();
+                }
+                return;
+              }
               const cached =
                 reason instanceof ApiError && reason.status === 0
                   ? await offlineWorkoutUser()
@@ -565,8 +584,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
     return () => {
       cancelled = true;
+      window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, markSessionExpired);
     };
-  }, [clearCurrentUserData, queryClient, reloadUser, telegramLogin]);
+  }, [clearCurrentUserData, previousAuthenticatedUserId, queryClient, reloadUser, telegramLogin]);
 
   const value = useMemo(
     () => ({
