@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AUTH_LOGOUT_EVENT,
   AUTH_SESSION_EXPIRED_EVENT,
+  AUTH_TOKEN_RECEIVED_EVENT,
   api,
   apiFile,
   clearAccessToken,
   coordinateAccessTokenRefresh,
+  expireAccessToken,
   getAccessToken,
   refreshAccessToken,
   setAccessToken,
@@ -37,6 +39,238 @@ describe('api client', () => {
     await expect(api<{ ok: boolean }>('/api/v1/me')).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(getAccessToken()).toBe('new');
+  });
+
+  it('discards a stale read and retries once after the same verified account signs in', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)))
+      .mockResolvedValueOnce(new Response('{"version":"fresh"}', { status: 200 }));
+    const request = api<{ version: string }>('/api/v1/workouts/session-rotation');
+    setAccessToken('new-token', 7);
+    finishRequest(new Response('{"version":"stale"}', { status: 200 }));
+
+    await expect(request).resolves.toEqual({ version: 'fresh' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      Authorization: 'Bearer new-token',
+    });
+  });
+
+  it('waits for the verified token when the same-user login marker arrives first', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)))
+      .mockResolvedValueOnce(new Response('{"version":"fresh"}', { status: 200 }));
+    const request = api<{ version: string }>('/api/v1/workouts/session-rotation');
+    localStorage.setItem(
+      'fit_auth_verified_login_v1',
+      JSON.stringify({ id: 'pending', userId: 7 }),
+    );
+    finishRequest(new Response('{"version":"stale"}', { status: 200 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledOnce();
+    setAccessToken('new-token', 7);
+    window.dispatchEvent(new Event(AUTH_TOKEN_RECEIVED_EVENT));
+
+    await expect(request).resolves.toEqual({ version: 'fresh' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      Authorization: 'Bearer new-token',
+    });
+  });
+
+  it('does not retry if logout occurs while waiting for a verified token', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    localStorage.setItem(
+      'fit_auth_verified_login_v1',
+      JSON.stringify({ id: 'pending', userId: 7 }),
+    );
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    clearAccessToken();
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('stops waiting when the caller cancels before the verified token arrives', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const controller = new AbortController();
+    const rejected = expect(
+      api('/api/v1/private', { signal: controller.signal }),
+    ).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    localStorage.setItem(
+      'fit_auth_verified_login_v1',
+      JSON.stringify({ id: 'pending', userId: 7 }),
+    );
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not extend the original timeout while waiting for a token', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private', { timeoutMs: 40 })).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    localStorage.setItem(
+      'fit_auth_verified_login_v1',
+      JSON.stringify({ id: 'pending', userId: 7 }),
+    );
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry file downloads even after a verified same-account login', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(apiFile('/api/v1/account/export')).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    setAccessToken('new-token', 7);
+    finishRequest(new Response('stale', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['another account', { method: 'GET' }, 8, false],
+    ['mutation', { method: 'POST', body: { value: 1 } }, 7, false],
+    ['explicit headers', { headers: { Authorization: 'Bearer explicit' } }, 7, false],
+    ['caller cancelled', { method: 'GET' }, 7, true],
+  ])('does not retry a stale request after %s', async (_case, options, nextUser, cancelled) => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const controller = new AbortController();
+    const request = api('/api/v1/private', { ...options, signal: controller.signal });
+    const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    setAccessToken('next-token', nextUser);
+    if (cancelled) controller.abort();
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry a stale read after logout and a new login, even for the same account', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    clearAccessToken();
+    setAccessToken('new-token', 7);
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry a stale read after expiry and a new login, even for the same account', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    expireAccessToken();
+    setAccessToken('new-token', 7);
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry when a different account signed in before the original account returned', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    setAccessToken('other-account', 8);
+    setAccessToken('same-account', 7);
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed when the previous account identity is not known', async () => {
+    setAccessToken('old-token', 7);
+    let finishRequest!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishRequest = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    setAccessToken('new-token', 7);
+    finishRequest(new Response('{"secret":"stale"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('limits recovery to one new read when the verified session changes again', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('first-token', 7);
+    let finishFirst!: (response: Response) => void;
+    let finishSecond!: (response: Response) => void;
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishFirst = resolve)))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => (finishSecond = resolve)));
+    const rejected = expect(api('/api/v1/private')).rejects.toMatchObject({ name: 'AbortError' });
+    setAccessToken('second-token', 7);
+    finishFirst(new Response('{"secret":"first"}', { status: 200 }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    setAccessToken('third-token', 7);
+    finishSecond(new Response('{"secret":"second"}', { status: 200 }));
+
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('does not restore a token when an in-flight refresh finishes after logout', async () => {
