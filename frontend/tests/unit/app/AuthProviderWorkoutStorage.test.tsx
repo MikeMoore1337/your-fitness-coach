@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from '../../../src/app/AuthProvider';
 import {
   AUTH_TOKEN_RECEIVED_EVENT,
   clearAccessToken,
+  expireAccessToken,
   setAccessToken,
 } from '../../../src/shared/api/client';
 import type { Workout } from '../../../src/shared/api/types';
@@ -132,6 +133,125 @@ describe('AuthProvider active workout cleanup', () => {
     clearAccessToken();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('preserves the verified same-user session when Telegram initialization is superseded', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init' } });
+    let finishLogin!: (response: Response) => void;
+    let loginCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init')) {
+        loginCalls += 1;
+        return new Promise<Response>((resolve) => (finishLogin = resolve));
+      }
+      if (path.endsWith('/me')) return new Response('{"id":7}', { status: 200 });
+      return new Response('{}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(loginCalls).toBe(1));
+    await act(async () => {
+      setAccessToken('verified-winner', 7);
+      finishLogin(new Response('{"access_token":"superseded"}', { status: 200 }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('7'));
+    expect(sessionStorage.getItem('fit_access_token')).toBe('verified-winner');
+    expect(loginCalls).toBe(1);
+  });
+
+  it('does not restore the session when Telegram initialization finishes after logout', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init' } });
+    let finishLogin!: (response: Response) => void;
+    let loginCalls = 0;
+    let profileCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init')) {
+        loginCalls += 1;
+        return new Promise<Response>((resolve) => (finishLogin = resolve));
+      }
+      if (path.endsWith('/me')) profileCalls += 1;
+      return new Response('{"id":7}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(loginCalls).toBe(1));
+    await act(async () => {
+      clearAccessToken();
+      finishLogin(new Response('{"access_token":"superseded"}', { status: 200 }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(sessionStorage.getItem('fit_access_token')).toBeNull();
+    expect(profileCalls).toBe(0);
+  });
+
+  it('does not recover a superseded Telegram login after session expiry', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init' } });
+    let finishLogin!: (response: Response) => void;
+    let loginCalls = 0;
+    let profileCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init')) {
+        loginCalls += 1;
+        return new Promise<Response>((resolve) => (finishLogin = resolve));
+      }
+      if (path.endsWith('/me')) profileCalls += 1;
+      return new Response('{"id":7}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(loginCalls).toBe(1));
+    await act(async () => {
+      expireAccessToken();
+      setAccessToken('new-token', 7);
+      finishLogin(new Response('{"access_token":"superseded"}', { status: 200 }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(profileCalls).toBe(0);
+  });
+
+  it('does not silently adopt a different account after Telegram initialization is superseded', async () => {
+    sessionStorage.setItem('fit_authenticated_user_id', '7');
+    setAccessToken('old-token', 7);
+    vi.stubGlobal('Telegram', { WebApp: { initData: 'synthetic-init' } });
+    let finishLogin!: (response: Response) => void;
+    let loginCalls = 0;
+    let profileCalls = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/public/config')) return new Response('{}', { status: 200 });
+      if (path.endsWith('/auth/telegram/init')) {
+        loginCalls += 1;
+        return new Promise<Response>((resolve) => (finishLogin = resolve));
+      }
+      if (path.endsWith('/me')) profileCalls += 1;
+      return new Response('{"id":8}', { status: 200 });
+    });
+    renderProvider();
+    await waitFor(() => expect(loginCalls).toBe(1));
+    await act(async () => {
+      setAccessToken('other-account', 8);
+      finishLogin(new Response('{"access_token":"superseded"}', { status: 200 }));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('auth-loading')).toHaveTextContent('ready'));
+    expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    expect(sessionStorage.getItem('fit_access_token')).toBe('other-account');
+    expect(profileCalls).toBe(0);
   });
 
   function pendingWorkout(userId = 7, workout = activeWorkout) {
