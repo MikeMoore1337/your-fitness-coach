@@ -1024,13 +1024,13 @@ for (const viewport of [
   }
 }
 
-test('AI Coach history supports switching, scoped deletion, and clear-all confirmations', async ({
-  browser,
-}) => {
-  for (const [label, viewport, hasTouch] of [
-    ['desktop', { width: 1440, height: 900 }, false],
-    ['mobile-light', { width: 390, height: 844 }, true],
-  ] as const) {
+for (const [label, viewport, hasTouch] of [
+  ['desktop', { width: 1440, height: 900 }, false],
+  ['mobile-light', { width: 390, height: 844 }, true],
+] as const) {
+  test(`AI Coach history supports switching, scoped deletion, and clear-all confirmations: ${label}`, async ({
+    browser,
+  }) => {
     const context = await browser.newContext({ viewport, hasTouch });
     const page = await context.newPage();
     await openAiCoachSurface(page, 'light', viewport);
@@ -1154,8 +1154,8 @@ test('AI Coach history supports switching, scoped deletion, and clear-all confir
     await expect(workspace.getByTestId('ai-coach-memory')).toBeVisible();
     await expect(workspace.getByTestId('ai-coach-personal-settings')).toBeVisible();
     await context.close();
-  }
-});
+  });
+}
 
 test('AI Coach history remains touch-friendly in dark TMA and uses the shared confirmation', async ({
   browser,
