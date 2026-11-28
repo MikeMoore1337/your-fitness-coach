@@ -40,3 +40,10 @@ jobs:
           name: landing-visual-${{ github.sha }}
           path: .artifacts/tasks/895/evidence/region-recovery
           if-no-files-found: error
+      - name: Preserve browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-visual-failure-${{ github.sha }}
+          path: .artifacts/tasks/895/evidence/visual-test-output
+          if-no-files-found: warn
