@@ -2159,38 +2159,36 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
   }
 });
 
-test('all Progress views keep decorative lime edges out of informational surfaces', async ({
-  page,
-}) => {
-  const views = ['overview', 'body', 'training', 'nutrition', 'cardio', 'wellbeing', 'history'];
-  const viewLabels: Record<string, string> = {
-    overview: 'Обзор',
-    body: 'Тело',
-    training: 'Тренировки',
-    nutrition: 'Питание',
-    cardio: 'Кардио',
-    wellbeing: 'Самочувствие',
-    history: 'История',
-  };
-  const viewports = [
+for (const colorScheme of ['light', 'dark'] as const) {
+  for (const viewport of [
     { width: 320, height: 844 },
     { width: 393, height: 844 },
     { width: 1440, height: 1000 },
-  ];
+  ]) {
+    test(`all Progress views keep decorative lime edges out of informational surfaces: ${colorScheme} ${viewport.width}px`, async ({
+      page,
+    }) => {
+      const views = ['overview', 'body', 'training', 'nutrition', 'cardio', 'wellbeing', 'history'];
+      const viewLabels: Record<string, string> = {
+        overview: 'Обзор',
+        body: 'Тело',
+        training: 'Тренировки',
+        nutrition: 'Питание',
+        cardio: 'Кардио',
+        wellbeing: 'Самочувствие',
+        history: 'История',
+      };
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await mockProgress(page);
+      await page.goto('/app?section=progress');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Прогресс' })
+        .click();
+      await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
 
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await mockProgress(page);
-  await page.goto('/app?section=progress');
-  await page.getByRole('button', { name: 'Клиент' }).click();
-  await page
-    .getByRole('navigation', { name: 'Основная навигация' })
-    .getByRole('link', { name: 'Прогресс' })
-    .click();
-  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
-
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    for (const viewport of viewports) {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
       await page.setViewportSize(viewport);
       await page.goto('/app?section=progress&progress_view=overview');
       await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
@@ -2337,9 +2335,9 @@ test('all Progress views keep decorative lime edges out of informational surface
         expect(audit.violations, `${colorScheme}/${viewport.width}/${view}`).toEqual([]);
         expect(audit.unevenInfoFrames, `${colorScheme}/${viewport.width}/${view}`).toEqual([]);
       }
-    }
+    });
   }
-});
+}
 
 test('mobile Body keeps expanded surfaces separated and reachable above the dock', async ({
   page,
