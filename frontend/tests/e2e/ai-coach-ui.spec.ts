@@ -1,4 +1,11 @@
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Locator,
+  type Page,
+  type Route,
+} from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installPlatformApi } from './fixtures/platform-api';
@@ -1028,132 +1035,147 @@ for (const [label, viewport, hasTouch] of [
   ['desktop', { width: 1440, height: 900 }, false],
   ['mobile-light', { width: 390, height: 844 }, true],
 ] as const) {
-  test(`AI Coach history supports switching, scoped deletion, and clear-all confirmations: ${label}`, async ({
-    browser,
-  }) => {
-    const context = await browser.newContext({ viewport, hasTouch });
-    const page = await context.newPage();
-    await openAiCoachSurface(page, 'light', viewport);
-    const workspace = await openWorkspace(page);
-    const input = workspace.getByRole('textbox', { name: 'Сообщение AI Coach' });
+  const historyTitle = `AI Coach history supports switching, scoped deletion, and clear-all confirmations: ${label}`;
+  test.describe.serial(historyTitle, () => {
+    let context: BrowserContext;
+    let page: Page;
+    let workspace: Locator;
+    let input: Locator;
+    let confirmation: Locator;
     const prefix = label === 'desktop' ? 'ai-coach-desktop' : 'ai-coach-mobile-light';
+
+    test.beforeAll(async ({ browser }) => {
+      context = await browser.newContext({ viewport, hasTouch });
+      page = await context.newPage();
+      await openAiCoachSurface(page, 'light', viewport);
+      workspace = await openWorkspace(page);
+      input = workspace.getByRole('textbox', { name: 'Сообщение AI Coach' });
+      confirmation = page.locator('.modal[role="dialog"]');
+    });
+
+    test.afterAll(async () => {
+      await context?.close();
+    });
 
     const sendMessage = async (message: string) => {
       await input.fill(message);
+      await expect(input).toHaveValue(message);
       await input.press('Enter');
       await expect(workspace.getByTestId('ai-coach-message-assistant').last()).toContainText(
         'Проверенный ответ по материалам YFC.',
       );
     };
 
-    await sendMessage('Сколько отдыхать между подходами?');
-    await workspace.getByTestId('ai-coach-history-control').click();
-    await expect(workspace.getByTestId('ai-coach-history-view')).toBeVisible();
-    await expect(workspace.getByTestId('ai-coach-history-item-1')).toContainText(
-      'Сколько отдыхать между подходами?',
-    );
-    await workspace.getByTestId('ai-coach-history-new-chat').click();
-    await sendMessage('Как оценивать восстановление?');
+    test('switches conversations and deletes active and inactive chats', async () => {
+      await sendMessage('Сколько отдыхать между подходами?');
+      await workspace.getByTestId('ai-coach-history-control').click();
+      await expect(workspace.getByTestId('ai-coach-history-view')).toBeVisible();
+      await expect(workspace.getByTestId('ai-coach-history-item-1')).toContainText(
+        'Сколько отдыхать между подходами?',
+      );
+      await workspace.getByTestId('ai-coach-history-new-chat').click();
+      await sendMessage('Как оценивать восстановление?');
 
-    await workspace.getByTestId('ai-coach-history-control').click();
-    const history = workspace.getByTestId('ai-coach-history-view');
-    await expect(history.getByTestId('ai-coach-history-item-1')).toBeVisible();
-    await expect(history.getByTestId('ai-coach-history-item-2')).toBeVisible();
-    await expect(input).toHaveCount(0);
-    await expect(history.locator('.ai-coach-history__item-title')).toHaveText([
-      'Сколько отдыхать между подходами?',
-      'Как оценивать восстановление?',
-    ]);
-    await expect(
-      history.getByTestId('ai-coach-history-item-1').locator('.ai-coach-history__item-open'),
-    ).toHaveCSS('text-align', 'left');
-    await captureEvidence(page, `${prefix}-history`);
+      await workspace.getByTestId('ai-coach-history-control').click();
+      const history = workspace.getByTestId('ai-coach-history-view');
+      await expect(history.getByTestId('ai-coach-history-item-1')).toBeVisible();
+      await expect(history.getByTestId('ai-coach-history-item-2')).toBeVisible();
+      await expect(input).toHaveCount(0);
+      await expect(history.locator('.ai-coach-history__item-title')).toHaveText([
+        'Сколько отдыхать между подходами?',
+        'Как оценивать восстановление?',
+      ]);
+      await expect(
+        history.getByTestId('ai-coach-history-item-1').locator('.ai-coach-history__item-open'),
+      ).toHaveCSS('text-align', 'left');
+      await captureEvidence(page, `${prefix}-history`);
 
-    await history
-      .getByTestId('ai-coach-history-item-1')
-      .locator('.ai-coach-history__item-open')
-      .click();
-    await expect(workspace.getByTestId('ai-coach-history-view')).toHaveCount(0);
-    await expect(
-      workspace.getByText('Сколько отдыхать между подходами?', { exact: true }),
-    ).toBeVisible();
-    await sendMessage('Как выбрать паузу после тяжёлого подхода?');
+      await history
+        .getByTestId('ai-coach-history-item-1')
+        .locator('.ai-coach-history__item-open')
+        .click();
+      await expect(workspace.getByTestId('ai-coach-history-view')).toHaveCount(0);
+      await expect(
+        workspace.getByText('Сколько отдыхать между подходами?', { exact: true }),
+      ).toBeVisible();
+      await sendMessage('Как выбрать паузу после тяжёлого подхода?');
 
-    await workspace.getByTestId('ai-coach-history-control').click();
-    const historyAfterSwitch = workspace.getByTestId('ai-coach-history-view');
-    const nonActiveItem = historyAfterSwitch.getByTestId('ai-coach-history-item-2');
-    await nonActiveItem.locator('summary').click();
-    await expect(nonActiveItem.getByRole('button', { name: 'Удалить чат' })).toBeVisible();
-    await captureEvidence(page, `${prefix}-history-menu`);
-    await nonActiveItem.getByRole('button', { name: 'Удалить чат' }).click();
-    const confirmation = page.locator('.modal[role="dialog"]');
-    await expect(confirmation).toBeVisible();
-    await expect(confirmation).toContainText('Удалить этот чат?');
-    await expect(confirmation).toContainText('Память AI Coach не изменится.');
-    await expect(confirmation.locator('.modal__panel')).toHaveCSS('opacity', '1');
-    await captureEvidence(page, `${prefix}-history-delete-confirmation`);
-    await confirmation.getByRole('button', { name: 'Удалить', exact: true }).click();
-    await expect(historyAfterSwitch.getByTestId('ai-coach-history-item-2')).toHaveCount(0);
-    await expect(historyAfterSwitch.getByTestId('ai-coach-history-item-1')).toBeVisible();
-    await historyAfterSwitch.getByRole('button', { name: 'Назад в чат' }).click();
-    await expect(
-      workspace.getByText('Как выбрать паузу после тяжёлого подхода?', { exact: true }),
-    ).toBeVisible();
+      await workspace.getByTestId('ai-coach-history-control').click();
+      const historyAfterSwitch = workspace.getByTestId('ai-coach-history-view');
+      const nonActiveItem = historyAfterSwitch.getByTestId('ai-coach-history-item-2');
+      await nonActiveItem.locator('summary').click();
+      await expect(nonActiveItem.getByRole('button', { name: 'Удалить чат' })).toBeVisible();
+      await captureEvidence(page, `${prefix}-history-menu`);
+      await nonActiveItem.getByRole('button', { name: 'Удалить чат' }).click();
+      await expect(confirmation).toBeVisible();
+      await expect(confirmation).toContainText('Удалить этот чат?');
+      await expect(confirmation).toContainText('Память AI Coach не изменится.');
+      await expect(confirmation.locator('.modal__panel')).toHaveCSS('opacity', '1');
+      await captureEvidence(page, `${prefix}-history-delete-confirmation`);
+      await confirmation.getByRole('button', { name: 'Удалить', exact: true }).click();
+      await expect(historyAfterSwitch.getByTestId('ai-coach-history-item-2')).toHaveCount(0);
+      await expect(historyAfterSwitch.getByTestId('ai-coach-history-item-1')).toBeVisible();
+      await historyAfterSwitch.getByRole('button', { name: 'Назад в чат' }).click();
+      await expect(
+        workspace.getByText('Как выбрать паузу после тяжёлого подхода?', { exact: true }),
+      ).toBeVisible();
 
-    await workspace.getByTestId('ai-coach-history-control').click();
-    const activeHistory = workspace.getByTestId('ai-coach-history-view');
-    const activeItem = activeHistory.getByTestId('ai-coach-history-item-1');
-    await activeItem.locator('summary').click();
-    await activeItem.getByRole('button', { name: 'Удалить чат' }).click();
-    await expect(confirmation).toContainText('Удалить этот чат?');
-    await confirmation.getByRole('button', { name: 'Удалить', exact: true }).click();
-    await expect(workspace.getByTestId('ai-coach-history-view')).toHaveCount(0);
-    await expect(workspace.getByTestId('ai-coach-chat-empty')).toBeVisible();
-    await expect(input).toHaveValue('');
+      await workspace.getByTestId('ai-coach-history-control').click();
+      const activeHistory = workspace.getByTestId('ai-coach-history-view');
+      const activeItem = activeHistory.getByTestId('ai-coach-history-item-1');
+      await activeItem.locator('summary').click();
+      await activeItem.getByRole('button', { name: 'Удалить чат' }).click();
+      await expect(confirmation).toContainText('Удалить этот чат?');
+      await confirmation.getByRole('button', { name: 'Удалить', exact: true }).click();
+      await expect(workspace.getByTestId('ai-coach-history-view')).toHaveCount(0);
+      await expect(workspace.getByTestId('ai-coach-chat-empty')).toBeVisible();
+      await expect(input).toHaveValue('');
+    });
 
-    await sendMessage('Как выбрать интенсивность разминки?');
-    await workspace.getByTestId('ai-coach-history-control').click();
-    await workspace.getByTestId('ai-coach-history-new-chat').click();
-    await sendMessage('Как распределить подходы в тренировке?');
-    await workspace.getByTestId('ai-coach-history-control').click();
-    const historyBeforeClear = workspace.getByTestId('ai-coach-history-view');
-    await expect(historyBeforeClear.getByTestId('ai-coach-history-item-3')).toBeVisible();
-    await expect(historyBeforeClear.getByTestId('ai-coach-history-item-4')).toBeVisible();
-    await expect(historyBeforeClear.locator('.ai-coach-history__footer')).toHaveCount(0);
-    await expect(historyBeforeClear.getByTestId('ai-coach-history-clear')).not.toBeVisible();
-    await expect(
-      historyBeforeClear
-        .getByTestId('ai-coach-history-item-3')
-        .locator('.ai-coach-history__item-open'),
-    ).toHaveCSS('text-align', 'left');
-    await historyBeforeClear.getByTestId('ai-coach-history-menu').locator('summary').click();
-    const clearHistoryButton = historyBeforeClear.getByTestId('ai-coach-history-clear');
-    await expect(clearHistoryButton).toBeVisible();
-    await clearHistoryButton.click();
-    await expect(confirmation).toBeVisible();
-    await expect(confirmation).toContainText('Удалить всю историю чатов?');
-    await expect(confirmation).toContainText('персонализация не изменятся.');
-    await expect(confirmation.locator('.modal__panel')).toHaveCSS('opacity', '1');
-    await captureEvidence(page, `${prefix}-history-clear-confirmation`);
-    await confirmation.getByRole('button', { name: 'Отмена', exact: true }).click();
-    await expect(historyBeforeClear.getByTestId('ai-coach-history-item-3')).toBeVisible();
-    await historyBeforeClear.getByTestId('ai-coach-history-menu').locator('summary').click();
-    await historyBeforeClear.getByTestId('ai-coach-history-clear').click();
-    await expect(confirmation).toContainText('Удалить всю историю чатов?');
-    await confirmation.getByRole('button', { name: 'Удалить всё', exact: true }).click();
-    await expect(workspace.getByTestId('ai-coach-history-empty')).toBeVisible();
-    await expect(workspace.locator('[data-testid^="ai-coach-history-item-"]')).toHaveCount(0);
-    await expect(workspace.getByTestId('ai-coach-history-new-chat')).toHaveCount(1);
-    await expect(workspace.getByTestId('ai-coach-history-new-chat-empty')).toHaveCount(0);
-    await expect(input).toHaveCount(0);
-    await captureEvidence(page, `${prefix}-history-empty`);
-    if (hasTouch) await expectTouchTargets(historyBeforeClear.locator('button:visible'));
+    test('confirms or cancels clearing the remaining history', async () => {
+      await sendMessage('Как выбрать интенсивность разминки?');
+      await workspace.getByTestId('ai-coach-history-control').click();
+      await workspace.getByTestId('ai-coach-history-new-chat').click();
+      await sendMessage('Как распределить подходы в тренировке?');
+      await workspace.getByTestId('ai-coach-history-control').click();
+      const historyBeforeClear = workspace.getByTestId('ai-coach-history-view');
+      await expect(historyBeforeClear.getByTestId('ai-coach-history-item-3')).toBeVisible();
+      await expect(historyBeforeClear.getByTestId('ai-coach-history-item-4')).toBeVisible();
+      await expect(historyBeforeClear.locator('.ai-coach-history__footer')).toHaveCount(0);
+      await expect(historyBeforeClear.getByTestId('ai-coach-history-clear')).not.toBeVisible();
+      await expect(
+        historyBeforeClear
+          .getByTestId('ai-coach-history-item-3')
+          .locator('.ai-coach-history__item-open'),
+      ).toHaveCSS('text-align', 'left');
+      await historyBeforeClear.getByTestId('ai-coach-history-menu').locator('summary').click();
+      const clearHistoryButton = historyBeforeClear.getByTestId('ai-coach-history-clear');
+      await expect(clearHistoryButton).toBeVisible();
+      await clearHistoryButton.click();
+      await expect(confirmation).toBeVisible();
+      await expect(confirmation).toContainText('Удалить всю историю чатов?');
+      await expect(confirmation).toContainText('персонализация не изменятся.');
+      await expect(confirmation.locator('.modal__panel')).toHaveCSS('opacity', '1');
+      await captureEvidence(page, `${prefix}-history-clear-confirmation`);
+      await confirmation.getByRole('button', { name: 'Отмена', exact: true }).click();
+      await expect(historyBeforeClear.getByTestId('ai-coach-history-item-3')).toBeVisible();
+      await historyBeforeClear.getByTestId('ai-coach-history-menu').locator('summary').click();
+      await historyBeforeClear.getByTestId('ai-coach-history-clear').click();
+      await expect(confirmation).toContainText('Удалить всю историю чатов?');
+      await confirmation.getByRole('button', { name: 'Удалить всё', exact: true }).click();
+      await expect(workspace.getByTestId('ai-coach-history-empty')).toBeVisible();
+      await expect(workspace.locator('[data-testid^="ai-coach-history-item-"]')).toHaveCount(0);
+      await expect(workspace.getByTestId('ai-coach-history-new-chat')).toHaveCount(1);
+      await expect(workspace.getByTestId('ai-coach-history-new-chat-empty')).toHaveCount(0);
+      await expect(input).toHaveCount(0);
+      await captureEvidence(page, `${prefix}-history-empty`);
+      if (hasTouch) await expectTouchTargets(historyBeforeClear.locator('button:visible'));
 
-    await workspace.getByRole('button', { name: 'Назад в чат' }).click();
-    await workspace.getByRole('button', { name: 'Открыть настройки AI Coach' }).click();
-    await expect(workspace.getByTestId('ai-coach-memory')).toBeVisible();
-    await expect(workspace.getByTestId('ai-coach-personal-settings')).toBeVisible();
-    await context.close();
+      await workspace.getByRole('button', { name: 'Назад в чат' }).click();
+      await workspace.getByRole('button', { name: 'Открыть настройки AI Coach' }).click();
+      await expect(workspace.getByTestId('ai-coach-memory')).toBeVisible();
+      await expect(workspace.getByTestId('ai-coach-personal-settings')).toBeVisible();
+    });
   });
 }
 
