@@ -496,7 +496,16 @@ test('brand-new Web user sees the profile prerequisite as the Today primary acti
   const builder = page.locator('#program-builder');
   const programTitle = builder.getByRole('textbox', { name: 'Название', exact: true });
   await expect(programTitle).toBeVisible();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await programTitle.focus();
+  await expect(programTitle).toBeFocused();
   await programTitle.blur();
+  await expect(programTitle).not.toBeFocused();
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
