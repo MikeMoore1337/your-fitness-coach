@@ -1,0 +1,3929 @@
+{
+  "sourceCommit": "c9f05232737f9072eb7716c120426a52ae990ad7",
+  "scope": "synthetic Windows DEV visual review; JPEG previews, local PNG originals",
+  "images": [
+    {
+      "file": "frozen/chromium/athlete-dark-320-first-screen.jpg",
+      "sha256": "d73c233f4da9769f77ea85de0d0fb38cf2cdede026596abbef09655ee07128da",
+      "bytes": 50788,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-dark-320-first-screen.png",
+      "rawSha256": "4261e078efd0a4342004a16f4d198ce315ca9546c6374ce365a22bfe53518c4b",
+      "rawBytes": 140886,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/athlete-dark-320-menu-open.jpg",
+      "sha256": "8283d3a31c219b90389e66cb3f8dfbd16edae6c38b3e5bcb70c001490fc124e7",
+      "bytes": 40661,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-dark-320-menu-open.png",
+      "rawSha256": "7fa56e68b8fe425e0f4fb5a16b01fcc53f115c989aec52711f6eb17b64d59f81",
+      "rawBytes": 89884,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/athlete-dark-390-first-screen.jpg",
+      "sha256": "fabf0a4e62d733025bbadc96c5725c3907c63749e792411863514d71e254389e",
+      "bytes": 56985,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-dark-390-first-screen.png",
+      "rawSha256": "a2e3acf819de1849216b8582603ec4ea46107898b74fd497f2f873295f5b585a",
+      "rawBytes": 161768,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/athlete-dark-390-menu-open.jpg",
+      "sha256": "f8af59d9c5d82ad476742e134150930a0eb7916af7afda24960a51b983780c38",
+      "bytes": 44647,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-dark-390-menu-open.png",
+      "rawSha256": "768ef69fb2d4eb76b55ff6c2f1289c1dd3e1e119a00b1cc28b88618cc3dfb3bf",
+      "rawBytes": 99644,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/athlete-dark-desktop-first-screen.jpg",
+      "sha256": "457a1063cbc7be434b07848fdf5e5d1624ef3a489f3728b9edbbefcfa622db19",
+      "bytes": 207890,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-dark-desktop-first-screen.png",
+      "rawSha256": "e5972a3b3c4ccf1f532ca1a6dc774f9a675822ad605c0cfac43277d3eb74decb",
+      "rawBytes": 1012039,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/athlete-light-320-first-screen.jpg",
+      "sha256": "6f2f4310280ba7110fa91c020f5dfc3c6ecc29287b7aa72b3a728ba05727880d",
+      "bytes": 49735,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-light-320-first-screen.png",
+      "rawSha256": "54d87872be723bda9b237b10104c962f845295d9ff36a4d556ce8c02f487c41f",
+      "rawBytes": 138728,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/athlete-light-320-menu-open.jpg",
+      "sha256": "24f25d1e2e8ba4961ce6285acc2301ba3609f3486921b6ddd77122f4667afcf0",
+      "bytes": 39584,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-light-320-menu-open.png",
+      "rawSha256": "970bd276e409a9a0078d1ef675c404b11711e88b8dcc369e1ff282dae14d0185",
+      "rawBytes": 87882,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/athlete-light-390-first-screen.jpg",
+      "sha256": "80de1e3ccbb8610ab1d342a920d9fea8b18a9919c4f17dae4c36b060bc3b1168",
+      "bytes": 56066,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-light-390-first-screen.png",
+      "rawSha256": "4e03b49961669acbce7da0e8586e36de61a4187d96c3a056799adbccea2440de",
+      "rawBytes": 159060,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/athlete-light-390-menu-open.jpg",
+      "sha256": "22778b8b47425bb2794d7ff93a097e2f8064a8948d85a0269639671039d9f31b",
+      "bytes": 43766,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-light-390-menu-open.png",
+      "rawSha256": "7b68215e1ceaa4277dcda26a21a965a67114885f64bf286582e91c2f8641c4a2",
+      "rawBytes": 97137,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/athlete-light-desktop-first-screen.jpg",
+      "sha256": "3f666ad265b5776406f22e01382d82287e7f18656c95ecde9c733f073910adbb",
+      "bytes": 208000,
+      "quality": 80,
+      "rawFile": "frozen/chromium/athlete-light-desktop-first-screen.png",
+      "rawSha256": "b7a1c761286730f8079d3da936f1626a23beceb95e598118545c90ca38d1430e",
+      "rawBytes": 1012447,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-dark-320-first-screen.jpg",
+      "sha256": "010ff49c9bc72ec41ddcdd35c45afd47d7d081b0ca445f003a34bca4c5575058",
+      "bytes": 47314,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-dark-320-first-screen.png",
+      "rawSha256": "50464fa1094753fc8e73485e550634032d4eb836bc495fcbd8373407447fcc92",
+      "rawBytes": 120550,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-dark-320-menu-open.jpg",
+      "sha256": "42a7719a0d1b4c148f6b8379b8e55b1ddeca83cecf26e3e2f8ab73b658c5f727",
+      "bytes": 40720,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-dark-320-menu-open.png",
+      "rawSha256": "f523ad92120a3674f29fcc75d0025399f41a42e556ea6bd7ea1ecc5f0fad37d2",
+      "rawBytes": 81698,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/coach-dark-390-first-screen.jpg",
+      "sha256": "78a34d6b4b91909bbd2fc125a7892949690521784050aaa0caa5ee5729f08d51",
+      "bytes": 54486,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-dark-390-first-screen.png",
+      "rawSha256": "fe436ab354e557978588f0f5f9b08c3f73fc2f6eb04f0f6c5fcfa6b86ee59600",
+      "rawBytes": 141824,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-dark-390-menu-open.jpg",
+      "sha256": "a6cd6c8685fdb579412da76bb081b95e6ca0846593fe16d7256e470f48ee2f78",
+      "bytes": 45738,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-dark-390-menu-open.png",
+      "rawSha256": "ae4f0a2e623525e861801c612ac184aa3409812a09c694aefed42799278e5923",
+      "rawBytes": 91553,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/coach-dark-desktop-first-screen.jpg",
+      "sha256": "85c69f5cd28be49f102b27bd506d84fe97bc1759ccb1dc57bded8f5bbfd6a105",
+      "bytes": 169571,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-dark-desktop-first-screen.png",
+      "rawSha256": "68d6d05c0094b7592f10e6d9536b525f2b90b7adb93f990473d4c5db4662038f",
+      "rawBytes": 804393,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-light-320-first-screen.jpg",
+      "sha256": "81e7f95c72068191831359e422e8e9310deb8b0c961bfae694822428c610ac20",
+      "bytes": 46899,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-light-320-first-screen.png",
+      "rawSha256": "1bf8b7e36b3c27cccbeefa81c40aa417702e0eb6e3bb12fe9b308ef74ee802bb",
+      "rawBytes": 118391,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-light-320-menu-open.jpg",
+      "sha256": "3f6835be5eda83f9936fbcb24b3c7dacf5a722ea8d58bf9d29228176e9ccbbe4",
+      "bytes": 40174,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-light-320-menu-open.png",
+      "rawSha256": "4551a461a9bf3ef8d933d312d5add8b1227844e5b67a5f375513bd7b1da8816f",
+      "rawBytes": 79595,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/coach-light-390-first-screen.jpg",
+      "sha256": "9b9ba2b7f1ba74556fff04aa427097098fdf001523c55edee5aaa7066eda7924",
+      "bytes": 53756,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-light-390-first-screen.png",
+      "rawSha256": "2c0fbad8a114c92e4ea08b146602019b765876a377e92506c8e890f668411d0c",
+      "rawBytes": 139049,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/chromium/coach-light-390-menu-open.jpg",
+      "sha256": "5e29004225253537dedbfbfbf51d75d388a1983c4014e72e18193bb9100cb17c",
+      "bytes": 44927,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-light-390-menu-open.png",
+      "rawSha256": "a1fe2800f3cb8da1166d10e1970047d4452650558b98a089ae0d41d17893b550",
+      "rawBytes": 88773,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/chromium/coach-light-desktop-first-screen.jpg",
+      "sha256": "0cfa2a71ee19e8c0b75b737dc377a555615eee486d295c55ee9b5a63df15bec5",
+      "bytes": 169629,
+      "quality": 80,
+      "rawFile": "frozen/chromium/coach-light-desktop-first-screen.png",
+      "rawSha256": "3b522ec32d480e8094313127fdc2ea3953e1e972c48b99564cb29bb84ab3f2a0",
+      "rawBytes": 804893,
+      "suite": "frozen",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-dark-320-first-screen.jpg",
+      "sha256": "4ced3a345f1ad86c8ea49253c6deef99b8d4c11371e63122e7e0ecb5fe8074ed",
+      "bytes": 55397,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-dark-320-first-screen.png",
+      "rawSha256": "d022e21e0583f3c8e45f50ca88fbddcc83489475c60244f72ef22afb12f10dc6",
+      "rawBytes": 163274,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-dark-320-menu-open.jpg",
+      "sha256": "0b6fcf75805f663ee853f2e20854aac57baf1941d13b25edab27c07f87340b03",
+      "bytes": 44870,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-dark-320-menu-open.png",
+      "rawSha256": "51a2e355cbbce541603be8d297d1b093cf3dc50bcd38928f19397a05fdf4b750",
+      "rawBytes": 102819,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/athlete-dark-390-first-screen.jpg",
+      "sha256": "815a06f0a9bec833e6cc5ba8e8f300e580116c5bb8e81e9e625d4f1187eae113",
+      "bytes": 62466,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-dark-390-first-screen.png",
+      "rawSha256": "65c2c40b3d4aea4323b9cafc049395ca7e52ec1d486c0bfbe8db2f50482b3ba8",
+      "rawBytes": 189058,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-dark-390-menu-open.jpg",
+      "sha256": "ba7620af5e72225dcd272de45eaa53c994592a2ffa5d98033f3b7c030ce7c100",
+      "bytes": 49869,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-dark-390-menu-open.png",
+      "rawSha256": "8e0f8542ed1fbc7d8986c771e02ce5612d5d8e81f1a5547b0ee1d7a1d05ef93e",
+      "rawBytes": 114067,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/athlete-dark-desktop-first-screen.jpg",
+      "sha256": "d2755b360dcd58df626a3d39f2407e6f5671d990849dc048b7855bc398716e69",
+      "bytes": 216401,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-dark-desktop-first-screen.png",
+      "rawSha256": "a2b1c50f989d7c90facaf8fac6a097f0372672b2d27dcb6955b299d9e76ed786",
+      "rawBytes": 1271327,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-light-320-first-screen.jpg",
+      "sha256": "755a8098e613fdd66c2d0bb87dd27763f806b6603622b1f4ce1be97694c479f1",
+      "bytes": 53961,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-light-320-first-screen.png",
+      "rawSha256": "948c273014bd60797778254b3b660ad98c37cbe77519763756b2b01a7fc1da05",
+      "rawBytes": 163592,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-light-320-menu-open.jpg",
+      "sha256": "250354c9d56018203f194ef9e314f6ee59bcb330efc3bd7982215a36ede3b770",
+      "bytes": 43364,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-light-320-menu-open.png",
+      "rawSha256": "8800f8ca4c076dc1c603f2d16ad7a6268e78017cbdeb760bb64b093bf307e2e5",
+      "rawBytes": 103385,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/athlete-light-390-first-screen.jpg",
+      "sha256": "3505d060d8035657d74bdae9bbb05246bc9def3510bb12a8d8b6e32225bd55d6",
+      "bytes": 61391,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-light-390-first-screen.png",
+      "rawSha256": "ee01613c59c50b8016caec7067e3a091f1e4c895d70b6fe4aa98810b1e91ebba",
+      "rawBytes": 189092,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/athlete-light-390-menu-open.jpg",
+      "sha256": "4520b9f3dbe7bb46cb827af081f498914934d1d6ae74661f70f5fbbda5f78d91",
+      "bytes": 48775,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-light-390-menu-open.png",
+      "rawSha256": "c6b66782fe128c4c1ab0f42581cd4bc466d5088de72359ecccd14586d07465f8",
+      "rawBytes": 114595,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/athlete-light-desktop-first-screen.jpg",
+      "sha256": "f7ac82b9856e1650ae16c16d8c822c83872bff63371c0a36c70f5282155c1f8e",
+      "bytes": 216537,
+      "quality": 80,
+      "rawFile": "frozen/firefox/athlete-light-desktop-first-screen.png",
+      "rawSha256": "a17d8b85e6a5aa994124a2d6152ca21899d4e81ca2678bf2504b909cc55032aa",
+      "rawBytes": 1271686,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-dark-320-first-screen.jpg",
+      "sha256": "7e769e2f5f763cd81f27fd684eefa2b3b6b58304472938c620386a07feaeb36b",
+      "bytes": 52336,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-dark-320-first-screen.png",
+      "rawSha256": "e0ca49cfdf60f5fbe4e4aaa8da148de361e2ed543f755f141d01e6a3d14582f8",
+      "rawBytes": 147527,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-dark-320-menu-open.jpg",
+      "sha256": "0d2489b7b74c3c6f6e665b25b1f8fd89f4f644bca20b8463b8285f926356a086",
+      "bytes": 45305,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-dark-320-menu-open.png",
+      "rawSha256": "63052ee48c6533b88f97193b11e4a7285cef3baee27e5d83d645eaa206ae942a",
+      "rawBytes": 99895,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/coach-dark-390-first-screen.jpg",
+      "sha256": "b668146f7079a8e10ce289475b2ef89b9659d3e616756c9fd848386c3718ebf2",
+      "bytes": 60897,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-dark-390-first-screen.png",
+      "rawSha256": "363020ead50860d132bf3ea8f03df20ab0bce8b4a07ca946b732067868599dc9",
+      "rawBytes": 177079,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-dark-390-menu-open.jpg",
+      "sha256": "1f2fe93f7cbc63baf456d3f6bfba3f5852b4e54c41d7ea68b1bf20203434b3f6",
+      "bytes": 51922,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-dark-390-menu-open.png",
+      "rawSha256": "5f6de6476ee34ebfe19ecadec513e6de8087b1bb014d328c359c5880ac7a97d7",
+      "rawBytes": 116197,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/coach-dark-desktop-first-screen.jpg",
+      "sha256": "aa148c2e10b6b908147dfcfb7c2f60c81b9fe65cac561a3cef5670047cc74735",
+      "bytes": 179542,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-dark-desktop-first-screen.png",
+      "rawSha256": "71aad5d00949ae51d3fbad7dd044b37b91c0baefaf868531a90314f5f0080247",
+      "rawBytes": 1080859,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-light-320-first-screen.jpg",
+      "sha256": "347db74f9841ea9c269040e56c6e151bb1f41fd7c2994eea26661b0400877d66",
+      "bytes": 51728,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-light-320-first-screen.png",
+      "rawSha256": "314e8ccbda798e81ea3a8add62d8eae695bbbde47f9176cff63b4ccccaa6a5ff",
+      "rawBytes": 147972,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-light-320-menu-open.jpg",
+      "sha256": "c90412d04b9625104eae05a9f30e17a8a392225d9c979efee3ce01b4fc6dfe59",
+      "bytes": 44522,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-light-320-menu-open.png",
+      "rawSha256": "8f4994eb77712fca110aa9c3a338955bc74e8b0e1e70b26f5f13f76cd8a25278",
+      "rawBytes": 100431,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/coach-light-390-first-screen.jpg",
+      "sha256": "dfde46b28af85b559b794d7d26bfc28ce09e6be04df2c061489a88d52613a90e",
+      "bytes": 60056,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-light-390-first-screen.png",
+      "rawSha256": "840e63ef46f1d1c8df1f1e7e18b18fff5453cb2312c2c6f1c173a9900f4db454",
+      "rawBytes": 177451,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/firefox/coach-light-390-menu-open.jpg",
+      "sha256": "fcc9fa0dd8dd1d5a3c28a9c13494bf82b3540d6a7a824b2815210a73dd35436d",
+      "bytes": 50851,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-light-390-menu-open.png",
+      "rawSha256": "c1e879173eef9ea8688e8c7f565a1d01f0fac7ae19e41aa4fe813e606626a468",
+      "rawBytes": 116751,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/firefox/coach-light-desktop-first-screen.jpg",
+      "sha256": "12bd45778d0197fd9b9edc9e549bd8b84ec6035a30eb908d01b93c1ac8c75144",
+      "bytes": 179541,
+      "quality": 80,
+      "rawFile": "frozen/firefox/coach-light-desktop-first-screen.png",
+      "rawSha256": "3c7e3a36998243d63ef609acb6ac22b59fa1429dc35c4d06e891aa625f17b99c",
+      "rawBytes": 1081250,
+      "suite": "frozen",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-dark-320-first-screen.jpg",
+      "sha256": "9ecec86264efbc24b7bc2147acd91560a2f3c56107d3dab32694296cc0708898",
+      "bytes": 54005,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-dark-320-first-screen.png",
+      "rawSha256": "eec0a2f1cf1d48ab2e3e593ad2e800712d6ec7900a69de058a9f6a7113074790",
+      "rawBytes": 144066,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-dark-320-menu-open.jpg",
+      "sha256": "759985085fcbeaa5d52e056ecad0efe45db2b528d064343d9e9ae1a834c9e807",
+      "bytes": 41905,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-dark-320-menu-open.png",
+      "rawSha256": "95c3e3e2c834c15efcd078045c62c8a463a8564219ed56e67af447b852035acb",
+      "rawBytes": 89128,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/athlete-dark-390-first-screen.jpg",
+      "sha256": "acab8726e7f83d5092c7f5b49b8b14a18641c5a9451d2c975ed5d239b73cca71",
+      "bytes": 60987,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-dark-390-first-screen.png",
+      "rawSha256": "5bd4c765c0b26f901f79a5b03b21d2b9fbace9ea2f000b65b35e39385ec5c177",
+      "rawBytes": 165016,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-dark-390-menu-open.jpg",
+      "sha256": "bcce8ad3029dfc2aef74b5b2cb0ab1d4a3c1faa7130698260f66a317117b66ec",
+      "bytes": 46352,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-dark-390-menu-open.png",
+      "rawSha256": "270879f92f0c3bfbd547e2f0b4f43fe13326948c533d121691c2c5c283f7f0f0",
+      "rawBytes": 97531,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/athlete-dark-desktop-first-screen.jpg",
+      "sha256": "0ea6542d3acf37a748665fc2eadde6d36d4c2a1ca5af9eee51609d4c0bac099d",
+      "bytes": 212225,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-dark-desktop-first-screen.png",
+      "rawSha256": "821e5e3d76c64b9a2141fa95eaea55a19354f68aa28c48f57f4e49812145bd87",
+      "rawBytes": 1022876,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-light-320-first-screen.jpg",
+      "sha256": "39adfe488025518a62aff0e235fb104fc22c937a01750000a8baeb7d566607e4",
+      "bytes": 53099,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-light-320-first-screen.png",
+      "rawSha256": "482cdcf74ea86d3f75cf084c832d47532b5a39eda404ef4259d7db2c06f38ff6",
+      "rawBytes": 143771,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-light-320-menu-open.jpg",
+      "sha256": "4cdaba8f21d40f2467c1810471a4c76c65fb0d18b3888a356b08983019747d2c",
+      "bytes": 41002,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-light-320-menu-open.png",
+      "rawSha256": "86e84f6c62448c39dbaa6e3e8ec1c34d96a0a370013e38a2ab5899bce26bb464",
+      "rawBytes": 88936,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/athlete-light-390-first-screen.jpg",
+      "sha256": "a9fecc8d6621a118dc88d3325abb4eb9fcd91bca1e442d5ffe9991425f6ae416",
+      "bytes": 60232,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-light-390-first-screen.png",
+      "rawSha256": "9f7a6910f3f4df555a9c8a9617336dba1b1cdc5198fe1de4b6a936c6380da318",
+      "rawBytes": 164711,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/athlete-light-390-menu-open.jpg",
+      "sha256": "6a2664c3e06ba2b5413c0f58dc1de0bb4a1557af40421cca4753c9e169f0acbf",
+      "bytes": 45663,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-light-390-menu-open.png",
+      "rawSha256": "623b1b82f62fd73e597ef662e74ac288e179f72233cdd32d81af5a830b1525a8",
+      "rawBytes": 97421,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/athlete-light-desktop-first-screen.jpg",
+      "sha256": "50af0711468804b6615ede5cefe08303aa93895ac42151ae537c61d6afa562d3",
+      "bytes": 212269,
+      "quality": 80,
+      "rawFile": "frozen/webkit/athlete-light-desktop-first-screen.png",
+      "rawSha256": "2f4a47740788f83eaf81e19573de42c90df7659e2307109fd3203ecd4fc0a568",
+      "rawBytes": 1023326,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-dark-320-first-screen.jpg",
+      "sha256": "05d9b447cdfd7fcd7c6dfb7f2c00075abfdc99e9e8dda66275dcaeb159b0f0af",
+      "bytes": 50207,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-dark-320-first-screen.png",
+      "rawSha256": "20005f39eb70e7336aeb05c2325eb5e3d5bc47f5d9430a47c3f39e80187119c1",
+      "rawBytes": 123545,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-dark-320-menu-open.jpg",
+      "sha256": "f72e4f1d42baa3eb8cc9b2c780302a2b161b288cc82496b5a1cbd8f3463bb3ed",
+      "bytes": 42629,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-dark-320-menu-open.png",
+      "rawSha256": "1da6897fc50723f5400e1eb361697188e6cbb869246c10e082db687daa6d9713",
+      "rawBytes": 80734,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/coach-dark-390-first-screen.jpg",
+      "sha256": "2b49d316350b61175aaaaac1bb47abe15bb752dbeb699570a3755213aadfd04d",
+      "bytes": 58138,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-dark-390-first-screen.png",
+      "rawSha256": "4007f011c4157c1ecb0faf2883b1aa59cecfa35e001550deb3dc4a343c076abb",
+      "rawBytes": 147140,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-dark-390-menu-open.jpg",
+      "sha256": "ab1b282e54692a0158b30d70f5f8e5115f48d124683e0ca4035b5e51af111691",
+      "bytes": 48356,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-dark-390-menu-open.png",
+      "rawSha256": "beeb72bd185262d472eb33d128a57109e29276d62507e365aed6b00a4c1a71ea",
+      "rawBytes": 92520,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/coach-dark-desktop-first-screen.jpg",
+      "sha256": "04878ddcd16c52ce5bb34ade3a67b78bb012c78b3771a55183864299f71a87f8",
+      "bytes": 175713,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-dark-desktop-first-screen.png",
+      "rawSha256": "4798200f33909990aaf5d2403f60cabb8dbac288bb57171d6c71936bb46c5e15",
+      "rawBytes": 816192,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-light-320-first-screen.jpg",
+      "sha256": "5aeaae7486eedf8e16f044c49777862f67a46c2b9cb0b56eca1b836fc96b1aec",
+      "bytes": 49694,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-light-320-first-screen.png",
+      "rawSha256": "8654651c2a9f831523f410759a5459d8585e488f9fff2bd55dabc41dfe6b7f5c",
+      "rawBytes": 123812,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-light-320-menu-open.jpg",
+      "sha256": "5d453efb292ad167cf81623910e36360438c01a823dd5d340185fb1f1678dc1a",
+      "bytes": 42008,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-light-320-menu-open.png",
+      "rawSha256": "850a765cc3148f0c49319dfdb13369b78893163d0506113da39c94022a66bf99",
+      "rawBytes": 80858,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/coach-light-390-first-screen.jpg",
+      "sha256": "dd5b6964ce8afebae6b2520835aa7b837f7c9b35d4f6da7bcabc007d771725dd",
+      "bytes": 57483,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-light-390-first-screen.png",
+      "rawSha256": "9403817f17f49c5b129d0eed68ab53acf0dc17db4bbc314bd29bcdba57641dc8",
+      "rawBytes": 147188,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": false
+    },
+    {
+      "file": "frozen/webkit/coach-light-390-menu-open.jpg",
+      "sha256": "442a9141eff8627525c42dcf5a8f0f7acc6e25740fcc045940f7a6c51a78b212",
+      "bytes": 47622,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-light-390-menu-open.png",
+      "rawSha256": "a31bb06655944177dd6ba1b8ca78d7908d79a1b13331df9697a676659dc8c864",
+      "rawBytes": 92314,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "menu": true
+    },
+    {
+      "file": "frozen/webkit/coach-light-desktop-first-screen.jpg",
+      "sha256": "0eb96a7b5333a5e3008eec4a2520e2ca00410badb1f6849e226829ca2744e6d0",
+      "bytes": 175773,
+      "quality": 80,
+      "rawFile": "frozen/webkit/coach-light-desktop-first-screen.png",
+      "rawSha256": "3e08fe22936a39d9b54fc9d8485a3cbd3c891bfca2e31948618ead3f42dc434c",
+      "rawBytes": 816806,
+      "suite": "frozen",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "menu": false
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-04.jpg",
+      "sha256": "6f8ac954eb959ce72dd06b1ae24f6c466d99fd15cbe056e8c0223797f0a1cfa5",
+      "bytes": 254857,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-04.png",
+      "rawSha256": "9c2f8ecb9a737a10624fa248bc739d5b2b45f4c767b49874962279783a27d0f4",
+      "rawBytes": 1304029,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-04.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-05.jpg",
+      "sha256": "10a8be6cb0ab186c1a660b2edeb15c4479e28df2fa38e6a5a1458a1742ba89e8",
+      "bytes": 115980,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-05.png",
+      "rawSha256": "69db3625aaedfc746a76c6361c3222c5162302b8106b0afd49fd30810b9849d9",
+      "rawBytes": 368500,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1242
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-05_1.jpg",
+      "sha256": "793bf78551ee0eddce2cca74d661731f71508f1c8f5736917dcb39940aa3c4c6",
+      "bytes": 113729,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-05_1.png",
+      "rawSha256": "7073ab87a35c0bb5427d9d851284ca82645dbee9c3f1d3b55ba0c4340095d927",
+      "rawBytes": 356203,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-05_2.jpg",
+      "sha256": "9c63cea5585da19ae7070f6371f0135020ef3b4ab019c39665c2533f70f8337b",
+      "bytes": 77614,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-05_2.png",
+      "rawSha256": "e69ecb2e4f4e8955e4fe13166f3eef5ebc26647c6d87a09b0db330a9ce04f810",
+      "rawBytes": 180193,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1244
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-05_3.jpg",
+      "sha256": "21d208e901a757471b9150599d5160540cf62521bda78c819a2dcb14ca36762e",
+      "bytes": 182256,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-05_3.png",
+      "rawSha256": "8f49283bec26817f7e19eecd6223b2bdbca3911aa60baf584ca292863d4b6b05",
+      "rawBytes": 480651,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-06.jpg",
+      "sha256": "5bf689b9e7ed442be544753b7e92439dfae77ccfc1d759c28c0bca6c231e3cc7",
+      "bytes": 190122,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-06.png",
+      "rawSha256": "64d52997c65dcd2e5357ffae9dd394f9559dc5db153e8901c2551e9c94b5dc4d",
+      "rawBytes": 516477,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-07.jpg",
+      "sha256": "8c66ba3a2d0d0fd9a0538b64eae80404494097b928b9401a129e52a23055b5cb",
+      "bytes": 176228,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-07.png",
+      "rawSha256": "a824e02f057df3e494cf64fe57f25ede03ce91f65f74b2fbd7a36d680d068570",
+      "rawBytes": 415422,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-07_1.jpg",
+      "sha256": "8594337afb6d77ce6f0f0ee5b1de9c3f1b2941b5ca621c2cf7cb722d159fef2b",
+      "bytes": 126595,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-07_1.png",
+      "rawSha256": "d88a7159e55a0bfb22c836b947ab8f5eaa33c13af3c1fd002f91fc536a0efbe4",
+      "rawBytes": 161610,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-07_2.jpg",
+      "sha256": "a8e2dff5e15b8f00ccdb13808780f534ca3e5d7b84118b6805252e4b58863dea",
+      "bytes": 130346,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-07_2.png",
+      "rawSha256": "8657d451fb8fbcefe8cf743c394aa180f262913a3aecaae1565b78ff6c3f31cf",
+      "rawBytes": 164060,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-08.jpg",
+      "sha256": "b049d39dece66c1b0cf60ecce72479ca93832cbc8ea50ab54274962628fdee72",
+      "bytes": 99045,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-08.png",
+      "rawSha256": "2070a097267a4e8edec65d27b95c1098f532f3318c4478ff6d13828d2fd3dfa1",
+      "rawBytes": 121560,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-08_1.jpg",
+      "sha256": "b049d39dece66c1b0cf60ecce72479ca93832cbc8ea50ab54274962628fdee72",
+      "bytes": 99045,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-08_1.png",
+      "rawSha256": "2070a097267a4e8edec65d27b95c1098f532f3318c4478ff6d13828d2fd3dfa1",
+      "rawBytes": 121560,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_1.png",
+      "state": "changes",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-08_2.jpg",
+      "sha256": "b049d39dece66c1b0cf60ecce72479ca93832cbc8ea50ab54274962628fdee72",
+      "bytes": 99045,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-08_2.png",
+      "rawSha256": "2070a097267a4e8edec65d27b95c1098f532f3318c4478ff6d13828d2fd3dfa1",
+      "rawBytes": 121560,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_2.png",
+      "state": "message",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-08_3.jpg",
+      "sha256": "b60b097fe8d5917eb8c7f775260c41ea61888a951bd08ca863056dd206fbf579",
+      "bytes": 98181,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-08_3.png",
+      "rawSha256": "35bffb8ef1aadda4dfc0e010ce0a232d884e90e8a46bd27769dfe0807a17e432",
+      "rawBytes": 114514,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-08_4.jpg",
+      "sha256": "5cc2495c0ce491871fa9c4a8ddb92293083b0887d1dd1ede5eb70d2d3f06be86",
+      "bytes": 89890,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-08_4.png",
+      "rawSha256": "765ced8bd170631e7745af76d0e35cb1baba1e5ba450c1aad8454aa8cc86abc5",
+      "rawBytes": 91643,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-09.jpg",
+      "sha256": "d9950cd669e4b78aabdcc038bd7baa430446bf4441eed8589014649a24eed1e5",
+      "bytes": 98121,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-09.png",
+      "rawSha256": "0e6d64b2be3563a1f76b1015102b9b7992f6a3c4849800684a9ab297b9124c36",
+      "rawBytes": 102939,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-10.jpg",
+      "sha256": "589640519a6b0d3387f543fafed1884a9fa7d417163cb46f01864fcb9a96bb11",
+      "bytes": 204663,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-10.png",
+      "rawSha256": "6c9b1c697bf937f7124e46ca62bbd057f0d19b2cf28993d9327f76bc3c734494",
+      "rawBytes": 1018591,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-10_1.jpg",
+      "sha256": "d3d24961256d3d4a7e3caf8c748aa0fe50b072249c672d89a754860debdda815",
+      "bytes": 113939,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-10_1.png",
+      "rawSha256": "3043cc35c468e67d66be4aa81bfd1e136864c547e53232baf8e14a3224fbe1ab",
+      "rawBytes": 131625,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-10_2.jpg",
+      "sha256": "d17306735bba560e65b8317c897ffe71e030982f90d0f273af8732fe7e699ee5",
+      "bytes": 104905,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-10_2.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_2.png",
+      "state": "bridge-effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-10_3.jpg",
+      "sha256": "c41fa74306279da46db4adbd4d35dc049ccc8ebb0b55b55171c59d95f9a2f0a6",
+      "bytes": 104887,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-10_3.png",
+      "rawSha256": "9625b61e464160f4e1032a1732cda8c1ef6c7091ee293174c0a8991556b8bcfa",
+      "rawBytes": 127295,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-10_3.png",
+      "state": "effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-10_4.jpg",
+      "sha256": "129c0e065ad3ed90d09354823698c97946fe4785bcdd2279e60e21544726e041",
+      "bytes": 104956,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-10_4.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_4.png",
+      "state": "record",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-11.jpg",
+      "sha256": "129c0e065ad3ed90d09354823698c97946fe4785bcdd2279e60e21544726e041",
+      "bytes": 104956,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-11.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11.png",
+      "state": "result",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-11_1.jpg",
+      "sha256": "d17306735bba560e65b8317c897ffe71e030982f90d0f273af8732fe7e699ee5",
+      "bytes": 104905,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-11_1.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_1.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-11_2.jpg",
+      "sha256": "d17306735bba560e65b8317c897ffe71e030982f90d0f273af8732fe7e699ee5",
+      "bytes": 104905,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-11_2.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_2.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/owner-baseline-2026-10-08_14-12.jpg",
+      "sha256": "d17306735bba560e65b8317c897ffe71e030982f90d0f273af8732fe7e699ee5",
+      "bytes": 104905,
+      "quality": 80,
+      "rawFile": "archive/chromium/owner-baseline-2026-10-08_14-12.png",
+      "rawSha256": "c93cad86576414c41cecd7e221a307a5eddf63023560267288b0f1191a357698",
+      "rawBytes": 127369,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/chromium/2026-10-08_14-12_1.jpg",
+      "sha256": "9c478a419981e050d2a459aae0da3d8a8ffa448af3a33e70a3256b44079174f0",
+      "bytes": 94170,
+      "quality": 80,
+      "rawFile": "archive/chromium/2026-10-08_14-12_1.png",
+      "rawSha256": "8a9ed7cf24dc2a8456fed81eb190a541a294ffb46bd7515cccd5cf9c4528c927",
+      "rawBytes": 100364,
+      "suite": "archive",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-04.jpg",
+      "sha256": "5acdcb08bddfae8743b43916868914e06dc716b8d3e295e75d704fcbcf674c63",
+      "bytes": 265560,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-04.png",
+      "rawSha256": "1f98a3455b724248587986e1b51a74284cfa47a13fd0df9689531f27d67b5cef",
+      "rawBytes": 1685636,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-04.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-05.jpg",
+      "sha256": "081b96db2a7d9af2e131d16ad7221812ba96b6db80c1c286d4530e61816b8210",
+      "bytes": 130904,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-05.png",
+      "rawSha256": "5343fe58548f8bd7e75d9f952393e1b7dbfab57ccb42a1e65b8a55d0d2ed94de",
+      "rawBytes": 447126,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1242
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-05_1.jpg",
+      "sha256": "8c6b0a6e1764653098553e1488b0b8dc2c47306178cc92345faf4e8e09a1daa6",
+      "bytes": 128737,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-05_1.png",
+      "rawSha256": "adab2b7c349414e21861edab3ffc0d749cfce276f309ff70239f41d071f5ecef",
+      "rawBytes": 420740,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-05_2.jpg",
+      "sha256": "74bd684a6eafdd5a7ab656a149496ca24d5bf2a77b42d219b7c1dd688cb67928",
+      "bytes": 95047,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-05_2.png",
+      "rawSha256": "d1c13b21b01e3bcd9c49c2bc8437cbf3c696842d460d47166cc5634dc1a00826",
+      "rawBytes": 205707,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1244
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-05_3.jpg",
+      "sha256": "a44817e88f8d8d1a90de707e3b1e6b0744328902b3f61a6705a0f75e0bfeff3a",
+      "bytes": 198199,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-05_3.png",
+      "rawSha256": "b18d82e86a49ae129875812a50638acbe7ae6d2ba131a061baf2cd0d119a75b1",
+      "rawBytes": 513323,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-06.jpg",
+      "sha256": "0140ee9233f77200f2b3df962eb9f7fc9926d926d6370bd648cc4c356ca2e89a",
+      "bytes": 207115,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-06.png",
+      "rawSha256": "37163a1d8aec41b845e8cba0930623372fd3faae4c6681afbeda46af67fbf9d0",
+      "rawBytes": 550769,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-07.jpg",
+      "sha256": "f0246a2e47d20cff07aac3d232a949aabd3bdda145bcda8f88619a2c349dcf29",
+      "bytes": 194055,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-07.png",
+      "rawSha256": "59f57350bda16c87ddd704a359367985d3a8de4994b0a040efbb7732dbf036cf",
+      "rawBytes": 429889,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-07_1.jpg",
+      "sha256": "4e69f4e38a389ec5c9e817f89b842054896106080db291fb587f32d4f884598c",
+      "bytes": 150920,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-07_1.png",
+      "rawSha256": "d32baaf68637b744af2429a12d3110ab30bdeb7ca47c69831ccd5d1b3a77d507",
+      "rawBytes": 139988,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-07_2.jpg",
+      "sha256": "fef4da99546d2b536be386ab24508286856b9e438ef22852d473c172ad15ac12",
+      "bytes": 155563,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-07_2.png",
+      "rawSha256": "82c09d8cdc33a9240cf4107dabf4897ffd023beedb77e771a3c25d9971249af2",
+      "rawBytes": 142203,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-08.jpg",
+      "sha256": "d36be03904f92c9cab526432f853967a854f1323ba57559a5bda03c2d9e9acc1",
+      "bytes": 116638,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-08.png",
+      "rawSha256": "a4689e2723852164cd44ee2dbd9b69db54ca6b82c94c3ad3bee418a261c608e0",
+      "rawBytes": 105765,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-08_1.jpg",
+      "sha256": "d36be03904f92c9cab526432f853967a854f1323ba57559a5bda03c2d9e9acc1",
+      "bytes": 116638,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-08_1.png",
+      "rawSha256": "a4689e2723852164cd44ee2dbd9b69db54ca6b82c94c3ad3bee418a261c608e0",
+      "rawBytes": 105765,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_1.png",
+      "state": "changes",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-08_2.jpg",
+      "sha256": "d36be03904f92c9cab526432f853967a854f1323ba57559a5bda03c2d9e9acc1",
+      "bytes": 116638,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-08_2.png",
+      "rawSha256": "a4689e2723852164cd44ee2dbd9b69db54ca6b82c94c3ad3bee418a261c608e0",
+      "rawBytes": 105765,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_2.png",
+      "state": "message",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-08_3.jpg",
+      "sha256": "0daf059f9dd941d23b3759b8314360cdb8b2d4cce3b092b069d8c5c6ddfb19f6",
+      "bytes": 119132,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-08_3.png",
+      "rawSha256": "62f0b856f6b5124f6e8343dd618293d696cad6ec37055fbfb7b723f817024c8f",
+      "rawBytes": 98007,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-08_4.jpg",
+      "sha256": "1558b5e9a77f8c5dc8e939505186ccd9f9558e03027e5e6c1a117aa1f5877d82",
+      "bytes": 113163,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-08_4.png",
+      "rawSha256": "9d8f8e252135fe730f8fa684c6b0691a04d1b92fca1eed832051a1c85f21e718",
+      "rawBytes": 81990,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-09.jpg",
+      "sha256": "a2df3edf18ac779e19d22254613c7a7c347e64c6cc05718f52313dceccda6012",
+      "bytes": 122043,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-09.png",
+      "rawSha256": "d65bf0df4aa347742f3e774bef5a0f97eeb96e8e85c34849414e9f1e79d1a41a",
+      "rawBytes": 91445,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-10.jpg",
+      "sha256": "921965dda7ecaa490e479eae5f89a58fdb8c6d01549717b5f57ec88d8ab0eda7",
+      "bytes": 216331,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-10.png",
+      "rawSha256": "550d27263e2a529ac086dda663e5a9dd2f37d7a190502c4c117fa8fbdd316313",
+      "rawBytes": 1400959,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-10_1.jpg",
+      "sha256": "f1c9dd40c11c9157da7a14003f61c92a894dc07c930a78cfcfda00d6bd0a8263",
+      "bytes": 135057,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-10_1.png",
+      "rawSha256": "cf69979b01dbebf2ff500854cf7c0ee8738a016b5f0fee3447be470faf956314",
+      "rawBytes": 115281,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-10_2.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-10_2.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_2.png",
+      "state": "bridge-effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-10_3.jpg",
+      "sha256": "5c4775221ea5b42914333b1c824171dcbee9f7e5c47d6dc2eb6c596adc21fa2f",
+      "bytes": 125719,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-10_3.png",
+      "rawSha256": "a5fadb39fc02c939205ba11405f5a478b7ad86d8a71b5c89a72d144e721553e4",
+      "rawBytes": 105862,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-10_3.png",
+      "state": "effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-10_4.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-10_4.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_4.png",
+      "state": "record",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-11.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-11.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11.png",
+      "state": "result",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-11_1.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-11_1.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_1.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-11_2.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-11_2.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_2.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/owner-baseline-2026-10-08_14-12.jpg",
+      "sha256": "6276996bebbb8c61827dd814b8905c3101199d466817eb8278321a9f13b0b9da",
+      "bytes": 128508,
+      "quality": 80,
+      "rawFile": "archive/firefox/owner-baseline-2026-10-08_14-12.png",
+      "rawSha256": "27f92703bcb5d287f85b80dd10bef52d4cb31e512413cb33c580c827328d0620",
+      "rawBytes": 106714,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/firefox/2026-10-08_14-12_1.jpg",
+      "sha256": "8ab2e78c9d2311671ee7505754d3215f3f094eba5905d237a173a7c0f8229a23",
+      "bytes": 116732,
+      "quality": 80,
+      "rawFile": "archive/firefox/2026-10-08_14-12_1.png",
+      "rawSha256": "06a207bc47de79be4e6b19c24ec52e220bdb0ba157a3cc70a621f64bb9f80899",
+      "rawBytes": 88863,
+      "suite": "archive",
+      "browser": "firefox",
+      "version": "153.0",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-04.jpg",
+      "sha256": "333ad26ede4e6cda7151ab472139414b6a364e194ff6df37c5ae733bafd3fd24",
+      "bytes": 259664,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-04.png",
+      "rawSha256": "048e720ce3c5695971ef88dd6c1e6233964a5782f7d0eb14729acb2e4c015397",
+      "rawBytes": 1331214,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-04.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-05.jpg",
+      "sha256": "d05636fd631a0352ec0348ecf5b4585d9ab7b025b1164ae81bb138bf7fbb078d",
+      "bytes": 116464,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-05.png",
+      "rawSha256": "8d4a842c7abfc845adfa93882f1e4b60248e0b1c0ff8a4b798aa078c9169909d",
+      "rawBytes": 352445,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1242
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-05_1.jpg",
+      "sha256": "00fbd9409696b21be8bb331de8cf12ebf3b4836fcf08ae8d82db188195c4fd08",
+      "bytes": 114464,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-05_1.png",
+      "rawSha256": "b7423b4b5b6b6a6c3a34112d9239a4f4f464ff72c28441434929e7247908abf9",
+      "rawBytes": 334571,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-05_2.jpg",
+      "sha256": "74c5837bffa7f21a28b054a613eb379c18607ab54a2596807d29c4ac47b929a2",
+      "bytes": 78095,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-05_2.png",
+      "rawSha256": "04d67f5a1be5b51c651e77ffacfe99a5f72260c07afbd324ae3e2afb4cb4156c",
+      "rawBytes": 155397,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1244
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-05_3.jpg",
+      "sha256": "3122824f8de17e183e456ddb1e5d348e31ec75c4dbd9e712b181b0a5d7a1359a",
+      "bytes": 182752,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-05_3.png",
+      "rawSha256": "fad9d2ba66587a266abcc42d7876b7b6de6dfab0eff781e469416b6855963719",
+      "rawBytes": 437452,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-06.jpg",
+      "sha256": "b96eea2206cf4fe3a4519a7ecc00e98c1b016f776fdffa42f22100c592f29e45",
+      "bytes": 190799,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-06.png",
+      "rawSha256": "d1a5b9deaca8698d98d55246e5630a2bd7f61852c9920192e122b33b27f5aa40",
+      "rawBytes": 470442,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-07.jpg",
+      "sha256": "3cf193db29ba848d380e95159d5d9898943e4234aec72262dfc2661e274c1e93",
+      "bytes": 176659,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-07.png",
+      "rawSha256": "ab7fe185f469af561b3dee13c7ec61a7a460a39cf7654a2d569830787fe40339",
+      "rawBytes": 366045,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-07_1.jpg",
+      "sha256": "4d2c23e94409356900469a943ba9f8ff8675f841244215767c34885b8c4fdc72",
+      "bytes": 129796,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-07_1.png",
+      "rawSha256": "34682d057da6b19d4fbffa3386490a2dfdb520688678653a09c66323c0e90001",
+      "rawBytes": 117227,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-07_2.jpg",
+      "sha256": "c6e0e04ff4f70c7c1abdc5666e47663cb8ac297815338d43d2a781bd5d140af5",
+      "bytes": 133058,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-07_2.png",
+      "rawSha256": "a4f5635088dc0932749cdc91de67e743facf359e26d1dfb88b3d26dbb737a854",
+      "rawBytes": 118857,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-08.jpg",
+      "sha256": "07d790383d28532b6df4e881e0ecf902d77dc4f8703a776755a1cada752d4bc6",
+      "bytes": 94363,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-08.png",
+      "rawSha256": "2aa5d5319beccbd8a967d3ee9b93e62ff6db2568b6b08644f08933a217553774",
+      "rawBytes": 90414,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-08_1.jpg",
+      "sha256": "07d790383d28532b6df4e881e0ecf902d77dc4f8703a776755a1cada752d4bc6",
+      "bytes": 94363,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-08_1.png",
+      "rawSha256": "2aa5d5319beccbd8a967d3ee9b93e62ff6db2568b6b08644f08933a217553774",
+      "rawBytes": 90414,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_1.png",
+      "state": "changes",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-08_2.jpg",
+      "sha256": "07d790383d28532b6df4e881e0ecf902d77dc4f8703a776755a1cada752d4bc6",
+      "bytes": 94363,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-08_2.png",
+      "rawSha256": "2aa5d5319beccbd8a967d3ee9b93e62ff6db2568b6b08644f08933a217553774",
+      "rawBytes": 90414,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_2.png",
+      "state": "message",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-08_3.jpg",
+      "sha256": "75d9a45f3fee53a5e0807aee32481c676220201dda3eade61abb3e9b9b4c2065",
+      "bytes": 101361,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-08_3.png",
+      "rawSha256": "02e2a176b22ae4c0d876e33784c06b8d63448aa94d27cfd519e8c2a0b08bef9d",
+      "rawBytes": 82961,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-08_4.jpg",
+      "sha256": "b47a37ce69d140fd56cb51093b9db9b5c4f087411166b8328ecede7be817996e",
+      "bytes": 92052,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-08_4.png",
+      "rawSha256": "2cab889e0359c76f8fd737db03f766fd7e45081469eccf7841612bb059a6f53d",
+      "rawBytes": 65724,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-09.jpg",
+      "sha256": "60bdfbc15e94a56b4fe74785636719f8345a9e80704ec3b5e7959681c3abf6a4",
+      "bytes": 99645,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-09.png",
+      "rawSha256": "7df47c12f43c1b2cdbbe0647bce08aab7c29a781590c584c882905f4ef531cbf",
+      "rawBytes": 75825,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-10.jpg",
+      "sha256": "e9966c9c173b566d0b6c8f8878e3f582d7ee5796feaff4232e8101fea59a2bb4",
+      "bytes": 211600,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-10.png",
+      "rawSha256": "d7360bf097bbae2a7fe61afb401290fea86bcceb6dcf32cfb88cc1699e576f84",
+      "rawBytes": 1038648,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-10_1.jpg",
+      "sha256": "b55193b5665bbd34e57dba09cb821fb3df674f498dda9c9a9a67959e2ef56090",
+      "bytes": 114883,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-10_1.png",
+      "rawSha256": "26cb4c18b7beb5f208b2cb0fa1f4659af3a9430dc133b81fd636e2dfb605743f",
+      "rawBytes": 95475,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-10_2.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-10_2.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_2.png",
+      "state": "bridge-effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-10_3.jpg",
+      "sha256": "4881503435f25661cb0aee59d41f9e372086d2bd159f6fde3b6880f628aaa6ab",
+      "bytes": 106796,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-10_3.png",
+      "rawSha256": "81ae6b095b1793b986fe76430225c03531a5e2990f0e04290afbc02de9e7a88a",
+      "rawBytes": 89017,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1245
+      },
+      "source": "2026-10-08_14-10_3.png",
+      "state": "effort",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-10_4.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-10_4.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-10_4.png",
+      "state": "record",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-11.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-11.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11.png",
+      "state": "result",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-11_1.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-11_1.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_1.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-11_2.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-11_2.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-11_2.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/owner-baseline-2026-10-08_14-12.jpg",
+      "sha256": "43bd00470c55472411f3c0015062f4d87607c06b3f667ac9281381e8c797ba3c",
+      "bytes": 109681,
+      "quality": 80,
+      "rawFile": "archive/webkit/owner-baseline-2026-10-08_14-12.png",
+      "rawSha256": "a9efa4715b46ebd69e02ca5ce316af858215d83ab7e146d1952d86bf833f028a",
+      "rawBytes": 89752,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12.png",
+      "state": "initial",
+      "disposition": "OWNER_SUPERSEDED"
+    },
+    {
+      "file": "archive/webkit/2026-10-08_14-12_1.jpg",
+      "sha256": "8533b1f2f65e4c18969717af721ad4b77b4e30ae6c04b879ff66faa99062d9e9",
+      "bytes": 95772,
+      "quality": 80,
+      "rawFile": "archive/webkit/2026-10-08_14-12_1.png",
+      "rawSha256": "2c719b63edb2e601eaa741296bd3d89d950d5f7437dfd75ae4ed54e289694021",
+      "rawBytes": 74306,
+      "suite": "archive",
+      "browser": "webkit",
+      "version": "26.5",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1648,
+        "height": 1246
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial",
+      "disposition": "ACTIVE_COMPARABLE"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05-light-390.jpg",
+      "sha256": "2b3c2adc38a9b65c019899ed8c861fd415c39481722124174e4828705b8e5aa4",
+      "bytes": 48158,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05-light-390.png",
+      "rawSha256": "4b8cdbdc615956352815e0a11b7754c97a3935374c4f74a9f7420ebbe1a98766",
+      "rawBytes": 135481,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05-light-1440.jpg",
+      "sha256": "102d0e3094386d4fac32d78cee8bb1e8ef32c9661d25179bdac1cce572f5a201",
+      "bytes": 109614,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05-light-1440.png",
+      "rawSha256": "cdd96da72a69a585dac7bc17c659126ca8a88c4f7379673ee0d0659884b618bd",
+      "rawBytes": 348777,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05-dark-390.jpg",
+      "sha256": "c10d0c1d984badd9c1dd10e3c3cda75bfdea5cd86fc08bef1061f33ec8010b40",
+      "bytes": 48668,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05-dark-390.png",
+      "rawSha256": "129ab82a1b0c29be71773ade6779fe496f03f63e05ca733cf8bcaf8a407f35c7",
+      "rawBytes": 141013,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05-dark-1440.jpg",
+      "sha256": "f092ea413f9484e74909fc8c555198d85a4fefed39bb1acaabbcac3c24f03896",
+      "bytes": 109471,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05-dark-1440.png",
+      "rawSha256": "eef7e0edd45cdee73c7f56d625ac2fd5e68ca7099945de97a6e02c075ed0d64d",
+      "rawBytes": 355360,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05.png",
+      "state": "effort"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_1-light-390.jpg",
+      "sha256": "162a12f0c2682b26aba0420abf9f019dfef70dc6dc81dc22be8c01b44c8c94ea",
+      "bytes": 48355,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_1-light-390.png",
+      "rawSha256": "7a97a67fbb518f94e49d3ba853e59c6419ee96388ca6b1b4bc5369ecbac587f5",
+      "rawBytes": 131641,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_1-light-1440.jpg",
+      "sha256": "a1955a7001dd1571ea63b7d72ad7beaef9b62be054da3864d7e72f8554428e9b",
+      "bytes": 110011,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_1-light-1440.png",
+      "rawSha256": "b3a34b15be27376c90a137df332f7ba588ccde4209bb77b4118962ec67af6197",
+      "rawBytes": 337907,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_1-dark-390.jpg",
+      "sha256": "c63a9da09c64e64e03ac2978e305b7255ab7e22b089ef8344adb6bc9ca933b1d",
+      "bytes": 48848,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_1-dark-390.png",
+      "rawSha256": "e60164f59d723f42d6ee6f447824fc8bd193982bc6ede06a6541de7a8fd18d37",
+      "rawBytes": 137359,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_1-dark-1440.jpg",
+      "sha256": "e936e4469daa9fc7a556f2b57301b01f14a88f4d26e9f326309a09f68fa337bc",
+      "bytes": 109869,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_1-dark-1440.png",
+      "rawSha256": "a2bdad159a7c42a8fc044f0f8e21a314c9b1f19a19ef5773656575de3939d10e",
+      "rawBytes": 344612,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_1.png",
+      "state": "record"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_2-light-390.jpg",
+      "sha256": "df75c98931b5f26163ebeed1cb37146372726f2ae4dba8f36b7fec8e14d10caa",
+      "bytes": 40419,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_2-light-390.png",
+      "rawSha256": "b830c52ea6a0459059b410cdae0484859961d3066b57e2bda08fb5451892f979",
+      "rawBytes": 84025,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_2-light-1440.jpg",
+      "sha256": "d62cd0dec0c26c63ab92e6fe706480a837c707ce06f77a551b7318399bb20726",
+      "bytes": 76323,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_2-light-1440.png",
+      "rawSha256": "9cddf10391ef8f8b5a6a1e820846296d2e3a39c051b93ca048b87b70e5c5cdb4",
+      "rawBytes": 170336,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_2-dark-390.jpg",
+      "sha256": "36928b90502d2782877d1e0ff66c70c5d161c036c409c7cb52c9bcfcec322bb3",
+      "bytes": 39992,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_2-dark-390.png",
+      "rawSha256": "0ed03beb7c01edb8f1a3a70f05dc80ee6c161117e0a2f8ee5eace232a4e6fc00",
+      "rawBytes": 89490,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_2-dark-1440.jpg",
+      "sha256": "f5be1f137b0fd77eae3f6d7836e298dff441dd49934b4c0ac0c2cc826d81ebde",
+      "bytes": 74633,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_2-dark-1440.png",
+      "rawSha256": "6dd23f0b36d385f0f8f571534d5cec50b237a4735c73a8ac5eb5fe750fbfe5b9",
+      "rawBytes": 176520,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_2.png",
+      "state": "result"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_3-light-390.jpg",
+      "sha256": "63fcfb242ef94d8a673b75037a4f701901b3aa94f1719f56c0b9dfef1963b43d",
+      "bytes": 39253,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_3-light-390.png",
+      "rawSha256": "0f9d62771407bb7e035550b662d429312696774a0dc98046618fab1de93509af",
+      "rawBytes": 49966,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_3-light-1440.jpg",
+      "sha256": "7588b80180acedd1634d62b4ddae7c9bdf0e929f8ad9668cd6f33411420bc5c5",
+      "bytes": 114260,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_3-light-1440.png",
+      "rawSha256": "7ba6565a586fd652e7d7af19753c07c6b695288a671741f3eea2fe34a2c78b06",
+      "rawBytes": 238720,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_3-dark-390.jpg",
+      "sha256": "186124959b41809d75204bcd78d72cf166e6f677eb4d223a3c26d6075f2ae481",
+      "bytes": 41576,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_3-dark-390.png",
+      "rawSha256": "bd9d4e0a06108e6835a49b7bfeb94905da6dd72ddd6a118e90960a0a8efbf958",
+      "rawBytes": 55761,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-05_3-dark-1440.jpg",
+      "sha256": "54078412bbaf44e634676ee4ad58d98df55bb868508a3fc80e7cec674d75a4c5",
+      "bytes": 118254,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-05_3-dark-1440.png",
+      "rawSha256": "621295f2400b07b5226b05772fd710ae527f3ac5c701d926fa2b93d22c83909f",
+      "rawBytes": 247001,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-05_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-06-light-390.jpg",
+      "sha256": "e83cdd243169316b0ef500301cce80b4a9117560acc89c226c76d52a5ec5218a",
+      "bytes": 39385,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-06-light-390.png",
+      "rawSha256": "1496d0a85ab8b167b1fdc990b320cfd1edc288f7f5d51ef838d3d268e486b7a4",
+      "rawBytes": 51608,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases"
+    },
+    {
+      "file": "scenes/2026-10-08_14-06-light-1440.jpg",
+      "sha256": "7e150cdff77832cf266c9bd8fce77a6616314b4fba95cfe5db841436c6b998c0",
+      "bytes": 121132,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-06-light-1440.png",
+      "rawSha256": "de397ed4d2ddf8d36683919f03b754728384e3de6be119b08de5bc83a0e7cbc8",
+      "rawBytes": 273115,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases"
+    },
+    {
+      "file": "scenes/2026-10-08_14-06-dark-390.jpg",
+      "sha256": "37dc2153104cdecdc19d3551cc6e49020394ef3508a031b2f292de5b6d67cf3c",
+      "bytes": 41802,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-06-dark-390.png",
+      "rawSha256": "1b60cfba5605aae72f710c7679a454db142a0d5d9b1ab7cbf7c904a6babbdf09",
+      "rawBytes": 57375,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases"
+    },
+    {
+      "file": "scenes/2026-10-08_14-06-dark-1440.jpg",
+      "sha256": "bbdb771b5fa4b22e8f768b0008feb2e0bab57e3f42db043ae3e49616e22dcbe7",
+      "bytes": 125527,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-06-dark-1440.png",
+      "rawSha256": "15ed274bc541f0d074c1a329171abd43c47410c13f7df1000fc2ce8ddba219e7",
+      "rawBytes": 282268,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-06.png",
+      "state": "summary-purchases"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07-light-390.jpg",
+      "sha256": "536557797c78972e5dd3d374d7f5c8937a35f949a676645c3d5b7163ce118c43",
+      "bytes": 42494,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07-light-390.png",
+      "rawSha256": "b97d8dc3c6f0bb242f66c02ab602919af0f64608a0fcadf60c7bc75c7a6cd63b",
+      "rawBytes": 58119,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07-light-1440.jpg",
+      "sha256": "2c1c631bee15fe328ea5f94faae6ac4423b6780e8d42f303818f2072a543d1e7",
+      "bytes": 99683,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07-light-1440.png",
+      "rawSha256": "fe2540f4c1ee138e565a96fe35dea04e7a329b6ddbf7dc263c72cb3f4f62f85b",
+      "rawBytes": 163843,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07-dark-390.jpg",
+      "sha256": "1ef2539992c705c11064deea81b82e293d68353f77181d09504427a91279d949",
+      "bytes": 44902,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07-dark-390.png",
+      "rawSha256": "dd0553e581ff59ba2e3e69b8bc6f3c81bf3f22c2ade6314b42cb682917e8b0d2",
+      "rawBytes": 65877,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07-dark-1440.jpg",
+      "sha256": "bbd78e95904a1905c000e2307e18a5b57e9c3a850274895adac190fbda0326a1",
+      "bytes": 103981,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07-dark-1440.png",
+      "rawSha256": "b20d41dd9b470f99d00ee10a844be548ac2a61f7d2b61af78f7ab082c9afff48",
+      "rawBytes": 171054,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07.png",
+      "state": "progress-diary"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_1-light-390.jpg",
+      "sha256": "02e0edd58c1b43bb104812981eb9bee0498d44cfcfbbc4dc6cb077ecbf1a3f73",
+      "bytes": 39962,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_1-light-390.png",
+      "rawSha256": "4cd97d71b757efadc4ce4c37700698396b7f6bc553f31271af90efd1e2e73c6d",
+      "rawBytes": 61349,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_1-light-1440.jpg",
+      "sha256": "af328c6369c1c466bd13788f99af1bcba12940b774eea704b7444f3589b14e2f",
+      "bytes": 86698,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_1-light-1440.png",
+      "rawSha256": "ee78d99a432efdb75f399a92c0682b6def30ed7181f21a8f80a811d2ca1e3568",
+      "rawBytes": 114955,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_1-dark-390.jpg",
+      "sha256": "1639a544683201d5e4e0473544bc9ca98dc9975c6650401ed618d370fec115bb",
+      "bytes": 41498,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_1-dark-390.png",
+      "rawSha256": "2ae86a62906b86ab17592ef24e7933a02a1848a3dd66bb175c99434c470be024",
+      "rawBytes": 66184,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_1-dark-1440.jpg",
+      "sha256": "911320c7ccaedeaeb3ad0fe5741755d75fc9b7ff2c380367bfbe65c17da3f6a3",
+      "bytes": 89891,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_1-dark-1440.png",
+      "rawSha256": "e212c595ecfe59a35fa6aabafb3ca0d5f4a6dcb43e86d7f87afe8bc1fe2a1b62",
+      "rawBytes": 119626,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_2-light-390.jpg",
+      "sha256": "d427c97a4b4f862c8aaa4f582de0775d12bbd774f50e5f3894255d80c58c20a2",
+      "bytes": 42419,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_2-light-390.png",
+      "rawSha256": "778cf886616487a7d5f5b59bef668632bba9ed237e8c2291da787330f73e1616",
+      "rawBytes": 65459,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_2-light-1440.jpg",
+      "sha256": "8ad87219b1ace077d4f4d329951526c82d91e06f4aad7952dbd5ca1b647de618",
+      "bytes": 92975,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_2-light-1440.png",
+      "rawSha256": "642f471ef982096470941ac708946409125f678ecd00467f0a924b6195500504",
+      "rawBytes": 120504,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_2-dark-390.jpg",
+      "sha256": "fe3ab419327b1cfff9dfa0c06e1aa5a7e038b1b3d056420e09ea38b71f2b4099",
+      "bytes": 44364,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_2-dark-390.png",
+      "rawSha256": "08a86c17e014482e43d3bdfe6d1050d6dd3c9a8e7bf71a3c8156dffcbd93704b",
+      "rawBytes": 70451,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly"
+    },
+    {
+      "file": "scenes/2026-10-08_14-07_2-dark-1440.jpg",
+      "sha256": "3f3542187c64b4a74011e546a274b47d7a87eb550f254a6e58a8bad87a22d527",
+      "bytes": 96897,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-07_2-dark-1440.png",
+      "rawSha256": "d2e8b799ebace0a372be2b4e1017afbc6d4fc7b2657cf99c6727ca05f74c845d",
+      "rawBytes": 125830,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-07_2.png",
+      "state": "weekly"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_3-light-390.jpg",
+      "sha256": "107122abdb76a1834c672e3c51251dd858dd17dd51eb9995e94a2a611c1dd2cd",
+      "bytes": 32921,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_3-light-390.png",
+      "rawSha256": "a0ebebad4beac1812b64dad7ca106426560ec8ab6b4edac44628218370d3ae16",
+      "rawBytes": 41042,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_3-light-1440.jpg",
+      "sha256": "a91ae7789aecaf0b985c73811917bfe56927c8637daa4f82e6aa0ed10ca898ec",
+      "bytes": 90921,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_3-light-1440.png",
+      "rawSha256": "3c6f99fbb4c5da3baaa68087a3d53ec8de2a8133c01a4e60874d7443b2b26872",
+      "rawBytes": 101630,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_3-dark-390.jpg",
+      "sha256": "3c78c9ec632f5a4a760bfbb4c1af1510781661ea01e0df0951e03fde9316983a",
+      "bytes": 34166,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_3-dark-390.png",
+      "rawSha256": "8dd6920f4ee2b6f6dd2a744f5160832734ee41d4f1817878d184b74f3643ba86",
+      "rawBytes": 44430,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_3-dark-1440.jpg",
+      "sha256": "e7761152e8a11da536c4271440e7635e6e3939d73a3128b9f1f3e443052d56c4",
+      "bytes": 91904,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_3-dark-1440.png",
+      "rawSha256": "16836ccda949ed05c2fbf5f7d55f5c46073b61ebc39a47ea1a62989ae9c19929",
+      "rawBytes": 109783,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-08_3.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_4-light-390.jpg",
+      "sha256": "fdee9ce90d7c290dc40bb028fda99d25df21194671bc7c1260753efc0036d6e0",
+      "bytes": 34746,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_4-light-390.png",
+      "rawSha256": "f66191b92f1bf2f1ab593ef2e91f489fd06e9d77b5e3a1936b30590d26488127",
+      "rawBytes": 40100,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_4-light-1440.jpg",
+      "sha256": "02496d383c19d7aa54fbd1cb72a9ed18b5af3bc6aabaf113ff4df48a7f93477b",
+      "bytes": 66549,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_4-light-1440.png",
+      "rawSha256": "6ef7293cf157258d7c0da20a05ef314242884506ec6be7fe7c63f14936f0150b",
+      "rawBytes": 72126,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_4-dark-390.jpg",
+      "sha256": "1fce2269a994185f217a43ebb2425b5ca8c1fd71194a67789b01856b7e32b38d",
+      "bytes": 35928,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_4-dark-390.png",
+      "rawSha256": "351f6cfa64eb44249fdeba9516f08374a06fd7c74ef57b53e7e11530e74061e3",
+      "rawBytes": 43514,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-08_4-dark-1440.jpg",
+      "sha256": "b56a6b11b91bdd56cced0b6b19012ebc1c4a03fb25d0bfef48a454458fb65f55",
+      "bytes": 67540,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-08_4-dark-1440.png",
+      "rawSha256": "910a5546fa3f052306abf7fb7fc8c748670be9857547f8fb1bd9d9df5340b94f",
+      "rawBytes": 76915,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-08_4.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-09-light-390.jpg",
+      "sha256": "db49b20560327d6084711a246dd20e20ec9e744da9bf2cd264e35da8bdd3ec7d",
+      "bytes": 35245,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-09-light-390.png",
+      "rawSha256": "c7ff4a3b588161579f6576d8b2fd211134f57628e085f129cb3b6695c8d41015",
+      "rawBytes": 41184,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-09-light-1440.jpg",
+      "sha256": "1222ccfe124bd5d1aa95c0728cc8be80050131dc82356671a0326b6416bc7fe8",
+      "bytes": 75003,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-09-light-1440.png",
+      "rawSha256": "70b9570778e5e2e7dad34d88f01f472b46a3c3435f535c3d75aa64a6240c4069",
+      "rawBytes": 74203,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-09-dark-390.jpg",
+      "sha256": "d7e7802fd51e34c8d0b99bd8aa23b2166283e63a08ae25ec8192fa21061416a7",
+      "bytes": 36833,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-09-dark-390.png",
+      "rawSha256": "e48b658be22019de498e4e2a834825905f1979b7010efff46d474f23b8af7ed3",
+      "rawBytes": 44663,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-09-dark-1440.jpg",
+      "sha256": "5f0a25eb8b8a3904a74cacf0b3e41bcdaa8782162e0f9e979855664447958d3b",
+      "bytes": 76344,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-09-dark-1440.png",
+      "rawSha256": "db90645c5a0e574dfea4b193a5db2d6b536b34a15564f4a6af0defa963c95b5c",
+      "rawBytes": 76702,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-09.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-10_1-light-390.jpg",
+      "sha256": "0b28c805978b5c4ba42444472689a797332443f22b76615f85a1a4c0ead41f56",
+      "bytes": 41877,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-10_1-light-390.png",
+      "rawSha256": "dc0a7a6d20594b0f62660487ec6749b0c5781c36e592e0d703f86c84f789eab1",
+      "rawBytes": 56044,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-10_1-light-1440.jpg",
+      "sha256": "2fb820a9d120126f3b37f11f986aa0b78ff4ce21bdd37f08d647b2a5b89523ad",
+      "bytes": 87678,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-10_1-light-1440.png",
+      "rawSha256": "7bf777a77a87034684ff271c321b512e0ec543c641eccb4af27a8c869056cad0",
+      "rawBytes": 97518,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-10_1-dark-390.jpg",
+      "sha256": "c2c7d29c0c3b1bac713b917c9332ba4421243ab30493d7c519420239ea6fd0e3",
+      "bytes": 43700,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-10_1-dark-390.png",
+      "rawSha256": "6079e73536a87f300a5b207a61c1ab75ce2a3c2e5772e6d357e85ae48e9b7670",
+      "rawBytes": 61946,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-10_1-dark-1440.jpg",
+      "sha256": "f78da37173dc8ef81d29a41eece9864579ba64cefaa751c1738cdfac3672ba31",
+      "bytes": 89212,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-10_1-dark-1440.png",
+      "rawSha256": "4e0d0b0e588b9df017df477a3b2299230e7d34adf6b44cd679926bccb8983d85",
+      "rawBytes": 104200,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-10_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-12_1-light-390.jpg",
+      "sha256": "5d6320e1d774de2391659d7e7d7d14b62cf45dc1930a5375079672d9017afe66",
+      "bytes": 33407,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-12_1-light-390.png",
+      "rawSha256": "3b7a6d9248771421229f2eff16282f8943ba484fc80c9dabc405df7e1b0b873b",
+      "rawBytes": 40393,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-12_1-light-1440.jpg",
+      "sha256": "12a6b5b58323d310102750861580b838a6d6d821dde990aaf54203ce4f977dee",
+      "bytes": 71492,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-12_1-light-1440.png",
+      "rawSha256": "e1ce96524825806336a39c4944f2be6ef3007452d53458f214432933aa7f2910",
+      "rawBytes": 72107,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-12_1-dark-390.jpg",
+      "sha256": "9ff54b27a65dea4425a695c5aeef4799ccc0e654d57a33da60928e2b6f6543a8",
+      "bytes": 35081,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-12_1-dark-390.png",
+      "rawSha256": "f84f201a40fc864031814975bc2ab16425133309014dfacf525f3624d2fcab46",
+      "rawBytes": 43904,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "scenes/2026-10-08_14-12_1-dark-1440.jpg",
+      "sha256": "4677ced06df59bcd5a6e3e49e722131db27b7de339d9c57189fef59395cbd292",
+      "bytes": 73077,
+      "quality": 80,
+      "rawFile": "scenes/2026-10-08_14-12_1-dark-1440.png",
+      "rawSha256": "7002d4dff112b20675fd6674a77910085ce7e6e9c961f05b3b89322f04b7c52b",
+      "rawBytes": 74897,
+      "suite": "scene",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "source": "2026-10-08_14-12_1.png",
+      "state": "initial"
+    },
+    {
+      "file": "full/athlete-light-390x844-full.jpg",
+      "sha256": "8faf08a8045ec409ae96125fb3726d766a1bb355e32ddf4fa35ea4cdb70c4264",
+      "bytes": 447441,
+      "quality": 80,
+      "rawFile": "full/athlete-light-390x844-full.png",
+      "rawSha256": "5cc3ee01e140e6d78b950635b440c6f19bd50b7c6b1f306934fa9a3dd2da863b",
+      "rawBytes": 737577,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "width": 390,
+      "viewportWidth": 390,
+      "missingImages": 0
+    },
+    {
+      "file": "full/athlete-light-1440x1000-full.jpg",
+      "sha256": "e051190bb550091c0ff67e21b75a4c68896e5ac3de9c3c93bc646573be18817b",
+      "bytes": 485503,
+      "quality": 35,
+      "rawFile": "full/athlete-light-1440x1000-full.png",
+      "rawSha256": "bc050a756189f8dd8b6c9168c2f58f72d701ac7e40b1a511ceee003dac4d034c",
+      "rawBytes": 2069881,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "width": 1440,
+      "viewportWidth": 1440,
+      "missingImages": 0
+    },
+    {
+      "file": "full/athlete-dark-390x844-full.jpg",
+      "sha256": "c06d99ade154e60d8ef52cb0b86762fd0e66bc41003c06d1c29810fed9a63e2d",
+      "bytes": 455642,
+      "quality": 80,
+      "rawFile": "full/athlete-dark-390x844-full.png",
+      "rawSha256": "ff73da45b3a81ac7a5c2cdd30d70c67e7e2c8a96ca2e46fe83052e84c27442f8",
+      "rawBytes": 779093,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "width": 390,
+      "viewportWidth": 390,
+      "missingImages": 0
+    },
+    {
+      "file": "full/athlete-dark-1440x1000-full.jpg",
+      "sha256": "1f062938f2ba4a4b7d0feca26e8a132e6cb950a4f5b6c0b66491e3d0cd56199a",
+      "bytes": 492388,
+      "quality": 35,
+      "rawFile": "full/athlete-dark-1440x1000-full.png",
+      "rawSha256": "81fb703864d7cfb0b6f0efb05cf79772bc5b871f776b6ca11e38681958b5ebb2",
+      "rawBytes": 2111448,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "athlete",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "width": 1440,
+      "viewportWidth": 1440,
+      "missingImages": 0
+    },
+    {
+      "file": "full/coach-light-390x844-full.jpg",
+      "sha256": "f34b6c451854342a6f8130912ba66d9aafc19e1a59e7bbcf399f64304251cee0",
+      "bytes": 473625,
+      "quality": 75,
+      "rawFile": "full/coach-light-390x844-full.png",
+      "rawSha256": "48785e6f6ce8443d0a097be967ddb280be020961feb6041b0035df2fac8c045e",
+      "rawBytes": 684294,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "width": 390,
+      "viewportWidth": 390,
+      "missingImages": 0
+    },
+    {
+      "file": "full/coach-light-1440x1000-full.jpg",
+      "sha256": "4fddefa9853fbd9dd1c2bde3e021ea885ea75dc2e7b834524a6fcf901606f70d",
+      "bytes": 489362,
+      "quality": 35,
+      "rawFile": "full/coach-light-1440x1000-full.png",
+      "rawSha256": "e0b07785b7eb9aeade6dffaed12aef9fb17d3d59df765b96ca75cfe44f8d093c",
+      "rawBytes": 1512990,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "width": 1440,
+      "viewportWidth": 1440,
+      "missingImages": 0
+    },
+    {
+      "file": "full/coach-dark-390x844-full.jpg",
+      "sha256": "510599c76482f43d598c7020c4c1530262dfc81c2e5a7b77836c2b84666942e2",
+      "bytes": 482766,
+      "quality": 75,
+      "rawFile": "full/coach-dark-390x844-full.png",
+      "rawSha256": "41548835c201c30776ce376fdf1c5ae0f467fb1d7e177cbd62880f2a041870d4",
+      "rawBytes": 744016,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "width": 390,
+      "viewportWidth": 390,
+      "missingImages": 0
+    },
+    {
+      "file": "full/coach-dark-1440x1000-full.jpg",
+      "sha256": "f42704abf80c84490dddb14ca7bb97392e9fe49b9bd15588be5e459e3cbb498f",
+      "bytes": 501538,
+      "quality": 35,
+      "rawFile": "full/coach-dark-1440x1000-full.png",
+      "rawSha256": "5a55b425597a51279e7bd9e507f2a8a51f3041719d928117d129b428716172bf",
+      "rawBytes": 1567245,
+      "suite": "overview",
+      "browser": "chromium",
+      "version": "151.0.7922.34",
+      "audience": "coach",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "width": 1440,
+      "viewportWidth": 1440,
+      "missingImages": 0
+    }
+  ]
+}
