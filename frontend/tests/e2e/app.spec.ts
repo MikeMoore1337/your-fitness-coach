@@ -3129,9 +3129,12 @@ test.describe
       .getByRole('navigation', { name: 'Разделы прогресса' })
       .getByRole('tab', { name: /^Тело$/ })
       .click();
-    await page.locator('.progress-measurement-editor > summary').click();
+    const measurementEditor = page.locator('.progress-measurement-editor');
+    await measurementEditor.locator(':scope > summary').click();
+    await expect(measurementEditor).toHaveAttribute('open', '');
     const measurementForm = page.locator('.measurement-diary__form');
     const dateField = measurementForm.locator('input[type="date"]');
+    await expect(dateField).toBeVisible();
     const weightField = measurementForm.getByLabel('Вес, кг');
     const diaryGrid = measurementForm.locator('.diary-form-grid');
     const dateControl = measurementForm.locator('.diary-date-control');
