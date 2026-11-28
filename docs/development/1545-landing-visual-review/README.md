@@ -93,6 +93,42 @@
 | Для тренера: Рабочая панель тренера, начало (2026-10-08_14-10_1.png) | [Открыть](scenes/2026-10-08_14-10_1-light-390.jpg) | [Открыть](scenes/2026-10-08_14-10_1-light-1440.jpg) | [Открыть](scenes/2026-10-08_14-10_1-dark-390.jpg) | [Открыть](scenes/2026-10-08_14-10_1-dark-1440.jpg) |
 | Для тренера: Вопросы и ответы, начало (2026-10-08_14-12_1.png) | [Открыть](scenes/2026-10-08_14-12_1-light-390.jpg) | [Открыть](scenes/2026-10-08_14-12_1-light-1440.jpg) | [Открыть](scenes/2026-10-08_14-12_1-dark-390.jpg) | [Открыть](scenes/2026-10-08_14-12_1-dark-1440.jpg) |
 
+## Интерактивные состояния тренера и Coach Today — Chromium
+
+Все действия выполняются в локальной демонстрационной сцене и не изменяют реальные данные.
+
+| Состояние | Light mobile 390×844 | Light desktop 1440×1000 | Dark mobile 390×844 | Dark desktop 1440×1000 |
+|---|---|---|---|---|
+| Coach Today — атлет: изменения | [Открыть](extra/coach-promo-changes-athlete-light-390.jpg) | [Открыть](extra/coach-promo-changes-athlete-light-1440.jpg) | [Открыть](extra/coach-promo-changes-athlete-dark-390.jpg) | [Открыть](extra/coach-promo-changes-athlete-dark-1440.jpg) |
+| Coach Today — атлет: предпросмотр | [Открыть](extra/coach-promo-preview-athlete-light-390.jpg) | [Открыть](extra/coach-promo-preview-athlete-light-1440.jpg) | [Открыть](extra/coach-promo-preview-athlete-dark-390.jpg) | [Открыть](extra/coach-promo-preview-athlete-dark-1440.jpg) |
+| Coach Today — атлет: подтверждено | [Открыть](extra/coach-promo-applied-athlete-light-390.jpg) | [Открыть](extra/coach-promo-applied-athlete-light-1440.jpg) | [Открыть](extra/coach-promo-applied-athlete-dark-390.jpg) | [Открыть](extra/coach-promo-applied-athlete-dark-1440.jpg) |
+| Coach Today — атлет: черновик | [Открыть](extra/coach-promo-message-athlete-light-390.jpg) | [Открыть](extra/coach-promo-message-athlete-light-1440.jpg) | [Открыть](extra/coach-promo-message-athlete-dark-390.jpg) | [Открыть](extra/coach-promo-message-athlete-dark-1440.jpg) |
+| Coach Today — атлет: подтверждение сообщения | [Открыть](extra/coach-promo-sent-athlete-light-390.jpg) | [Открыть](extra/coach-promo-sent-athlete-light-1440.jpg) | [Открыть](extra/coach-promo-sent-athlete-dark-390.jpg) | [Открыть](extra/coach-promo-sent-athlete-dark-1440.jpg) |
+| Coach Today — тренер: изменения | [Открыть](extra/coach-work-changes-coach-light-390.jpg) | [Открыть](extra/coach-work-changes-coach-light-1440.jpg) | [Открыть](extra/coach-work-changes-coach-dark-390.jpg) | [Открыть](extra/coach-work-changes-coach-dark-1440.jpg) |
+| Coach Today — тренер: предпросмотр | [Открыть](extra/coach-work-preview-coach-light-390.jpg) | [Открыть](extra/coach-work-preview-coach-light-1440.jpg) | [Открыть](extra/coach-work-preview-coach-dark-390.jpg) | [Открыть](extra/coach-work-preview-coach-dark-1440.jpg) |
+| Coach Today — тренер: подтверждено | [Открыть](extra/coach-work-applied-coach-light-390.jpg) | [Открыть](extra/coach-work-applied-coach-light-1440.jpg) | [Открыть](extra/coach-work-applied-coach-dark-390.jpg) | [Открыть](extra/coach-work-applied-coach-dark-1440.jpg) |
+| Coach Today — тренер: черновик | [Открыть](extra/coach-work-message-coach-light-390.jpg) | [Открыть](extra/coach-work-message-coach-light-1440.jpg) | [Открыть](extra/coach-work-message-coach-dark-390.jpg) | [Открыть](extra/coach-work-message-coach-dark-1440.jpg) |
+| Coach Today — тренер: подтверждение сообщения | [Открыть](extra/coach-work-sent-coach-light-390.jpg) | [Открыть](extra/coach-work-sent-coach-light-1440.jpg) | [Открыть](extra/coach-work-sent-coach-dark-390.jpg) | [Открыть](extra/coach-work-sent-coach-dark-1440.jpg) |
+| Подключение клиента: приглашение принято | [Открыть](extra/coach-connect-connected-coach-light-390.jpg) | [Открыть](extra/coach-connect-connected-coach-light-1440.jpg) | [Открыть](extra/coach-connect-connected-coach-dark-390.jpg) | [Открыть](extra/coach-connect-connected-coach-dark-1440.jpg) |
+| Программа и версия: версия 2 | [Открыть](extra/coach-program-version2-coach-light-390.jpg) | [Открыть](extra/coach-program-version2-coach-light-1440.jpg) | [Открыть](extra/coach-program-version2-coach-dark-390.jpg) | [Открыть](extra/coach-program-version2-coach-dark-1440.jpg) |
+| Программа и версия: назначение | [Открыть](extra/coach-program-assigned-coach-light-390.jpg) | [Открыть](extra/coach-program-assigned-coach-light-1440.jpg) | [Открыть](extra/coach-program-assigned-coach-dark-390.jpg) | [Открыть](extra/coach-program-assigned-coach-dark-1440.jpg) |
+| Факты клиента: обзор клиента | [Открыть](extra/coach-facts-client-coach-light-390.jpg) | [Открыть](extra/coach-facts-client-coach-light-1440.jpg) | [Открыть](extra/coach-facts-client-coach-dark-390.jpg) | [Открыть](extra/coach-facts-client-coach-dark-1440.jpg) |
+| Проверка состояния: изменения | [Открыть](extra/coach-review-changes-coach-light-390.jpg) | [Открыть](extra/coach-review-changes-coach-light-1440.jpg) | [Открыть](extra/coach-review-changes-coach-dark-390.jpg) | [Открыть](extra/coach-review-changes-coach-dark-1440.jpg) |
+| Проверка состояния: итог проверен | [Открыть](extra/coach-review-checked-coach-light-390.jpg) | [Открыть](extra/coach-review-checked-coach-light-1440.jpg) | [Открыть](extra/coach-review-checked-coach-dark-390.jpg) | [Открыть](extra/coach-review-checked-coach-dark-1440.jpg) |
+| Решение по клиентам: получатели не выбраны | [Открыть](extra/coach-decision-none-coach-light-390.jpg) | [Открыть](extra/coach-decision-none-coach-light-1440.jpg) | [Открыть](extra/coach-decision-none-coach-dark-390.jpg) | [Открыть](extra/coach-decision-none-coach-dark-1440.jpg) |
+| Решение по клиентам: один получатель | [Открыть](extra/coach-decision-one-coach-light-390.jpg) | [Открыть](extra/coach-decision-one-coach-light-1440.jpg) | [Открыть](extra/coach-decision-one-coach-dark-390.jpg) | [Открыть](extra/coach-decision-one-coach-dark-1440.jpg) |
+| Решение по клиентам: предпросмотр | [Открыть](extra/coach-decision-preview-coach-light-390.jpg) | [Открыть](extra/coach-decision-preview-coach-light-1440.jpg) | [Открыть](extra/coach-decision-preview-coach-dark-390.jpg) | [Открыть](extra/coach-decision-preview-coach-dark-1440.jpg) |
+| Решение по клиентам: подтверждено | [Открыть](extra/coach-decision-applied-coach-light-390.jpg) | [Открыть](extra/coach-decision-applied-coach-light-1440.jpg) | [Открыть](extra/coach-decision-applied-coach-dark-390.jpg) | [Открыть](extra/coach-decision-applied-coach-dark-1440.jpg) |
+| Сопровождение: черновик | [Открыть](extra/coach-followup-draft-coach-light-390.jpg) | [Открыть](extra/coach-followup-draft-coach-light-1440.jpg) | [Открыть](extra/coach-followup-draft-coach-dark-390.jpg) | [Открыть](extra/coach-followup-draft-coach-dark-1440.jpg) |
+| Сопровождение: подтверждение сообщения | [Открыть](extra/coach-followup-sent-coach-light-390.jpg) | [Открыть](extra/coach-followup-sent-coach-light-1440.jpg) | [Открыть](extra/coach-followup-sent-coach-dark-390.jpg) | [Открыть](extra/coach-followup-sent-coach-dark-1440.jpg) |
+
+## Раскрытый FAQ — Chromium
+
+| Аудитория | Light mobile | Light desktop | Dark mobile | Dark desktop |
+|---|---|---|---|---|
+| Для себя | [Открыть](faq/athlete-light-390-privacy-open.jpg) | [Открыть](faq/athlete-light-1440-privacy-open.jpg) | [Открыть](faq/athlete-dark-390-privacy-open.jpg) | [Открыть](faq/athlete-dark-1440-privacy-open.jpg) |
+| Для тренера | [Открыть](faq/coach-light-390-privacy-open.jpg) | [Открыть](faq/coach-light-1440-privacy-open.jpg) | [Открыть](faq/coach-dark-390-privacy-open.jpg) | [Открыть](faq/coach-dark-1440-privacy-open.jpg) |
+
 ## Решение владельца
 
 Проверьте обе аудитории, темы и размеры, а также состояния и заменённые сцены. Укажите, можно ли принять показанные кадры за основу нового эталона, или перечислите нужные исправления. Решение о визуальном эталоне не является разрешением на изменение проверок, Allure, merge или production deploy.
