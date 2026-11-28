@@ -1518,6 +1518,18 @@ test.describe('#1097 rest clock typography and v2 compact layout', () => {
 
       for (const width of [320, 360, 393, 430, 1440]) {
         await page.setViewportSize({ width, height: 844 });
+        // WebKit can acknowledge the resize before the new viewport has been rendered.
+        await page.waitForFunction(
+          (expected) =>
+            window.innerWidth === expected && document.documentElement.clientWidth === expected,
+          width,
+        );
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
         const result = await panel.evaluate((element) => {
           const planned = element.querySelector<HTMLElement>('.active-workout-rest__time strong')!;
           const actual = element.querySelector<HTMLElement>(
