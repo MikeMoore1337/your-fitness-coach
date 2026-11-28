@@ -14,6 +14,7 @@ import {
   TelegramHarness,
 } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
+import { expectFirefoxWhitePrintPages } from './fixtures/firefox-print';
 
 type ReportState = Parameters<typeof makeProgressReportFixture>[0];
 
@@ -422,14 +423,57 @@ test('full report keeps a mobile-first preview and print layout', async ({
     (rule) => rule.size.toLowerCase().includes('a4') && rule.margin.includes('16mm'),
   );
   expect(a4PageRules).not.toHaveLength(0);
-  expect(a4PageRules).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        margin: expect.stringContaining('17mm 16mm 19mm'),
-        background: expect.stringContaining('255'),
-      }),
-    ]),
-  );
+  if (browserName === 'firefox') {
+    // Firefox drops the background descriptor from CSSPageRule. Preserve the
+    // authored rule check and verify the actual printed PDF separately below.
+    expect(a4PageRules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ margin: expect.stringContaining('17mm 16mm 19mm') }),
+      ]),
+    );
+    const hasWhitePageRule = await page.evaluate(async () => {
+      const sources = await Promise.all(
+        Array.from(document.styleSheets)
+          .map((sheet) => sheet.href)
+          .filter(
+            (href): href is string => Boolean(href) && new URL(href!).origin === location.origin,
+          )
+          .map(async (href) => {
+            const response = await fetch(href);
+            if (!response.ok) throw new Error(`Cannot read print stylesheet: ${response.status}`);
+            return await response.text();
+          }),
+      );
+      sources.push(
+        ...Array.from(document.querySelectorAll('style'), (style) => style.textContent ?? ''),
+      );
+      return sources.some((source) =>
+        Array.from(source.matchAll(/@page\s*\{([^{}]*)\}/gi)).some((match) => {
+          const hasA4Size =
+            /(?:^|;)\s*size\s*:\s*a4(?:\s+portrait)?\s*(?:!important)?\s*(?:;|$)/i.test(match[1]!);
+          const style = document.createElement('span').style;
+          style.cssText = match[1]!;
+          return (
+            hasA4Size &&
+            style.margin.includes('17mm 16mm 19mm') &&
+            style.backgroundColor === 'rgb(255, 255, 255)'
+          );
+        }),
+      );
+    });
+    expect(hasWhitePageRule, 'Authored A4 page rule must still specify a white background').toBe(
+      true,
+    );
+  } else {
+    expect(a4PageRules).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          margin: expect.stringContaining('17mm 16mm 19mm'),
+          background: expect.stringContaining('255'),
+        }),
+      ]),
+    );
+  }
   expect(printContract.surfaces).not.toHaveLength(0);
   for (const surface of printContract.surfaces) {
     expect(surface.backgroundColor).toBe('rgb(255, 255, 255)');
@@ -500,6 +544,38 @@ test('full report keeps a mobile-first preview and print layout', async ({
       }
     }
   }
+});
+
+test('Firefox prints the report on white A4 pages', async ({ browserName }, testInfo) => {
+  test.skip(
+    browserName !== 'firefox',
+    'Firefox needs an actual PDF because CSSPageRule omits its background',
+  );
+  const baseURL = testInfo.project.use.baseURL;
+  expect(baseURL).toBeTruthy();
+  await expectFirefoxWhitePrintPages(async (page) => {
+    await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+    await installPlatformApi(page, { browserSession: true });
+    await installReportApi(page);
+    await page.goto(new URL('/app/report?period=days_30', baseURL).href);
+    await expect(
+      page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('.progress-report-document')).toContainText(
+      'Александр Константинович',
+    );
+  }, testInfo);
+});
+
+test('Firefox print check rejects a dark page', async ({ browserName }, testInfo) => {
+  test.skip(browserName !== 'firefox', 'This verifies the Firefox-specific PDF check');
+  await expect(
+    expectFirefoxWhitePrintPages(async (page) => {
+      await page.setContent(
+        '<style>@page{size:A4;margin:0}html,body{margin:0;width:100%;height:100%;background:black!important;color:white}</style><h1>Синтетическая проверка</h1>',
+      );
+    }, testInfo),
+  ).rejects.toThrow('must have white paper');
 });
 
 for (const width of [320, 360, 390, 393, 430, 1440]) {
