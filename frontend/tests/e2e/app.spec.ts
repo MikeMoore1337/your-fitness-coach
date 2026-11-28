@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
@@ -3028,164 +3028,23 @@ test('поля профиля и питания выровнены на деск
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
-test('поля адаптируются к разным iPhone, а пример программы открывает состав', async ({ page }) => {
-  await page.setViewportSize({ width: 440, height: 956 });
-  await mockApi(page);
+test.describe
+  .serial('поля адаптируются к разным iPhone, а пример программы открывает состав', () => {
+  let context: BrowserContext;
+  let page: Page;
   let staleAssignmentSent = false;
-  await page.route('**/api/v1/programs/templates/10', async (route) => {
-    if (route.request().method() !== 'GET') return route.continue();
-    return route.fulfill({
-      json: {
-        id: 10,
-        title: 'Программа обновлена после предпросмотра',
-        slug: 'full-body-3-days',
-        goal: 'recomposition',
-        level: 'beginner',
-        split_type: 'full_body',
-        owner_user_id: null,
-        owner_telegram_user_id: null,
-        owner_full_name: null,
-        created_by_user_id: null,
-        is_public: true,
-        is_example: true,
-        is_assigned_to_current_user: false,
-        is_active_for_current_user: false,
-        can_edit: false,
-        assigned_by_user_id: null,
-        assigned_by_full_name: null,
-        assigned_program_id: null,
-        assigned_program_status: null,
-        assigned_program_start_date: null,
-        assigned_program_duration_weeks: null,
-        assigned_program_schedule_weekdays: null,
-        current_revision_number: 2,
-        assigned_program_updated: false,
-        future_workouts_updated: 0,
-        assigned_program_revision_number: null,
-        default_duration_weeks: 1,
-        provenance_type: 'YFC_GENERIC',
-        provenance: null,
-        program_metadata: null,
-        days: fullBodyThreeDayDays(),
-      },
-    });
-  });
-  await page.route('**/api/v1/programs/templates/10/assign-to-me', async (route) => {
-    staleAssignmentSent = true;
-    return route.fulfill({ status: 204, body: '' });
-  });
-  await page.goto('/app');
-  await page.getByRole('button', { name: 'Клиент' }).click();
-
-  await openAppDestination(page, 'Прогресс');
-  await page
-    .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('tab', { name: /^Тело$/ })
-    .click();
-  await page.locator('.progress-measurement-editor > summary').click();
-  const measurementForm = page.locator('.measurement-diary__form');
-  const dateField = measurementForm.locator('input[type="date"]');
-  const weightField = measurementForm.getByLabel('Вес, кг');
-  const diaryGrid = measurementForm.locator('.diary-form-grid');
-  const dateControl = measurementForm.locator('.diary-date-control');
-  const [dateBox, dateControlBox, weightBox, diaryGridBox] = await Promise.all([
-    dateField.boundingBox(),
-    dateControl.boundingBox(),
-    weightField.boundingBox(),
-    diaryGrid.boundingBox(),
-  ]);
-  expect(dateBox).not.toBeNull();
-  expect(dateControlBox).not.toBeNull();
-  expect(weightBox).not.toBeNull();
-  expect(diaryGridBox).not.toBeNull();
-  expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y);
-  expect(dateControlBox!.x).toBeGreaterThanOrEqual(diaryGridBox!.x);
-  expect(dateControlBox!.x + dateControlBox!.width).toBeLessThanOrEqual(
-    diaryGridBox!.x + diaryGridBox!.width,
-  );
-  expect(dateBox!.x).toBeGreaterThanOrEqual(dateControlBox!.x);
-  expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
-    dateControlBox!.x + dateControlBox!.width,
-  );
-
-  await openAppDestination(page, 'Питание');
-  const nutritionDiary = page.locator('.nutrition-day-summary');
-  await expect(nutritionDiary).toHaveCount(1);
-  await expect(nutritionDiary).toBeVisible();
-  expect(
-    await page.evaluate(() => ({
-      viewport: document.documentElement.clientWidth,
-      content: document.documentElement.scrollWidth,
-    })),
-  ).toEqual({ viewport: 440, content: 440 });
-  await page.evaluate(() => window.scrollTo({ left: 1000 }));
-  expect(await page.evaluate(() => window.scrollX)).toBe(0);
-
-  await openAppDestination(page, 'Упражнения');
-  await expect(page.getByRole('heading', { name: 'Упражнения', exact: true })).toBeVisible();
-  const search = page.getByRole('searchbox', { name: 'Поиск' });
-  await search.fill('Тяга');
-  await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
-  const searchBox = await search.boundingBox();
-  expect(searchBox).not.toBeNull();
-  expect(searchBox!.x + searchBox!.width).toBeLessThanOrEqual(440);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
-  );
-
-  const bottomNavigation = page.locator('#appBottomNav');
-  await expect(search).toBeFocused();
-  await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
-  await expect(bottomNavigation).toBeHidden();
-  await search.evaluate((element) => element.blur());
-  await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
-  await expect(bottomNavigation).toBeVisible();
-  await expect(page).toHaveURL('/app?section=catalog');
-  await expect(search).toHaveValue('Тяга');
-  await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
-
-  await openAppDestination(page, 'План');
-  await expect(page.getByRole('heading', { name: 'Текущий план от тренера' })).toBeVisible();
-  const planManagementLink = page.getByRole('link', {
-    name: 'Управление программой',
-    exact: true,
-  });
-  await expect(planManagementLink).toBeVisible();
-  await planManagementLink.click();
-  await expect(page).toHaveURL('/app?section=programs&view=manage');
-  await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
-  await page
-    .getByRole('navigation', { name: 'Управление программой' })
-    .getByRole('button', { name: /Назначение и изменения/ })
-    .click();
-  await page.getByText('Все этапы и изменения', { exact: true }).click();
-  await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
-  await expect(page.getByText('Программа назначена')).toBeVisible();
-  await page.getByText('Все этапы и изменения', { exact: true }).click();
-  await page.getByRole('button', { name: 'К центру управления' }).click();
-  await page
-    .getByRole('navigation', { name: 'Управление программой' })
-    .getByRole('button', { name: /Программы и шаблоны/ })
-    .click();
-  const example = page.getByRole('button', {
-    name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
-  });
-  await expect(example).toContainText('Рекомпозиция · Начальный уровень · 3 тренировки в цикле');
-  await expect(example).toContainText('Готовый шаблон');
-  await expect(example).not.toContainText('recomposition');
-  await expect(example).not.toContainText('beginner');
+  let example: Locator;
+  let sourceCard: Locator;
+  let previewDialog: Locator;
+  let previewPanel: Locator;
+  let previewContent: Locator;
+  let originalViewport: { width: number; height: number } | null;
+  let originalTheme: string | null;
   const previewEvidenceDir = path.resolve(
     '..',
     '.artifacts/runtime/tests/playwright/issue-1185-program-preview',
   );
-  mkdirSync(previewEvidenceDir, { recursive: true });
-  const originalViewport = page.viewportSize();
-  const originalTheme = await page.locator('html').getAttribute('data-color-scheme');
+
   const setTheme = async (theme: 'dark' | 'light') => {
     await page.locator('html').evaluate((element, colorScheme) => {
       element.setAttribute('data-color-scheme', colorScheme);
@@ -3199,279 +3058,458 @@ test('поля адаптируются к разным iPhone, а пример 
     );
   };
 
-  // Real-browser evidence of the implementation (API fixtures, not production data).
-  await page.setViewportSize({ width: 393, height: 900 });
-  const sourceCard = example.locator('xpath=ancestor::article');
-  for (const theme of ['dark', 'light'] as const) {
-    await setTheme(theme);
-    await sourceCard.screenshot({
-      path: path.join(previewEvidenceDir, `card-${theme}-393.png`),
-      animations: 'disabled',
+  test.beforeAll(async ({ browser }, testInfo) => {
+    const use = testInfo.project.use;
+    context = await browser.newContext({
+      baseURL: use.baseURL,
+      userAgent: use.userAgent,
+      viewport: use.viewport,
+      deviceScaleFactor: use.deviceScaleFactor,
+      isMobile: use.isMobile,
+      hasTouch: use.hasTouch,
+      serviceWorkers: 'block',
     });
-  }
+    page = await context.newPage();
+  });
 
-  await example.click();
-  const previewDialog = page.locator('.program-example-modal');
-  const previewPanel = page.locator('.program-example-modal__panel');
-  const previewContent = page.locator('.program-example-modal__content');
-  await expect(previewDialog).toBeVisible();
-  for (const width of [320, 360, 393, 430, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    await expect(previewPanel).toBeVisible();
-    const panelBox = await previewPanel.boundingBox();
-    expect(panelBox).not.toBeNull();
-    expect(panelBox!.x).toBeGreaterThanOrEqual(-1);
-    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(width + 1);
-    if (width <= 600) {
-      expect(Math.abs(panelBox!.x)).toBeLessThanOrEqual(1);
-      expect(Math.abs(panelBox!.width - width)).toBeLessThanOrEqual(1);
-    } else {
-      expect(Math.abs(panelBox!.x + panelBox!.width - width)).toBeLessThanOrEqual(1);
-      expect(panelBox!.width).toBeLessThanOrEqual(651);
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      width,
+  test.afterAll(async () => {
+    await context?.close();
+  });
+
+  test('checks mobile fields and opens the program library', async () => {
+    await page.setViewportSize({ width: 440, height: 956 });
+    await mockApi(page);
+    await page.route('**/api/v1/programs/templates/10', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      return route.fulfill({
+        json: {
+          id: 10,
+          title: 'Программа обновлена после предпросмотра',
+          slug: 'full-body-3-days',
+          goal: 'recomposition',
+          level: 'beginner',
+          split_type: 'full_body',
+          owner_user_id: null,
+          owner_telegram_user_id: null,
+          owner_full_name: null,
+          created_by_user_id: null,
+          is_public: true,
+          is_example: true,
+          is_assigned_to_current_user: false,
+          is_active_for_current_user: false,
+          can_edit: false,
+          assigned_by_user_id: null,
+          assigned_by_full_name: null,
+          assigned_program_id: null,
+          assigned_program_status: null,
+          assigned_program_start_date: null,
+          assigned_program_duration_weeks: null,
+          assigned_program_schedule_weekdays: null,
+          current_revision_number: 2,
+          assigned_program_updated: false,
+          future_workouts_updated: 0,
+          assigned_program_revision_number: null,
+          default_duration_weeks: 1,
+          provenance_type: 'YFC_GENERIC',
+          provenance: null,
+          program_metadata: null,
+          days: fullBodyThreeDayDays(),
+        },
+      });
+    });
+    await page.route('**/api/v1/programs/templates/10/assign-to-me', async (route) => {
+      staleAssignmentSent = true;
+      return route.fulfill({ status: 204, body: '' });
+    });
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+
+    await openAppDestination(page, 'Прогресс');
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тело$/ })
+      .click();
+    await page.locator('.progress-measurement-editor > summary').click();
+    const measurementForm = page.locator('.measurement-diary__form');
+    const dateField = measurementForm.locator('input[type="date"]');
+    const weightField = measurementForm.getByLabel('Вес, кг');
+    const diaryGrid = measurementForm.locator('.diary-form-grid');
+    const dateControl = measurementForm.locator('.diary-date-control');
+    const [dateBox, dateControlBox, weightBox, diaryGridBox] = await Promise.all([
+      dateField.boundingBox(),
+      dateControl.boundingBox(),
+      weightField.boundingBox(),
+      diaryGrid.boundingBox(),
+    ]);
+    expect(dateBox).not.toBeNull();
+    expect(dateControlBox).not.toBeNull();
+    expect(weightBox).not.toBeNull();
+    expect(diaryGridBox).not.toBeNull();
+    expect(dateBox!.y + dateBox!.height).toBeLessThanOrEqual(weightBox!.y);
+    expect(dateControlBox!.x).toBeGreaterThanOrEqual(diaryGridBox!.x);
+    expect(dateControlBox!.x + dateControlBox!.width).toBeLessThanOrEqual(
+      diaryGridBox!.x + diaryGridBox!.width,
     );
-    if (width <= 600) {
-      const actions = page.locator('.program-example-modal__actions');
-      const primaryAction = actions.getByRole('button', {
-        name: 'Настроить расписание и запустить',
-      });
-      const [actionsBox, primaryBox] = await Promise.all([
-        actions.boundingBox(),
-        primaryAction.boundingBox(),
-      ]);
-      expect(actionsBox).not.toBeNull();
-      expect(primaryBox).not.toBeNull();
-      const actionPadding = await actions.evaluate((element) => {
-        const styles = getComputedStyle(element);
-        return Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
-      });
-      expect(primaryBox!.width).toBeGreaterThanOrEqual(actionsBox!.width - actionPadding - 2);
-      expect(primaryBox!.height).toBeLessThanOrEqual(50);
-      expect(
-        await primaryAction.evaluate((element) => element.scrollHeight <= element.clientHeight),
-      ).toBe(true);
-    }
+    expect(dateBox!.x).toBeGreaterThanOrEqual(dateControlBox!.x);
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(
+      dateControlBox!.x + dateControlBox!.width,
+    );
+
+    await openAppDestination(page, 'Питание');
+    const nutritionDiary = page.locator('.nutrition-day-summary');
+    await expect(nutritionDiary).toHaveCount(1);
+    await expect(nutritionDiary).toBeVisible();
+    expect(
+      await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        content: document.documentElement.scrollWidth,
+      })),
+    ).toEqual({ viewport: 440, content: 440 });
+    await page.evaluate(() => window.scrollTo({ left: 1000 }));
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
+
+    await openAppDestination(page, 'Упражнения');
+    await expect(page.getByRole('heading', { name: 'Упражнения', exact: true })).toBeVisible();
+    const search = page.getByRole('searchbox', { name: 'Поиск' });
+    await search.fill('Тяга');
+    await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
+    const searchBox = await search.boundingBox();
+    expect(searchBox).not.toBeNull();
+    expect(searchBox!.x + searchBox!.width).toBeLessThanOrEqual(440);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+
+    const bottomNavigation = page.locator('#appBottomNav');
+    await expect(search).toBeFocused();
+    await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+    await expect(bottomNavigation).toBeHidden();
+    await search.evaluate((element) => element.blur());
+    await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
+    await expect(bottomNavigation).toBeVisible();
+    await expect(page).toHaveURL('/app?section=catalog');
+    await expect(search).toHaveValue('Тяга');
+    await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
+
+    await openAppDestination(page, 'План');
+    await expect(page.getByRole('heading', { name: 'Текущий план от тренера' })).toBeVisible();
+    const planManagementLink = page.getByRole('link', {
+      name: 'Управление программой',
+      exact: true,
+    });
+    await expect(planManagementLink).toBeVisible();
+    await planManagementLink.click();
+    await expect(page).toHaveURL('/app?section=programs&view=manage');
+    await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
+    await page
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Назначение и изменения/ })
+      .click();
+    await page.getByText('Все этапы и изменения', { exact: true }).click();
+    await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
+    await expect(page.getByText('Программа назначена')).toBeVisible();
+    await page.getByText('Все этапы и изменения', { exact: true }).click();
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    await page
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Программы и шаблоны/ })
+      .click();
+    example = page.getByRole('button', {
+      name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
+    });
+    await expect(example).toContainText('Рекомпозиция · Начальный уровень · 3 тренировки в цикле');
+    await expect(example).toContainText('Готовый шаблон');
+    await expect(example).not.toContainText('recomposition');
+    await expect(example).not.toContainText('beginner');
+    mkdirSync(previewEvidenceDir, { recursive: true });
+    originalViewport = page.viewportSize();
+    originalTheme = await page.locator('html').getAttribute('data-color-scheme');
+    sourceCard = example.locator('xpath=ancestor::article');
+  });
+
+  test('checks preview geometry at each viewport and theme', async () => {
+    // Real-browser evidence of the implementation (API fixtures, not production data).
+    await page.setViewportSize({ width: 393, height: 900 });
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(theme);
-      await page.screenshot({
-        path: path.join(previewEvidenceDir, `preview-${theme}-${width}.png`),
+      await sourceCard.screenshot({
+        path: path.join(previewEvidenceDir, `card-${theme}-393.png`),
         animations: 'disabled',
       });
     }
-  }
 
-  await page.setViewportSize({ width: 320, height: 900 });
-  const lastDay = previewPanel.locator('.program-example-day').last();
-  await lastDay.locator('summary').click();
-  const lastExercise = lastDay.locator('li').last();
-  await lastExercise.scrollIntoViewIfNeeded();
-  const [lastExerciseBox, exerciseActionsBox] = await Promise.all([
-    lastExercise.boundingBox(),
-    page.locator('.program-example-modal__actions').boundingBox(),
-  ]);
-  expect(lastExerciseBox).not.toBeNull();
-  expect(exerciseActionsBox).not.toBeNull();
-  expect(lastExerciseBox!.y + lastExerciseBox!.height).toBeLessThanOrEqual(
-    exerciseActionsBox!.y + 1,
-  );
-  await previewContent.evaluate((panel) =>
-    panel.scrollTo({ top: panel.scrollHeight, behavior: 'instant' }),
-  );
-  await expect
-    .poll(() =>
-      previewContent.evaluate(
-        (panel) => panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1,
+    await example.click();
+    previewDialog = page.locator('.program-example-modal');
+    previewPanel = page.locator('.program-example-modal__panel');
+    previewContent = page.locator('.program-example-modal__content');
+    await expect(previewDialog).toBeVisible();
+    for (const width of [320, 360, 393, 430, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(previewPanel).toBeVisible();
+      const panelBox = await previewPanel.boundingBox();
+      expect(panelBox).not.toBeNull();
+      expect(panelBox!.x).toBeGreaterThanOrEqual(-1);
+      expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(width + 1);
+      if (width <= 600) {
+        expect(Math.abs(panelBox!.x)).toBeLessThanOrEqual(1);
+        expect(Math.abs(panelBox!.width - width)).toBeLessThanOrEqual(1);
+      } else {
+        expect(Math.abs(panelBox!.x + panelBox!.width - width)).toBeLessThanOrEqual(1);
+        expect(panelBox!.width).toBeLessThanOrEqual(651);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width,
+      );
+      if (width <= 600) {
+        const actions = page.locator('.program-example-modal__actions');
+        const primaryAction = actions.getByRole('button', {
+          name: 'Настроить расписание и запустить',
+        });
+        const [actionsBox, primaryBox] = await Promise.all([
+          actions.boundingBox(),
+          primaryAction.boundingBox(),
+        ]);
+        expect(actionsBox).not.toBeNull();
+        expect(primaryBox).not.toBeNull();
+        const actionPadding = await actions.evaluate((element) => {
+          const styles = getComputedStyle(element);
+          return Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+        });
+        expect(primaryBox!.width).toBeGreaterThanOrEqual(actionsBox!.width - actionPadding - 2);
+        expect(primaryBox!.height).toBeLessThanOrEqual(50);
+        expect(
+          await primaryAction.evaluate((element) => element.scrollHeight <= element.clientHeight),
+        ).toBe(true);
+      }
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(theme);
+        await page.screenshot({
+          path: path.join(previewEvidenceDir, `preview-${theme}-${width}.png`),
+          animations: 'disabled',
+        });
+      }
+    }
+  });
+
+  test('checks preview content and actions for each program owner', async () => {
+    await page.setViewportSize({ width: 320, height: 900 });
+    const lastDay = previewPanel.locator('.program-example-day').last();
+    await lastDay.locator('summary').click();
+    const lastExercise = lastDay.locator('li').last();
+    await lastExercise.scrollIntoViewIfNeeded();
+    const [lastExerciseBox, exerciseActionsBox] = await Promise.all([
+      lastExercise.boundingBox(),
+      page.locator('.program-example-modal__actions').boundingBox(),
+    ]);
+    expect(lastExerciseBox).not.toBeNull();
+    expect(exerciseActionsBox).not.toBeNull();
+    expect(lastExerciseBox!.y + lastExerciseBox!.height).toBeLessThanOrEqual(
+      exerciseActionsBox!.y + 1,
+    );
+    await previewContent.evaluate((panel) =>
+      panel.scrollTo({ top: panel.scrollHeight, behavior: 'instant' }),
+    );
+    await expect
+      .poll(() =>
+        previewContent.evaluate(
+          (panel) => panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1,
+        ),
+      )
+      .toBe(true);
+    const sourceNote = page.locator('.program-preview-source');
+    await expect(sourceNote).toBeVisible();
+    const [sourceNoteBox, bottomActionsBox] = await Promise.all([
+      sourceNote.boundingBox(),
+      page.locator('.program-example-modal__actions').boundingBox(),
+    ]);
+    expect(sourceNoteBox).not.toBeNull();
+    expect(bottomActionsBox).not.toBeNull();
+    expect(sourceNoteBox!.y + sourceNoteBox!.height).toBeLessThanOrEqual(bottomActionsBox!.y + 1);
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `preview-scroll-bottom-${theme}-320.png`),
+        animations: 'disabled',
+      });
+    }
+
+    await page.setViewportSize({ width: 393, height: 900 });
+    await page.getByRole('button', { name: 'Настроить расписание и запустить' }).click();
+    await expect(page.locator('.program-preview-stale')).toHaveText(
+      'Данные обновились. Проверьте сведения выше и повторите назначение.',
+    );
+    await setTheme('light');
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, 'stale-light-393.png'),
+      animations: 'disabled',
+    });
+    expect(staleAssignmentSent).toBe(false);
+    await page.getByRole('button', { name: 'Закрыть сообщение' }).click();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(previewDialog).toHaveCount(0);
+    await expect(example).toBeFocused();
+
+    const ownProgram = page.getByRole('button', {
+      name: 'Посмотреть программу «Моя программа — длинное название для проверки переноса строк и действий»',
+    });
+    await ownProgram.click();
+    await expect(previewDialog).toBeVisible();
+    await expect(
+      page.getByText('Владелец: вы. Вы можете редактировать свою программу.'),
+    ).toBeVisible();
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `own-${theme}-393.png`),
+        animations: 'disabled',
+      });
+    }
+    await page.locator('.program-example-modal__close').click();
+    await expect(previewDialog).toHaveCount(0);
+
+    const legacyProgram = page.getByRole('button', {
+      name: 'Посмотреть программу «Импортированная программа без метаданных»',
+    });
+    await legacyProgram.click();
+    await expect(previewDialog).toBeVisible();
+    await expect(page.getByText('Владелец: Архивный автор.')).toBeVisible();
+    await expect(page.getByText('Нет данных').first()).toBeVisible();
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `legacy-${theme}-393.png`),
+        animations: 'disabled',
+      });
+    }
+    await page.locator('.program-example-modal__close').click();
+    await expect(previewDialog).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'К центру управления' }).click();
+    await page.getByRole('button', { name: 'Посмотреть состав' }).click();
+    await expect(previewDialog).toBeVisible();
+    await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
+    await expect(
+      page.getByText('Эта программа назначена тренером. Изменение недоступно.'),
+    ).toBeVisible();
+    const trainerActions = page.locator('.program-example-modal__actions');
+    const trainerNotice = trainerActions.locator('.program-example-modal__readonly');
+    await expect(trainerActions.locator('button')).toHaveCount(0);
+    await trainerNotice.scrollIntoViewIfNeeded();
+    const [trainerNoticeBox, trainerActionsBox] = await Promise.all([
+      trainerNotice.boundingBox(),
+      trainerActions.boundingBox(),
+    ]);
+    const trainerPanelBox = await previewPanel.boundingBox();
+    expect(trainerNoticeBox).not.toBeNull();
+    expect(trainerActionsBox).not.toBeNull();
+    expect(trainerPanelBox).not.toBeNull();
+    const trainerActionsPadding = await trainerActions.evaluate((element) => {
+      const styles = getComputedStyle(element);
+      return {
+        left: Number.parseFloat(styles.paddingLeft),
+        right: Number.parseFloat(styles.paddingRight),
+      };
+    });
+    const trainerContentLeft = trainerActionsBox!.x + trainerActionsPadding.left;
+    const trainerContentRight =
+      trainerActionsBox!.x + trainerActionsBox!.width - trainerActionsPadding.right;
+    expect(trainerNoticeBox!.x).toBeGreaterThanOrEqual(trainerContentLeft - 1);
+    expect(trainerNoticeBox!.x + trainerNoticeBox!.width).toBeLessThanOrEqual(
+      trainerContentRight + 1,
+    );
+    expect(trainerNoticeBox!.width).toBeGreaterThanOrEqual(
+      trainerContentRight - trainerContentLeft - 2,
+    );
+    expect(trainerNoticeBox!.y).toBeGreaterThanOrEqual(trainerPanelBox!.y - 1);
+    expect(trainerNoticeBox!.y + trainerNoticeBox!.height).toBeLessThanOrEqual(
+      trainerPanelBox!.y + trainerPanelBox!.height + 1,
+    );
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `trainer-${theme}-393.png`),
+        animations: 'disabled',
+      });
+    }
+    await page.locator('.program-example-modal__close').click();
+    await expect(previewDialog).toHaveCount(0);
+  });
+
+  test('checks assignment confirmation and exercise guide', async () => {
+    // #1326: the active program preview lives in overview; return to the library to launch this template.
+    await page
+      .getByRole('navigation', { name: 'Управление программой' })
+      .getByRole('button', { name: /Программы и шаблоны/ })
+      .click();
+    await expect(sourceCard).toBeVisible();
+    await sourceCard.getByRole('button', { name: 'Запустить' }).click();
+    const assignmentDialog = page.locator('.assignment-modal');
+    await expect(assignmentDialog).toBeVisible();
+    await assignmentDialog.getByRole('button', { name: 'Назначить по расписанию' }).click();
+    const replacementDialog = page.getByRole('dialog', { name: 'Заменить активную программу?' });
+    await expect(replacementDialog).toBeVisible();
+    await setTheme('dark');
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, 'confirmation-dark-393.png'),
+      animations: 'disabled',
+    });
+    await setTheme('light');
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, 'confirmation-light-393.png'),
+      animations: 'disabled',
+    });
+    await replacementDialog.getByRole('button', { name: 'Отмена' }).click();
+    await assignmentDialog.getByRole('button', { name: 'Закрыть настройку расписания' }).click();
+    await expect(assignmentDialog).toHaveCount(0);
+    await example.click();
+    await expect(previewDialog).toBeVisible();
+
+    if (originalViewport) await page.setViewportSize(originalViewport);
+    await page.locator('html').evaluate((element, colorScheme) => {
+      if (colorScheme == null) element.removeAttribute('data-color-scheme');
+      else element.setAttribute('data-color-scheme', colorScheme);
+    }, originalTheme);
+
+    await expect(page.getByRole('heading', { name: 'День 1. Всё тело' })).toBeVisible();
+    const firstExercise = page.getByRole('listitem').filter({ hasText: 'Тяга блока' });
+    await expect(firstExercise).toHaveCount(1);
+    await expect(firstExercise.getByText('Тяга блока')).toBeVisible();
+    await expect(firstExercise.getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
+    const [programPanelBox, programHeadBox] = await Promise.all([
+      page.locator('.program-example-modal__panel').boundingBox(),
+      page.locator('.program-example-modal__head').boundingBox(),
+    ]);
+    expect(programPanelBox).not.toBeNull();
+    expect(programHeadBox).not.toBeNull();
+    expect(programPanelBox!.x).toBeLessThanOrEqual(1);
+    expect(Math.abs(programPanelBox!.width - 390)).toBeLessThanOrEqual(1);
+    expect(Math.abs(programHeadBox!.x - programPanelBox!.x)).toBeLessThanOrEqual(2);
+    expect(
+      Math.abs(
+        programHeadBox!.x + programHeadBox!.width - (programPanelBox!.x + programPanelBox!.width),
       ),
-    )
-    .toBe(true);
-  const sourceNote = page.locator('.program-preview-source');
-  await expect(sourceNote).toBeVisible();
-  const [sourceNoteBox, bottomActionsBox] = await Promise.all([
-    sourceNote.boundingBox(),
-    page.locator('.program-example-modal__actions').boundingBox(),
-  ]);
-  expect(sourceNoteBox).not.toBeNull();
-  expect(bottomActionsBox).not.toBeNull();
-  expect(sourceNoteBox!.y + sourceNoteBox!.height).toBeLessThanOrEqual(bottomActionsBox!.y + 1);
-  for (const theme of ['dark', 'light'] as const) {
-    await setTheme(theme);
-    await page.screenshot({
-      path: path.join(previewEvidenceDir, `preview-scroll-bottom-${theme}-320.png`),
-      animations: 'disabled',
-    });
-  }
-
-  await page.setViewportSize({ width: 393, height: 900 });
-  await page.getByRole('button', { name: 'Настроить расписание и запустить' }).click();
-  await expect(page.locator('.program-preview-stale')).toHaveText(
-    'Данные обновились. Проверьте сведения выше и повторите назначение.',
-  );
-  await setTheme('light');
-  await page.screenshot({
-    path: path.join(previewEvidenceDir, 'stale-light-393.png'),
-    animations: 'disabled',
+    ).toBeLessThanOrEqual(2);
+    await page.getByRole('button', { name: 'Техника и детали' }).click();
+    const exerciseGuide = page.locator('.exercise-guide-modal__panel');
+    await expect(exerciseGuide.getByRole('img', { name: 'Фаза усилия' })).toBeVisible();
+    await expect(exerciseGuide.getByRole('img', { name: 'Фаза возврата' })).toBeVisible();
+    await expect(
+      exerciseGuide.locator('.exercise-guide-images figcaption').getByText('Фаза усилия'),
+    ).toBeVisible();
+    await expect(
+      exerciseGuide.locator('.exercise-guide-images figcaption').getByText('Фаза возврата'),
+    ).toBeVisible();
+    await exerciseGuide.getByRole('button', { name: 'Увеличить: Фаза усилия' }).click();
+    await expect(page.locator('.exercise-lightbox')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
   });
-  expect(staleAssignmentSent).toBe(false);
-  await page.getByRole('button', { name: 'Закрыть сообщение' }).click();
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(previewDialog).toHaveCount(0);
-  await expect(example).toBeFocused();
-
-  const ownProgram = page.getByRole('button', {
-    name: 'Посмотреть программу «Моя программа — длинное название для проверки переноса строк и действий»',
-  });
-  await ownProgram.click();
-  await expect(previewDialog).toBeVisible();
-  await expect(
-    page.getByText('Владелец: вы. Вы можете редактировать свою программу.'),
-  ).toBeVisible();
-  for (const theme of ['dark', 'light'] as const) {
-    await setTheme(theme);
-    await page.screenshot({
-      path: path.join(previewEvidenceDir, `own-${theme}-393.png`),
-      animations: 'disabled',
-    });
-  }
-  await page.locator('.program-example-modal__close').click();
-  await expect(previewDialog).toHaveCount(0);
-
-  const legacyProgram = page.getByRole('button', {
-    name: 'Посмотреть программу «Импортированная программа без метаданных»',
-  });
-  await legacyProgram.click();
-  await expect(previewDialog).toBeVisible();
-  await expect(page.getByText('Владелец: Архивный автор.')).toBeVisible();
-  await expect(page.getByText('Нет данных').first()).toBeVisible();
-  for (const theme of ['dark', 'light'] as const) {
-    await setTheme(theme);
-    await page.screenshot({
-      path: path.join(previewEvidenceDir, `legacy-${theme}-393.png`),
-      animations: 'disabled',
-    });
-  }
-  await page.locator('.program-example-modal__close').click();
-  await expect(previewDialog).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'К центру управления' }).click();
-  await page.getByRole('button', { name: 'Посмотреть состав' }).click();
-  await expect(previewDialog).toBeVisible();
-  await expect(page.getByText('Назначил тренер Тренер Анна', { exact: true })).toBeVisible();
-  await expect(
-    page.getByText('Эта программа назначена тренером. Изменение недоступно.'),
-  ).toBeVisible();
-  const trainerActions = page.locator('.program-example-modal__actions');
-  const trainerNotice = trainerActions.locator('.program-example-modal__readonly');
-  await expect(trainerActions.locator('button')).toHaveCount(0);
-  await trainerNotice.scrollIntoViewIfNeeded();
-  const [trainerNoticeBox, trainerActionsBox] = await Promise.all([
-    trainerNotice.boundingBox(),
-    trainerActions.boundingBox(),
-  ]);
-  const trainerPanelBox = await previewPanel.boundingBox();
-  expect(trainerNoticeBox).not.toBeNull();
-  expect(trainerActionsBox).not.toBeNull();
-  expect(trainerPanelBox).not.toBeNull();
-  const trainerActionsPadding = await trainerActions.evaluate((element) => {
-    const styles = getComputedStyle(element);
-    return {
-      left: Number.parseFloat(styles.paddingLeft),
-      right: Number.parseFloat(styles.paddingRight),
-    };
-  });
-  const trainerContentLeft = trainerActionsBox!.x + trainerActionsPadding.left;
-  const trainerContentRight =
-    trainerActionsBox!.x + trainerActionsBox!.width - trainerActionsPadding.right;
-  expect(trainerNoticeBox!.x).toBeGreaterThanOrEqual(trainerContentLeft - 1);
-  expect(trainerNoticeBox!.x + trainerNoticeBox!.width).toBeLessThanOrEqual(
-    trainerContentRight + 1,
-  );
-  expect(trainerNoticeBox!.width).toBeGreaterThanOrEqual(
-    trainerContentRight - trainerContentLeft - 2,
-  );
-  expect(trainerNoticeBox!.y).toBeGreaterThanOrEqual(trainerPanelBox!.y - 1);
-  expect(trainerNoticeBox!.y + trainerNoticeBox!.height).toBeLessThanOrEqual(
-    trainerPanelBox!.y + trainerPanelBox!.height + 1,
-  );
-  for (const theme of ['dark', 'light'] as const) {
-    await setTheme(theme);
-    await page.screenshot({
-      path: path.join(previewEvidenceDir, `trainer-${theme}-393.png`),
-      animations: 'disabled',
-    });
-  }
-  await page.locator('.program-example-modal__close').click();
-  await expect(previewDialog).toHaveCount(0);
-
-  // #1326: the active program preview lives in overview; return to the library to launch this template.
-  await page
-    .getByRole('navigation', { name: 'Управление программой' })
-    .getByRole('button', { name: /Программы и шаблоны/ })
-    .click();
-  await expect(sourceCard).toBeVisible();
-  await sourceCard.getByRole('button', { name: 'Запустить' }).click();
-  const assignmentDialog = page.locator('.assignment-modal');
-  await expect(assignmentDialog).toBeVisible();
-  await assignmentDialog.getByRole('button', { name: 'Назначить по расписанию' }).click();
-  const replacementDialog = page.getByRole('dialog', { name: 'Заменить активную программу?' });
-  await expect(replacementDialog).toBeVisible();
-  await setTheme('dark');
-  await page.screenshot({
-    path: path.join(previewEvidenceDir, 'confirmation-dark-393.png'),
-    animations: 'disabled',
-  });
-  await setTheme('light');
-  await page.screenshot({
-    path: path.join(previewEvidenceDir, 'confirmation-light-393.png'),
-    animations: 'disabled',
-  });
-  await replacementDialog.getByRole('button', { name: 'Отмена' }).click();
-  await assignmentDialog.getByRole('button', { name: 'Закрыть настройку расписания' }).click();
-  await expect(assignmentDialog).toHaveCount(0);
-  await example.click();
-  await expect(previewDialog).toBeVisible();
-
-  if (originalViewport) await page.setViewportSize(originalViewport);
-  await page.locator('html').evaluate((element, colorScheme) => {
-    if (colorScheme == null) element.removeAttribute('data-color-scheme');
-    else element.setAttribute('data-color-scheme', colorScheme);
-  }, originalTheme);
-
-  await expect(page.getByRole('heading', { name: 'День 1. Всё тело' })).toBeVisible();
-  const firstExercise = page.getByRole('listitem').filter({ hasText: 'Тяга блока' });
-  await expect(firstExercise).toHaveCount(1);
-  await expect(firstExercise.getByText('Тяга блока')).toBeVisible();
-  await expect(firstExercise.getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
-  const [programPanelBox, programHeadBox] = await Promise.all([
-    page.locator('.program-example-modal__panel').boundingBox(),
-    page.locator('.program-example-modal__head').boundingBox(),
-  ]);
-  expect(programPanelBox).not.toBeNull();
-  expect(programHeadBox).not.toBeNull();
-  expect(programPanelBox!.x).toBeLessThanOrEqual(1);
-  expect(Math.abs(programPanelBox!.width - 390)).toBeLessThanOrEqual(1);
-  expect(Math.abs(programHeadBox!.x - programPanelBox!.x)).toBeLessThanOrEqual(2);
-  expect(
-    Math.abs(
-      programHeadBox!.x + programHeadBox!.width - (programPanelBox!.x + programPanelBox!.width),
-    ),
-  ).toBeLessThanOrEqual(2);
-  await page.getByRole('button', { name: 'Техника и детали' }).click();
-  const exerciseGuide = page.locator('.exercise-guide-modal__panel');
-  await expect(exerciseGuide.getByRole('img', { name: 'Фаза усилия' })).toBeVisible();
-  await expect(exerciseGuide.getByRole('img', { name: 'Фаза возврата' })).toBeVisible();
-  await expect(
-    exerciseGuide.locator('.exercise-guide-images figcaption').getByText('Фаза усилия'),
-  ).toBeVisible();
-  await expect(
-    exerciseGuide.locator('.exercise-guide-images figcaption').getByText('Фаза возврата'),
-  ).toBeVisible();
-  await exerciseGuide.getByRole('button', { name: 'Увеличить: Фаза усилия' }).click();
-  await expect(page.locator('.exercise-lightbox')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
 });
 
 for (const width of [360, 390, 430]) {
