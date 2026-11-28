@@ -502,14 +502,14 @@ test('full report keeps a mobile-first preview and print layout', async ({
   }
 });
 
-test('report stays readable across the requested viewport matrix', async ({
-  page,
-  browserName,
-}, testInfo) => {
-  await installPlatformApi(page, { browserSession: true });
-  await installReportApi(page);
+for (const width of [320, 360, 390, 393, 430, 1440]) {
+  test(`report stays readable across the requested viewport matrix: ${width}px`, async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    await installPlatformApi(page, { browserSession: true });
+    await installReportApi(page);
 
-  for (const width of [320, 360, 390, 393, 430, 1440]) {
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 844 });
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -544,8 +544,8 @@ test('report stays readable across the requested viewport matrix', async ({
         });
       }
     }
-  }
-});
+  });
+}
 
 test('browser print PDF contains the canonical facts and privacy boundaries', async ({
   page,
