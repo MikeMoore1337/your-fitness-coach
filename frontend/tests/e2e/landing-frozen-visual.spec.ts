@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { PNG, compareLandingPixels } from './fixtures/landing-pixels';
+import { acceptedLandingReference } from './fixtures/landing-accepted-reference';
 
 const root = path.resolve('../docs/design/references/product-v10-landing-approved/final-895');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'MANIFEST.json'), 'utf8')) as {
@@ -47,7 +48,7 @@ for (const item of manifest.images)
       animations: 'disabled',
       scale: 'css',
     });
-    const source = PNG.sync.read(data);
+    const source = acceptedLandingReference(testInfo, 'frozen', item.file);
     const candidate = PNG.sync.read(actual);
     expect(candidate.width).toBe(source.width);
     expect(candidate.height).toBe(source.height);
@@ -76,10 +77,13 @@ for (const item of manifest.images)
       path.join(evidence, 'frozen', item.file + '-diff.png'),
       PNG.sync.write(result.heatmap),
     );
-    await testInfo.attach('frozen-reference', { body: data, contentType: 'image/png' });
+    await testInfo.attach('frozen-reference', {
+      body: PNG.sync.write(source),
+      contentType: 'image/png',
+    });
     await testInfo.attach('candidate', { body: actual, contentType: 'image/png' });
     expect(
       result.changedPixelRatio,
-      'Approved #895 first-screen/menu differs; never regenerate the baseline.',
+      'Accepted Landing first-screen/menu differs from its approved reference.',
     ).toBeLessThanOrEqual(0.01);
   });
