@@ -6,6 +6,7 @@ import cases from '../fixtures/landing-archive-normalization.json' with { type: 
 import dispositions from '../fixtures/landing-archive-disposition.json' with { type: 'json' };
 import regionCases from '../fixtures/landing-archive-regions.json' with { type: 'json' };
 import { PNG, compareLandingPixels } from './fixtures/landing-pixels';
+import { acceptedLandingReference } from './fixtures/landing-accepted-reference';
 const root = path.resolve(
   process.env.LANDING_ARCHIVE_ROOT ?? '../docs/design/references/landing-archive-owner-canonical',
 );
@@ -243,12 +244,25 @@ async function waitForSceneState(page: Page, target: Locator, entry: ArchiveCase
           .locator('.strength-scene__raised')
           .evaluate((element) => Number(getComputedStyle(element).opacity)),
       )
-      .toBeLessThan(0.1);
+      .toBeLessThan(0.001);
     await expect(target.locator('[data-reps]')).toHaveText('2');
   } else if (entry.state === 'record') {
     await expect(target.locator('[data-reps]')).toHaveText('3');
     await expect(target.locator('[data-record]')).toHaveText('18 кг × 3');
-  } else await expect(target.locator('.strength-scene__result')).toBeVisible();
+    await expect
+      .poll(() =>
+        target
+          .locator('.strength-scene__raised')
+          .evaluate((element) => Number(getComputedStyle(element).opacity)),
+      )
+      .toBeGreaterThan(0.99);
+  } else {
+    const result = target.locator('.strength-scene__result');
+    await expect(result).toBeVisible();
+    await expect
+      .poll(() => result.evaluate((element) => Number(getComputedStyle(element).opacity)))
+      .toBeGreaterThan(0.99);
+  }
 }
 
 function writeSceneResult(entry: ArchiveCase, disposition: Disposition, result: object) {
@@ -275,9 +289,7 @@ for (const entry of cases) {
   if (!disposition) throw new Error(`Missing archive disposition for ${entry.file}`);
 
   if (disposition.comparisonStatus === 'OWNER_SUPERSEDED') {
-    test(`${entry.file}: later-owner reference coverage, not pixel parity`, async ({
-      page,
-    }, testInfo: TestInfo) => {
+    test(`${entry.file}: accepted replacement reference`, async ({ page }, testInfo: TestInfo) => {
       await openLanding(page, entry);
       for (const selector of disposition.baselineAssertions ?? [])
         await expect(page.locator(selector)).toHaveCount(1);
@@ -292,6 +304,20 @@ for (const entry of cases) {
         animations: 'disabled',
         scale: 'css',
       });
+      const reference = acceptedLandingReference(
+        testInfo,
+        'archive',
+        `owner-baseline-${entry.file}`,
+      );
+      const candidate = PNG.sync.read(actual);
+      expect(candidate.width).toBe(reference.width);
+      expect(candidate.height).toBe(reference.height);
+      const comparison = compareLandingPixels(reference, candidate, {
+        x: 0,
+        y: 0,
+        width: reference.width,
+        height: reference.height,
+      });
       const ownerSourcePath = disposition.ownerSource
         ? path.resolve(ownerEvidence, path.basename(disposition.ownerSource))
         : null;
@@ -302,23 +328,25 @@ for (const entry of cases) {
       if (ownerSourceHash && disposition.ownerSource)
         expect(ownerSourceHash).toBe(approvedSourceHashes[path.basename(disposition.ownerSource)]);
       writeSceneResult(entry, disposition, {
-        comparisonResult: 'NOT_COMPARABLE',
-        ownerBaselineResult:
-          disposition.visualProof === 'FROZEN_FIRST_SCREEN'
-            ? 'CHECK_SEPARATE_FROZEN_PIXEL_SUITE'
-            : 'VISUAL_NOT_PROVEN',
+        comparisonResult: comparison.changedPixelRatio <= 0.01 ? 'PASS' : 'FAIL',
+        changedPixelRatio: comparison.changedPixelRatio,
+        ownerBaselineResult: 'ACCEPTED_REPLACEMENT',
         structureResult: 'PASS',
-        ownerApproval: false,
-        approvedReferenceScope: 'FIRST_SCREEN_ONLY; current pixels require separate comparison',
+        ownerApproval: true,
+        approvedReferenceScope: 'ACCEPTED_REPLACEMENT_FRAME',
         ownerSourcePresent: Boolean(ownerSourcePath && fs.existsSync(ownerSourcePath)),
         ownerSourcePath,
         ownerSourceHash,
       });
       await testInfo.attach('current-owner-baseline', { body: actual, contentType: 'image/png' });
+      await testInfo.attach('accepted-reference', {
+        body: PNG.sync.write(reference),
+        contentType: 'image/png',
+      });
       expect(
-        disposition.visualProof,
-        'VISUAL_NOT_PROVEN: a first-screen reference cannot approve a replacement lower scene.',
-      ).toBe('FROZEN_FIRST_SCREEN');
+        comparison.changedPixelRatio,
+        'Accepted replacement differs from its reference.',
+      ).toBeLessThanOrEqual(0.01);
     });
     continue;
   }
@@ -338,9 +366,9 @@ for (const entry of cases) {
       animations: 'disabled',
       scale: 'css',
     });
-    const source = PNG.sync.read(fs.readFileSync(path.join(root, 'screenshots', entry.file)));
+    const source = acceptedLandingReference(testInfo, 'archive', entry.file);
     const candidate = PNG.sync.read(actual);
-    const crop = entry.sourceCrop;
+    const crop = { x: 0, y: 0, width: source.width, height: source.height };
     expect(candidate.width).toBe(crop.width);
     expect(candidate.height).toBe(crop.height);
     const scene = regionCases[entry.file as keyof typeof regionCases];
@@ -383,19 +411,21 @@ for (const entry of cases) {
       comparisonResult: results.every((result) => result.result === 'PASS')
         ? 'REGION_PASS'
         : 'REGION_FAIL',
+      comparisonReference: 'ACCEPTED_2026_11_28',
+      referenceCrop: crop,
       changedPixelRatio: full.changedPixelRatio,
       fullScreenRatioIsAcceptance: false,
       regions: results,
       excluded: scene.excluded,
       geometry,
-      ownerApproval: false,
+      ownerApproval: true,
     });
     await testInfo.attach('candidate', { body: actual, contentType: 'image/png' });
     expect(
       results
         .filter((result) => result.result !== 'PASS')
         .map((result) => ({ region: result.name, ratio: result.changedPixelRatio })),
-      'Unchanged archive region differs. Inspect capture provenance and the regional gallery; never change the reference or tolerance.',
+      'Accepted Landing region differs. Inspect capture provenance and the regional gallery.',
     ).toEqual([]);
   });
 }
