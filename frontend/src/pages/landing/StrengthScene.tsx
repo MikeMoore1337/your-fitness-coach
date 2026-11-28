@@ -71,7 +71,7 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
           : clamp(
               (window.innerHeight - photoBounds.top) / (window.innerHeight + photoBounds.height),
             );
-      const delta = previous === null ? 16 : Math.min(40, Math.max(0, time - previous));
+      const delta = previous === null ? 16 : Math.min(1000, Math.max(0, time - previous));
       previous = time;
       if (
         displayed === null ||
@@ -115,7 +115,7 @@ export function StrengthScene({ interactive = false }: { interactive?: boolean }
     window.addEventListener('resize', schedule);
     document.addEventListener('visibilitychange', visibility);
     media?.addEventListener('change', schedule);
-    schedule();
+    if (!document.hidden) render(performance.now());
     return () => {
       cancelAnimationFrame(frame);
       resize?.disconnect();
