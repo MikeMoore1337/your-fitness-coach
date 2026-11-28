@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test';
 
+test('weekly score can be opened while its chapter enters', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/', { waitUntil: 'networkidle' });
+
+  const chapter = page.locator('#progress');
+  const summary = chapter.locator('.ref-weekly summary');
+  await summary.scrollIntoViewIfNeeded();
+  const animation = await chapter.evaluate((element) => {
+    element.setAttribute('data-motion-phase', 'idle');
+    void element.getBoundingClientRect();
+    element.setAttribute('data-motion-phase', 'enter');
+    return getComputedStyle(element).animationName;
+  });
+  expect(animation).toBe('landing-progress-static-entry');
+  await expect(chapter).toHaveCSS('transform', 'none');
+  const bounds = await summary.boundingBox();
+  expect(bounds).not.toBeNull();
+  await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  await page.mouse.down();
+  await expect(chapter).toHaveCSS('transform', 'none');
+  await page.mouse.up();
+  await expect(chapter.locator('.ref-scores label').first()).toBeVisible();
+});
+
 test.describe('Landing #903 weekly score scale', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const width of [390, 1440]) {
