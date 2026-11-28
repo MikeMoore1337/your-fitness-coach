@@ -2713,28 +2713,135 @@
       ]
     },
     "win32/chromium/archive/2026-10-08_14-05.png": {
-      "width": 1648,
+      "width": 1641,
       "height": 1242,
-      "pixelsSha256": "295e54264474f597380ab5a640a1904237d94cc606af63aed72b0e71eb85a643",
+      "pixelsSha256": "cc34f68b8cb37df07c19c9077f47bd1aa8922601dffbc18d5eb621abcbed81be",
       "tiles": [
         {
-          "file": "tiles/f6bd58f76d0ccecf6c34447dbaf04e086bec208f8488b084ae01dd12ef8092a9.png",
-          "sha256": "f6bd58f76d0ccecf6c34447dbaf04e086bec208f8488b084ae01dd12ef8092a9",
+          "file": "tiles/38c3a1d41aceea0bb24a58eafe59bcaed1394967775078890f61d6cd1938df2b.png",
+          "sha256": "38c3a1d41aceea0bb24a58eafe59bcaed1394967775078890f61d6cd1938df2b",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1641,
           "height": 1242
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-05_1.png": {
-      "width": 1648,
+      "width": 1646,
       "height": 1245,
-      "pixelsSha256": "b4c0c68561c976ae19f17cd5d03bcfd160de41c180addedfd4fe85047042825a",
+      "pixelsSha256": "63c2f5c537dd26ca3e304ca368567cf82330bd9310a1efb30c2aab9f12217855",
       "tiles": [
         {
-          "file": "tiles/88f6490ebee8edfec42bb63f5e605cba998446de60a73a1402b5c55eb54cb2d0.png",
-          "sha256": "88f6490ebee8edfec42bb63f5e605cba998446de60a73a1402b5c55eb54cb2d0",
+          "file": "tiles/93e08016bfc46b626624ecda9c10ae3905f98a273eefc1d4b5e20484586900bb.png",
+          "sha256": "93e08016bfc46b626624ecda9c10ae3905f98a273eefc1d4b5e20484586900bb",
+          "x": 0,
+          "y": 0,
+          "width": 1646,
+          "height": 1245
+        }
+      ]
+    },
+    "win32/chromium/archive/2026-10-08_14-05_2.png": {
+      "width": 1641,
+      "height": 1244,
+      "pixelsSha256": "4208d07a84e85e58133feb4a0a257540eee84e4cc11adb88d7d4f7ad2aaf32e7",
+      "tiles": [
+        {
+          "file": "tiles/92072c9290338d27d355c514f242b28af209143d8fb4633399260cb767c0b462.png",
+          "sha256": "92072c9290338d27d355c514f242b28af209143d8fb4633399260cb767c0b462",
+          "x": 0,
+          "y": 0,
+          "width": 1641,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/chromium/archive/2026-10-08_14-05_3.png": {
+      "width": 1643,
+      "height": 1246,
+      "pixelsSha256": "44dd8d23a3fe5aadbda393e0da18224ccbddeb9ee172e57a3f8f523787dd9ccb",
+      "tiles": [
+        {
+          "file": "tiles/906906e536724f4a790bd2728f212440e94f60616935a8f2a2a23ce586d8c366.png",
+          "sha256": "906906e536724f4a790bd2728f212440e94f60616935a8f2a2a23ce586d8c366",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        },
+        {
+          "file": "tiles/8991c00dffb516770ebf8fab7c396db0cb195bd8345ea9d7c808bbb9d660e395.png",
+          "sha256": "8991c00dffb516770ebf8fab7c396db0cb195bd8345ea9d7c808bbb9d660e395",
+          "x": 821,
+          "y": 0,
+          "width": 822,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/chromium/archive/2026-10-08_14-06.png": {
+      "width": 1642,
+      "height": 1246,
+      "pixelsSha256": "04eddd449ec111f27fd49aebaf5790adb8ea318bb1ef1619bf6ec5ffabeaf8aa",
+      "tiles": [
+        {
+          "file": "tiles/48dd55a83dfa5ab7b5f31cf58265a947ef142b984c4e0c8da0016177f516e60d.png",
+          "sha256": "48dd55a83dfa5ab7b5f31cf58265a947ef142b984c4e0c8da0016177f516e60d",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 623
+        },
+        {
+          "file": "tiles/eae5ee259d5aeff10d40e01915b2036b3cec3ee40227724a82bba271335243e6.png",
+          "sha256": "eae5ee259d5aeff10d40e01915b2036b3cec3ee40227724a82bba271335243e6",
+          "x": 0,
+          "y": 623,
+          "width": 821,
+          "height": 623
+        },
+        {
+          "file": "tiles/fbabc9673f12d2b4eb57b1ccce47daae773d3e8ee61994d4fc10440c322e5029.png",
+          "sha256": "fbabc9673f12d2b4eb57b1ccce47daae773d3e8ee61994d4fc10440c322e5029",
+          "x": 821,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/chromium/archive/2026-10-08_14-07.png": {
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "b33162c834675891241bff2872372d245e2f3964a42396c56c653cb8a2db90d3",
+      "tiles": [
+        {
+          "file": "tiles/5e1f586bdd169031e1202bd5a1bbbf863b339510e8155921d3bc3cd314354b03.png",
+          "sha256": "5e1f586bdd169031e1202bd5a1bbbf863b339510e8155921d3bc3cd314354b03",
+          "x": 0,
+          "y": 0,
+          "width": 822,
+          "height": 1244
+        },
+        {
+          "file": "tiles/cff1200d1e62fc6aef6da37868204fc428f8d62747a692a555b7a1c79168d521.png",
+          "sha256": "cff1200d1e62fc6aef6da37868204fc428f8d62747a692a555b7a1c79168d521",
+          "x": 822,
+          "y": 0,
+          "width": 823,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/chromium/archive/2026-10-08_14-07_1.png": {
+      "width": 1648,
+      "height": 1245,
+      "pixelsSha256": "48d5cae30595c90fa98257c967e9b6b6a12c7a83dc563d583e88ff43bc555ac0",
+      "tiles": [
+        {
+          "file": "tiles/2404df677e2e26a70687848bba2a57f6e943ed1016df5cf8917354e037f398c1.png",
+          "sha256": "2404df677e2e26a70687848bba2a57f6e943ed1016df5cf8917354e037f398c1",
           "x": 0,
           "y": 0,
           "width": 1648,
@@ -2742,200 +2849,93 @@
         }
       ]
     },
-    "win32/chromium/archive/2026-10-08_14-05_2.png": {
-      "width": 1648,
-      "height": 1244,
-      "pixelsSha256": "67f4108faca86a086c5fe425703716dbd0c5e4e41991032d4f342e0f5db8522b",
-      "tiles": [
-        {
-          "file": "tiles/490ad8c681c7f4b045b2f5bbc931df5a113fd5e7cda0e43c21763a7f11c26837.png",
-          "sha256": "490ad8c681c7f4b045b2f5bbc931df5a113fd5e7cda0e43c21763a7f11c26837",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1244
-        }
-      ]
-    },
-    "win32/chromium/archive/2026-10-08_14-05_3.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "7a875d68cf9bf224d3e40c43867715901b922750048fef098e015d44e19223ca",
-      "tiles": [
-        {
-          "file": "tiles/42fea2d4595e0c0eadad52ad7604e938fc736c850f9f44ac567e30c1e653158c.png",
-          "sha256": "42fea2d4595e0c0eadad52ad7604e938fc736c850f9f44ac567e30c1e653158c",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/a523469127fc5754bd37ca916785f0fa74dbad64e8f00cb562052177d9f4c3fc.png",
-          "sha256": "a523469127fc5754bd37ca916785f0fa74dbad64e8f00cb562052177d9f4c3fc",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/chromium/archive/2026-10-08_14-06.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "93d61dd53e4f70d480ad6f7ebc547d6e6bb93766cb5e69bd56b0d8df05dca19c",
-      "tiles": [
-        {
-          "file": "tiles/7bcb1a09831a53afcd429d35dd874d5865cc8ea1a5ab352edfc619ff965f8b13.png",
-          "sha256": "7bcb1a09831a53afcd429d35dd874d5865cc8ea1a5ab352edfc619ff965f8b13",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 623
-        },
-        {
-          "file": "tiles/768425fc6aeed2a5bf87e92864889c58fbadb1ad4e1385592ad3661dbc7d232a.png",
-          "sha256": "768425fc6aeed2a5bf87e92864889c58fbadb1ad4e1385592ad3661dbc7d232a",
-          "x": 0,
-          "y": 623,
-          "width": 824,
-          "height": 623
-        },
-        {
-          "file": "tiles/2fd48d41ee57ae212c092a51a8523e08a6db910579ae854a13748e982301ac6a.png",
-          "sha256": "2fd48d41ee57ae212c092a51a8523e08a6db910579ae854a13748e982301ac6a",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/chromium/archive/2026-10-08_14-07.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "01ce48a418f1dadf35a4cdbdccabaaa551c1df52cd7524f23b25774c5b7bd8be",
-      "tiles": [
-        {
-          "file": "tiles/2c90f29931c5644f3f02a402bc0fbdd5e2a31f65c6a9082944a535b53ad487ac.png",
-          "sha256": "2c90f29931c5644f3f02a402bc0fbdd5e2a31f65c6a9082944a535b53ad487ac",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/6ce0a2f25233aaf93593d9141289734d776eae8fdc0adb44ba208ff9aea2c78c.png",
-          "sha256": "6ce0a2f25233aaf93593d9141289734d776eae8fdc0adb44ba208ff9aea2c78c",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/chromium/archive/2026-10-08_14-07_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "e4eef5a78143cf691019231747b8e57f05822b2891f0dc840f2a857f9a6c9ed3",
-      "tiles": [
-        {
-          "file": "tiles/6388af3353b11414f186fdf0089d35bf82d08cc83d2b11997b5e92b57a75f875.png",
-          "sha256": "6388af3353b11414f186fdf0089d35bf82d08cc83d2b11997b5e92b57a75f875",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1246
-        }
-      ]
-    },
     "win32/chromium/archive/2026-10-08_14-07_2.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "5ab231b389e42dedac0d11f44815467e030ebc969e3b81e9ec637e1cdbd26e7d",
+      "height": 1245,
+      "pixelsSha256": "eecb84e9a4a2714f582e124ce55607b9d12e358c7d33568372e7847257308d7f",
       "tiles": [
         {
-          "file": "tiles/4c9e9f6e4ceea78e5bfc38e9b78f79147d102ddfa3662ab745321e6cb37d8030.png",
-          "sha256": "4c9e9f6e4ceea78e5bfc38e9b78f79147d102ddfa3662ab745321e6cb37d8030",
+          "file": "tiles/4ae3a296a968779e91a8ffcdba221f401a8c4e6d80dc1e87ab8b0fc58ef49190.png",
+          "sha256": "4ae3a296a968779e91a8ffcdba221f401a8c4e6d80dc1e87ab8b0fc58ef49190",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-08_3.png": {
-      "width": 1648,
+      "width": 1633,
       "height": 1246,
-      "pixelsSha256": "35311a943bfd2056845621c64094d8dfead3b71c8aa0cb5e0731529ff6c225a7",
+      "pixelsSha256": "bcc2a270277d2dd20ef496b1ee0f48442a369fad10ede017a2a0cf7e911aa5b3",
       "tiles": [
         {
-          "file": "tiles/9ce34ca0cbe8458e8da05fa7e2eaabb28d07087b138cd6c255b2947e026600bb.png",
-          "sha256": "9ce34ca0cbe8458e8da05fa7e2eaabb28d07087b138cd6c255b2947e026600bb",
+          "file": "tiles/481dccff042e950a950ddd55592d8567b00ff60f3d226d7f689b68c944654c30.png",
+          "sha256": "481dccff042e950a950ddd55592d8567b00ff60f3d226d7f689b68c944654c30",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1633,
           "height": 1246
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-08_4.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "4a5229ef273e1a78871fffce4b873a2d08240f510c29c32634f66c9c62759645",
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "1568a2f6a0b05b3c1ade8ca3915e44437073796db164772e60e36cca2cbcc402",
       "tiles": [
         {
-          "file": "tiles/48a6457b454659520d0180a28b7d851bfd44f4e4fdd6727005bd25182baf0b29.png",
-          "sha256": "48a6457b454659520d0180a28b7d851bfd44f4e4fdd6727005bd25182baf0b29",
+          "file": "tiles/acbf2210bf24741d061065115b164b51554ffab53c83d439cf8dace72bb149be.png",
+          "sha256": "acbf2210bf24741d061065115b164b51554ffab53c83d439cf8dace72bb149be",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1645,
+          "height": 1244
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-09.png": {
-      "width": 1648,
+      "width": 1647,
       "height": 1246,
-      "pixelsSha256": "632018a5b5abdc7ce0933877656c60b2ae528528a560cb86036be05c04a6e356",
+      "pixelsSha256": "70978a168e46a0b4ddc75fb4ff27c4facc705c3722e36dfdf2e15c900793bb9f",
       "tiles": [
         {
-          "file": "tiles/d173f36f8d1ca21ab052bed1477c3341be8f3bb912aabc3f20e99dfbd46ba42d.png",
-          "sha256": "d173f36f8d1ca21ab052bed1477c3341be8f3bb912aabc3f20e99dfbd46ba42d",
+          "file": "tiles/c72fcdcd95b3ac97efe62eaee71dbbe65763c59e1040b35776c897e1f6ea857e.png",
+          "sha256": "c72fcdcd95b3ac97efe62eaee71dbbe65763c59e1040b35776c897e1f6ea857e",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1647,
           "height": 1246
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-10_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "2206fc045c161a5c1b40b76a408674db668c3c1cb421dca2c240d3af1476729a",
+      "width": 1643,
+      "height": 1241,
+      "pixelsSha256": "d99fe0539259c70052fb54dd1d3d5a02d106029a980e2d278b081e38b4c14bb7",
       "tiles": [
         {
-          "file": "tiles/fd2e79b50880e6133eb21fc3b8fdb60ca54e3eb1fbdf00d86327162359f3d14f.png",
-          "sha256": "fd2e79b50880e6133eb21fc3b8fdb60ca54e3eb1fbdf00d86327162359f3d14f",
+          "file": "tiles/ac4bbafa1934abf43889d3d246a2eefe0717e1a618dcb65d35fab7618b4d8d89.png",
+          "sha256": "ac4bbafa1934abf43889d3d246a2eefe0717e1a618dcb65d35fab7618b4d8d89",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1643,
+          "height": 1241
         }
       ]
     },
     "win32/chromium/archive/2026-10-08_14-12_1.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "86e55f2ded0506b8aec41f50c0fa17bd90f9c809cfaa8e2fbd5e712a9ec07cf5",
+      "height": 1245,
+      "pixelsSha256": "f0bff11db568107aa59b4dcc4184ef7959939d9a8512f71323d9c24f554a527e",
       "tiles": [
         {
-          "file": "tiles/1599b855ba3f3e2cccef2ffd158b39ae538d536e3b514b6d14543570441e2c00.png",
-          "sha256": "1599b855ba3f3e2cccef2ffd158b39ae538d536e3b514b6d14543570441e2c00",
+          "file": "tiles/69d9bdf5d664af5393bb2a3f2d5db1735b80c5f2d70237a9bf316007d76a4eda.png",
+          "sha256": "69d9bdf5d664af5393bb2a3f2d5db1735b80c5f2d70237a9bf316007d76a4eda",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
@@ -3508,28 +3508,119 @@
       ]
     },
     "win32/firefox/archive/2026-10-08_14-05.png": {
-      "width": 1648,
+      "width": 1641,
       "height": 1242,
-      "pixelsSha256": "520d7c4d083c204cfb313898da2d85134abbf2be9a089e0fe2502ccd68802975",
+      "pixelsSha256": "9864e68fd2bf2dcf4e0b7b0821e7a414e2e9421d841556d3cbcf66cf8c19c850",
       "tiles": [
         {
-          "file": "tiles/acaa8d1933d8f3f17edf3b6089e6b99df909de62d3bb962b34570d7c7678fade.png",
-          "sha256": "acaa8d1933d8f3f17edf3b6089e6b99df909de62d3bb962b34570d7c7678fade",
+          "file": "tiles/f3d9cebf29d83c99903ccefc58ea9925ca421b835d7c69eec882555452063bdd.png",
+          "sha256": "f3d9cebf29d83c99903ccefc58ea9925ca421b835d7c69eec882555452063bdd",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1641,
           "height": 1242
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-05_1.png": {
-      "width": 1648,
+      "width": 1646,
       "height": 1245,
-      "pixelsSha256": "8d11f1c797d301bbc940fc38d73a84e3189d0e7a39e6a849a58e63952ab1b9a6",
+      "pixelsSha256": "311f3ad8b78844edba81d7cd1d3177f7c425a64422f1c50ff3e5825a1792f634",
       "tiles": [
         {
-          "file": "tiles/6678231cef254cd92228f9096ba0d327b490af4151149f8a443a44d4785cc73f.png",
-          "sha256": "6678231cef254cd92228f9096ba0d327b490af4151149f8a443a44d4785cc73f",
+          "file": "tiles/34b080ee445a48e2fd719b70ecb38a00fb1ffa20d7a7b45a8aed41d3457b4f5a.png",
+          "sha256": "34b080ee445a48e2fd719b70ecb38a00fb1ffa20d7a7b45a8aed41d3457b4f5a",
+          "x": 0,
+          "y": 0,
+          "width": 1646,
+          "height": 1245
+        }
+      ]
+    },
+    "win32/firefox/archive/2026-10-08_14-05_2.png": {
+      "width": 1641,
+      "height": 1244,
+      "pixelsSha256": "ce04f2ba8f1b85d9d0b9d163aaa8b9e31b66625d3abd65affed26d09054f894d",
+      "tiles": [
+        {
+          "file": "tiles/5b826585347d2668b470b28ae8fdd8dd535410cd9d9fe73b1c4f8a9d664220d0.png",
+          "sha256": "5b826585347d2668b470b28ae8fdd8dd535410cd9d9fe73b1c4f8a9d664220d0",
+          "x": 0,
+          "y": 0,
+          "width": 1641,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/firefox/archive/2026-10-08_14-05_3.png": {
+      "width": 1643,
+      "height": 1246,
+      "pixelsSha256": "b6f7939ef8bdc23b703b850bdf2aa800b924c902fbe174d3fb59d1105c53eafa",
+      "tiles": [
+        {
+          "file": "tiles/3e70b2892728205df407b807c4a52c3bbc03da7b4f9a4f9d02d99b265cc43121.png",
+          "sha256": "3e70b2892728205df407b807c4a52c3bbc03da7b4f9a4f9d02d99b265cc43121",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        },
+        {
+          "file": "tiles/0fa731c47d426d1a7c547851b9d84b3d24f9f387c7dfbb1d7cab16c47548376a.png",
+          "sha256": "0fa731c47d426d1a7c547851b9d84b3d24f9f387c7dfbb1d7cab16c47548376a",
+          "x": 821,
+          "y": 0,
+          "width": 822,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/firefox/archive/2026-10-08_14-06.png": {
+      "width": 1642,
+      "height": 1246,
+      "pixelsSha256": "8c40b76360a39afe8a300200197037d55b897d86479877a87b8b33b3efbbbec5",
+      "tiles": [
+        {
+          "file": "tiles/10ac1fc3ea3f4b884ad37de5cbde1f311b04aed17e4c4337e522f183d4c795d5.png",
+          "sha256": "10ac1fc3ea3f4b884ad37de5cbde1f311b04aed17e4c4337e522f183d4c795d5",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        },
+        {
+          "file": "tiles/5180d7122a5e51f63c431b46943c75f28e2a2eaa23dc91e4bb42b41c2cbbc828.png",
+          "sha256": "5180d7122a5e51f63c431b46943c75f28e2a2eaa23dc91e4bb42b41c2cbbc828",
+          "x": 821,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/firefox/archive/2026-10-08_14-07.png": {
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "538ef43f156e1e4c99f0468aadb830cd32cdb6b7ce69d194273d971e848d7a41",
+      "tiles": [
+        {
+          "file": "tiles/b1e0ccb4a6dbc032f035faf4cb0fe899055fa706de67d93522ce2ea4c28b4338.png",
+          "sha256": "b1e0ccb4a6dbc032f035faf4cb0fe899055fa706de67d93522ce2ea4c28b4338",
+          "x": 0,
+          "y": 0,
+          "width": 1645,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/firefox/archive/2026-10-08_14-07_1.png": {
+      "width": 1648,
+      "height": 1245,
+      "pixelsSha256": "2b78c6030d122c06351a5a0475c4d4c59e39921d8603ab2bcf07236b5943e65d",
+      "tiles": [
+        {
+          "file": "tiles/ce849c4407db8f86ad6aa5d8652aed94a134cccca42f7e419ea4e605071468f5.png",
+          "sha256": "ce849c4407db8f86ad6aa5d8652aed94a134cccca42f7e419ea4e605071468f5",
           "x": 0,
           "y": 0,
           "width": 1648,
@@ -3537,184 +3628,93 @@
         }
       ]
     },
-    "win32/firefox/archive/2026-10-08_14-05_2.png": {
-      "width": 1648,
-      "height": 1244,
-      "pixelsSha256": "ead1e001e3e7d8f4dbafa83e8fa8375200cd07deb45bec729583f03ad2219474",
-      "tiles": [
-        {
-          "file": "tiles/52992322974c2a6f0b18871e3c0741668a53545cb4a66e98a118f28f7713ca8c.png",
-          "sha256": "52992322974c2a6f0b18871e3c0741668a53545cb4a66e98a118f28f7713ca8c",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1244
-        }
-      ]
-    },
-    "win32/firefox/archive/2026-10-08_14-05_3.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "e54aaa4056ebba1252a1f12879e64a8801ac5f1dd15a5bcdb999595be33b263e",
-      "tiles": [
-        {
-          "file": "tiles/52db101e070042108fb2774d34c8845a790f68cf88694c88d31602d74d496202.png",
-          "sha256": "52db101e070042108fb2774d34c8845a790f68cf88694c88d31602d74d496202",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/2a5f23357f3a22fc5288c536d8132db5fe8cb3e1c0a918c30b0537b79ea2d3ce.png",
-          "sha256": "2a5f23357f3a22fc5288c536d8132db5fe8cb3e1c0a918c30b0537b79ea2d3ce",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/firefox/archive/2026-10-08_14-06.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "311f42b5c92325d98ac7acf1551b1383539c8f233bcb19ff1ea3a3ca9b55e88f",
-      "tiles": [
-        {
-          "file": "tiles/de547338d07d33462f8f61e8d0bd3887b2bc59c6d11fd3b07e4d5f8fc4bd1c0d.png",
-          "sha256": "de547338d07d33462f8f61e8d0bd3887b2bc59c6d11fd3b07e4d5f8fc4bd1c0d",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/85e97fd398c26d48d4cb3f2edc6e27f62a4bc327d01ad874f0e277f10717491f.png",
-          "sha256": "85e97fd398c26d48d4cb3f2edc6e27f62a4bc327d01ad874f0e277f10717491f",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/firefox/archive/2026-10-08_14-07.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "6f5d0d0dce0a5627a2444e9d1df848b6fb963cef475616553b7f12779ef154a4",
-      "tiles": [
-        {
-          "file": "tiles/0bcb8ff9a8b9ea3f785b6558570fa9b661154bee03cedf79fac4feca98935175.png",
-          "sha256": "0bcb8ff9a8b9ea3f785b6558570fa9b661154bee03cedf79fac4feca98935175",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/firefox/archive/2026-10-08_14-07_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "34e058c6d216ce9cbaae37bde4eeeb503105c829e6abda4fbc2dd62d795be431",
-      "tiles": [
-        {
-          "file": "tiles/ee58408eec037c04fd735e13286423072310bf46888ddda364b01a5edc7713f0.png",
-          "sha256": "ee58408eec037c04fd735e13286423072310bf46888ddda364b01a5edc7713f0",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1246
-        }
-      ]
-    },
     "win32/firefox/archive/2026-10-08_14-07_2.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "0a028ad86caf7cbe969b67ebebdabcfd2de799db3240248508b0f8910072bdb0",
+      "height": 1245,
+      "pixelsSha256": "f137a5dd54759cfcd4c0ec5770cd44219ee21f6ab22051ebf1da257caf0cf5d9",
       "tiles": [
         {
-          "file": "tiles/96b8c7cf57206122d0e6a8ba682838cbf084b7ea7b2a02a3343f5ff41c921afa.png",
-          "sha256": "96b8c7cf57206122d0e6a8ba682838cbf084b7ea7b2a02a3343f5ff41c921afa",
+          "file": "tiles/deff487c8d5ff26b1086c611aa68337038e7f6712d81b511c482d4f47e8d2a65.png",
+          "sha256": "deff487c8d5ff26b1086c611aa68337038e7f6712d81b511c482d4f47e8d2a65",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-08_3.png": {
-      "width": 1648,
+      "width": 1633,
       "height": 1246,
-      "pixelsSha256": "1ea6c5e18420c83d2c50faeebbcf144a942aec7a02d1b46ddf4619e75eb4956f",
+      "pixelsSha256": "7e91efd84e6de80aa5b47c2cce23fefccf6474d71ca8fdbb8c6fa20c9390c770",
       "tiles": [
         {
-          "file": "tiles/73ffde22f485e1bb83b48747815ffd8bf3505569b95afd55098ca2e71bf040f5.png",
-          "sha256": "73ffde22f485e1bb83b48747815ffd8bf3505569b95afd55098ca2e71bf040f5",
+          "file": "tiles/f5462c9f3c81d4925b3db24eef40ed546b7632a3f9af1eea0c31d7c646058bfb.png",
+          "sha256": "f5462c9f3c81d4925b3db24eef40ed546b7632a3f9af1eea0c31d7c646058bfb",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1633,
           "height": 1246
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-08_4.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "211623863e823acab2d02f2471f553bb1d83b36295313b4acfb35d9fe05c814e",
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "45f48ece0f43c1bd276a321a83b83b7f125b234b449207cd806907dbbae49184",
       "tiles": [
         {
-          "file": "tiles/1a4b4389c6472d20848b030c98e8e40ea3559bd671fcebae7584b136d8dee75d.png",
-          "sha256": "1a4b4389c6472d20848b030c98e8e40ea3559bd671fcebae7584b136d8dee75d",
+          "file": "tiles/726333aec2a6bdddb872d3d4837dade9aebd23975d111fc82603fc5368a2e386.png",
+          "sha256": "726333aec2a6bdddb872d3d4837dade9aebd23975d111fc82603fc5368a2e386",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1645,
+          "height": 1244
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-09.png": {
-      "width": 1648,
+      "width": 1647,
       "height": 1246,
-      "pixelsSha256": "5d95a43f868a2def7739001dab72b0ee9c6db0d7b3e0097bd37cceb834952376",
+      "pixelsSha256": "cba8c70f9f176e28e4d9afb0eb0b17ebf3dbe2b795e3c76cfbbcfd6492bdd88d",
       "tiles": [
         {
-          "file": "tiles/84d526ca6c6a903e7208147c4ab9e985f9a583f56342a96d771f748e567ba72e.png",
-          "sha256": "84d526ca6c6a903e7208147c4ab9e985f9a583f56342a96d771f748e567ba72e",
+          "file": "tiles/30bbd99b8a9b62d22e1811f7118486922797863140ddab53a1b20ee28b2b43af.png",
+          "sha256": "30bbd99b8a9b62d22e1811f7118486922797863140ddab53a1b20ee28b2b43af",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1647,
           "height": 1246
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-10_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "f1d5023b46b73e2ffbe62ebfa9b3e0ad6d63bfb0a783bae41f541abdef267fb5",
+      "width": 1643,
+      "height": 1241,
+      "pixelsSha256": "58bf2521a492835680fd5525be8b698aef4d65993fb4737bb980c7d11fe53341",
       "tiles": [
         {
-          "file": "tiles/c3e3ac64a8bfc2859a7f6b1354190a97f165d27ab28c65a9e5dab929aa2ea985.png",
-          "sha256": "c3e3ac64a8bfc2859a7f6b1354190a97f165d27ab28c65a9e5dab929aa2ea985",
+          "file": "tiles/2a8a7c4948bfd5c90384b7238d318f84b1e04a3caee6e7badf40c0a458fd2183.png",
+          "sha256": "2a8a7c4948bfd5c90384b7238d318f84b1e04a3caee6e7badf40c0a458fd2183",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1643,
+          "height": 1241
         }
       ]
     },
     "win32/firefox/archive/2026-10-08_14-12_1.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "b65a5495c0fd961d8e2ba6e3f8ef0001d934305aa9e2defcb7a02e1ee9ae027c",
+      "height": 1245,
+      "pixelsSha256": "b9dd162d41f4b00fa77b6d0a0bcb549b620b06dca27e04b2a63ad8520ef00c32",
       "tiles": [
         {
-          "file": "tiles/daa7913896d5d11eb8c4a09e8ac007f0c941ef21f77065d5fe1c07aef1a7d3bd.png",
-          "sha256": "daa7913896d5d11eb8c4a09e8ac007f0c941ef21f77065d5fe1c07aef1a7d3bd",
+          "file": "tiles/76b1739249c37c7ee66866cba2edd4ad0e82ad962dfa240254ff15951ce767e5.png",
+          "sha256": "76b1739249c37c7ee66866cba2edd4ad0e82ad962dfa240254ff15951ce767e5",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
@@ -4279,28 +4279,119 @@
       ]
     },
     "win32/webkit/archive/2026-10-08_14-05.png": {
-      "width": 1648,
+      "width": 1641,
       "height": 1242,
-      "pixelsSha256": "85ed74d2dbd18d95941eebafa4971d404c8d85c2fa2a484c7592d39b72a41870",
+      "pixelsSha256": "69d6f8f5657830f28ad1cbd45f5fe816ac47d2d3150b469888c1d3d6010e25a5",
       "tiles": [
         {
-          "file": "tiles/f01228cfb8fdc2ff364a0da5638015afdeb7ad2e6ca256c819a4e94adb4d9c81.png",
-          "sha256": "f01228cfb8fdc2ff364a0da5638015afdeb7ad2e6ca256c819a4e94adb4d9c81",
+          "file": "tiles/bc65ed1f07761ca2a8ab8ff558160856a85ec162132e887696e893eff4a12c24.png",
+          "sha256": "bc65ed1f07761ca2a8ab8ff558160856a85ec162132e887696e893eff4a12c24",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1641,
           "height": 1242
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-05_1.png": {
-      "width": 1648,
+      "width": 1646,
       "height": 1245,
-      "pixelsSha256": "8633ac35cbafdfd443f16e76ee3b7f7048201e0dc2a2a19398398815a76c9f22",
+      "pixelsSha256": "eb346f2e286aad4ca6d557ad2d572c9dc6ee282b49f1fa7fd8ab9b0dd16b5c7d",
       "tiles": [
         {
-          "file": "tiles/fb4efd7f126716f78912b44e1307ff08253d83e82eb7fe4e45f795a06f206f82.png",
-          "sha256": "fb4efd7f126716f78912b44e1307ff08253d83e82eb7fe4e45f795a06f206f82",
+          "file": "tiles/3e6819fd9e59e1401fbd0c5143662987b93e96afbbae61e509a412c73e5980e9.png",
+          "sha256": "3e6819fd9e59e1401fbd0c5143662987b93e96afbbae61e509a412c73e5980e9",
+          "x": 0,
+          "y": 0,
+          "width": 1646,
+          "height": 1245
+        }
+      ]
+    },
+    "win32/webkit/archive/2026-10-08_14-05_2.png": {
+      "width": 1641,
+      "height": 1244,
+      "pixelsSha256": "8900fbfb5f445e2e49fab732e56cf029a9fbaf5b9223928c0c5cc79f2e05c44f",
+      "tiles": [
+        {
+          "file": "tiles/37c873904a30933d0988652a3b0b43e4f1579c9a10ec53d15ce870244c094c2d.png",
+          "sha256": "37c873904a30933d0988652a3b0b43e4f1579c9a10ec53d15ce870244c094c2d",
+          "x": 0,
+          "y": 0,
+          "width": 1641,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/webkit/archive/2026-10-08_14-05_3.png": {
+      "width": 1643,
+      "height": 1246,
+      "pixelsSha256": "d0f38c7e973f0d658e8312fcc462040c2589765200337707139acb086f838f47",
+      "tiles": [
+        {
+          "file": "tiles/869f7f18443bdd0c2bbbb6d29887e82d4237ff1cedb21510f24b78d99588f699.png",
+          "sha256": "869f7f18443bdd0c2bbbb6d29887e82d4237ff1cedb21510f24b78d99588f699",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        },
+        {
+          "file": "tiles/fa734b724eef4d1a136ac440f1e9965a8dbadea7be038f9ae399bbc52d153fb1.png",
+          "sha256": "fa734b724eef4d1a136ac440f1e9965a8dbadea7be038f9ae399bbc52d153fb1",
+          "x": 821,
+          "y": 0,
+          "width": 822,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/webkit/archive/2026-10-08_14-06.png": {
+      "width": 1642,
+      "height": 1246,
+      "pixelsSha256": "0244153e9506b0ed8c46e7fcf5ca87e38c871ce2ced58d9e1e424728c9fab471",
+      "tiles": [
+        {
+          "file": "tiles/26078f317b10dc62a4256394dfb228cf11e25a62562a053d19803e3174a472ab.png",
+          "sha256": "26078f317b10dc62a4256394dfb228cf11e25a62562a053d19803e3174a472ab",
+          "x": 0,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        },
+        {
+          "file": "tiles/b4501363ca928ae18b8a126ecf20406cf828a926efc8786013d602aa7ec4f70c.png",
+          "sha256": "b4501363ca928ae18b8a126ecf20406cf828a926efc8786013d602aa7ec4f70c",
+          "x": 821,
+          "y": 0,
+          "width": 821,
+          "height": 1246
+        }
+      ]
+    },
+    "win32/webkit/archive/2026-10-08_14-07.png": {
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "78fcbf2fc60d944237c95a8fd52cb6921de652eb1ece5d2ca807fb3dfae5ad51",
+      "tiles": [
+        {
+          "file": "tiles/a763f2dd5ce6f05ec9579fe8830dee85d4ad0d02ccaad9be7efa5973e6bc01ed.png",
+          "sha256": "a763f2dd5ce6f05ec9579fe8830dee85d4ad0d02ccaad9be7efa5973e6bc01ed",
+          "x": 0,
+          "y": 0,
+          "width": 1645,
+          "height": 1244
+        }
+      ]
+    },
+    "win32/webkit/archive/2026-10-08_14-07_1.png": {
+      "width": 1648,
+      "height": 1245,
+      "pixelsSha256": "3f1afb9095dfdb6b79d7764f5f80a2ca2190d4d0a7c3cfc3ef4b75225f07c9c4",
+      "tiles": [
+        {
+          "file": "tiles/fdc877451575d889df3b728a717129836a6d22ab2e33c6622474f3bbf75ee9b7.png",
+          "sha256": "fdc877451575d889df3b728a717129836a6d22ab2e33c6622474f3bbf75ee9b7",
           "x": 0,
           "y": 0,
           "width": 1648,
@@ -4308,184 +4399,93 @@
         }
       ]
     },
-    "win32/webkit/archive/2026-10-08_14-05_2.png": {
-      "width": 1648,
-      "height": 1244,
-      "pixelsSha256": "be273be82fe4bcaa0aeaaba115286557b15c2c0392b140b36a9c98f4646b46a8",
-      "tiles": [
-        {
-          "file": "tiles/bdbb665f23c141820af566bddafb893ba234fe9663b7466a93ba252f529e002d.png",
-          "sha256": "bdbb665f23c141820af566bddafb893ba234fe9663b7466a93ba252f529e002d",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1244
-        }
-      ]
-    },
-    "win32/webkit/archive/2026-10-08_14-05_3.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "3fb8ef03e78621ad1b06d60e6604246eda717cb10733b212e5df2892d596d4d3",
-      "tiles": [
-        {
-          "file": "tiles/0c1e7a5f4ca18965c3922278450b9c612ab647b75ce30dd26572a61d43f2cd08.png",
-          "sha256": "0c1e7a5f4ca18965c3922278450b9c612ab647b75ce30dd26572a61d43f2cd08",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/ad1cf6969a6b05973062122b070d7ae56939b09bcd171012cee0ad5b796a99a3.png",
-          "sha256": "ad1cf6969a6b05973062122b070d7ae56939b09bcd171012cee0ad5b796a99a3",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/webkit/archive/2026-10-08_14-06.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "f7b0c52c8c90b4007ebf84a4d56006bc6b2853f1eb1e44f8052546aad5c0ebe7",
-      "tiles": [
-        {
-          "file": "tiles/49494205400fd8d1ef35ea3dde4361c078e583e8ee1efea92e0ec984650d5293.png",
-          "sha256": "49494205400fd8d1ef35ea3dde4361c078e583e8ee1efea92e0ec984650d5293",
-          "x": 0,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        },
-        {
-          "file": "tiles/b45ffcf366c51e59b28312d1686ef01fc0d4f01ee98a5222c4661c881ad86eb4.png",
-          "sha256": "b45ffcf366c51e59b28312d1686ef01fc0d4f01ee98a5222c4661c881ad86eb4",
-          "x": 824,
-          "y": 0,
-          "width": 824,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/webkit/archive/2026-10-08_14-07.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "3228c650ad17d3dc1943bb1a4394a19777f550d258e7be0c399f32a99747afdf",
-      "tiles": [
-        {
-          "file": "tiles/d61118ff7e2400a2ca6f7ebf5c63515c652beb4ca59ea8b0c0fffea5d2bb9504.png",
-          "sha256": "d61118ff7e2400a2ca6f7ebf5c63515c652beb4ca59ea8b0c0fffea5d2bb9504",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1246
-        }
-      ]
-    },
-    "win32/webkit/archive/2026-10-08_14-07_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "5f13caab4c6b785005ea8b1987ccfa6834c2b3345ac82eb63da2a6457ad5d2f0",
-      "tiles": [
-        {
-          "file": "tiles/3eb97422a0a837b13d431d5a21f5de4f985cc59e63bda96309d6f96f1f4cf56b.png",
-          "sha256": "3eb97422a0a837b13d431d5a21f5de4f985cc59e63bda96309d6f96f1f4cf56b",
-          "x": 0,
-          "y": 0,
-          "width": 1648,
-          "height": 1246
-        }
-      ]
-    },
     "win32/webkit/archive/2026-10-08_14-07_2.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "709a308d6877854382f0d85f53401f27d21c0b403f4b0e68cb74cb9e4ff233a1",
+      "height": 1245,
+      "pixelsSha256": "8acde747534793c00de7427e65b6836fe1783deac83fede9bf4163bbf9de5577",
       "tiles": [
         {
-          "file": "tiles/838708765ba27a3837db65ba74c0abc00e0ced6221bd1203b9d568331d928ec5.png",
-          "sha256": "838708765ba27a3837db65ba74c0abc00e0ced6221bd1203b9d568331d928ec5",
+          "file": "tiles/357bee9c3567f67229b3dd99d4a61afc5d49f10a1c7d6c9f7c9ca3ebdb89a162.png",
+          "sha256": "357bee9c3567f67229b3dd99d4a61afc5d49f10a1c7d6c9f7c9ca3ebdb89a162",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-08_3.png": {
-      "width": 1648,
+      "width": 1633,
       "height": 1246,
-      "pixelsSha256": "d9b486ae5cc4ccb10311d7411342a5aaea93f3c7d631baec244cb38514768d75",
+      "pixelsSha256": "a0041e9e65360de1501521e643db58607fba95df3d2c44b1818067042d4bc800",
       "tiles": [
         {
-          "file": "tiles/005966b5e37eac4ab8ff74c03110d4123d5d794c2f9fbe7d040b67ddd962712c.png",
-          "sha256": "005966b5e37eac4ab8ff74c03110d4123d5d794c2f9fbe7d040b67ddd962712c",
+          "file": "tiles/36dfdefef90f1cf634b9bdaefece14deb60129a6439344c61f0ef3064f73e0f6.png",
+          "sha256": "36dfdefef90f1cf634b9bdaefece14deb60129a6439344c61f0ef3064f73e0f6",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1633,
           "height": 1246
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-08_4.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "f83349b2a5aff6f006768c6e98f17a957d4cd086b550a359ee309f76360e5fc7",
+      "width": 1645,
+      "height": 1244,
+      "pixelsSha256": "94c34fff18d5692b3e8caad7e1a8f4711802c32cbe1e548426e91bbe71a24b4d",
       "tiles": [
         {
-          "file": "tiles/69a9e41bd25ccea48a5eff61120521e4c886569ab3cc8ee58a154bfe49cfd43b.png",
-          "sha256": "69a9e41bd25ccea48a5eff61120521e4c886569ab3cc8ee58a154bfe49cfd43b",
+          "file": "tiles/67361aac846f71de0a43cf7c4ec7d0a5100067481f96fac371f9a3c1a9d805ef.png",
+          "sha256": "67361aac846f71de0a43cf7c4ec7d0a5100067481f96fac371f9a3c1a9d805ef",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1645,
+          "height": 1244
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-09.png": {
-      "width": 1648,
+      "width": 1647,
       "height": 1246,
-      "pixelsSha256": "d88222cea2ce14db9f49533e49a0638b0ab076ee764738e6f90f0e30fa6de954",
+      "pixelsSha256": "189f152089077e73f093169a58fea74c7595225fe47eb2a8a4e41321cbed6c81",
       "tiles": [
         {
-          "file": "tiles/6b885e86db3970cc034530debe17989cde16f46d286f4a2418a33875592d463a.png",
-          "sha256": "6b885e86db3970cc034530debe17989cde16f46d286f4a2418a33875592d463a",
+          "file": "tiles/5d6d7d598aaebbcf9097e1b0decc4202309a9b36665283be6271ba6af874a2c6.png",
+          "sha256": "5d6d7d598aaebbcf9097e1b0decc4202309a9b36665283be6271ba6af874a2c6",
           "x": 0,
           "y": 0,
-          "width": 1648,
+          "width": 1647,
           "height": 1246
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-10_1.png": {
-      "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "eb5554e4fc7933955b318d791ae570f5dba43c28cd6a4f428ce9f9a8a9e7165c",
+      "width": 1643,
+      "height": 1241,
+      "pixelsSha256": "ce6fc4828c19bc032f5d63767a658859234932b9e52327fc848ff0f36f2d588a",
       "tiles": [
         {
-          "file": "tiles/eacdbbb00a8bd0ec7740bb40fd6ac63d0fdfa50379eb633b0491a12444a3760d.png",
-          "sha256": "eacdbbb00a8bd0ec7740bb40fd6ac63d0fdfa50379eb633b0491a12444a3760d",
+          "file": "tiles/6a8e591b2014e51f829725e660c545de35d3b5abcccd81dac2c72bc99c661727.png",
+          "sha256": "6a8e591b2014e51f829725e660c545de35d3b5abcccd81dac2c72bc99c661727",
           "x": 0,
           "y": 0,
-          "width": 1648,
-          "height": 1246
+          "width": 1643,
+          "height": 1241
         }
       ]
     },
     "win32/webkit/archive/2026-10-08_14-12_1.png": {
       "width": 1648,
-      "height": 1246,
-      "pixelsSha256": "5eb23bd56fe0a3d1cade8a44f504859f7b909ef468d07e3ca05200cba1f7652e",
+      "height": 1245,
+      "pixelsSha256": "f48a9e0f933e39a0b7fdc5583688ad1f9c8dc821164c6e12fb61a4e186500006",
       "tiles": [
         {
-          "file": "tiles/a2a96a9aa1427299cb5a698580c1f0eda3770d7f379e5b4d86fb6b52937fdd75.png",
-          "sha256": "a2a96a9aa1427299cb5a698580c1f0eda3770d7f379e5b4d86fb6b52937fdd75",
+          "file": "tiles/ce68badf51afb0f64c5113c60eb4404d804ee31c55e526e38aae494270bd0d2f.png",
+          "sha256": "ce68badf51afb0f64c5113c60eb4404d804ee31c55e526e38aae494270bd0d2f",
           "x": 0,
           "y": 0,
           "width": 1648,
-          "height": 1246
+          "height": 1245
         }
       ]
     },
