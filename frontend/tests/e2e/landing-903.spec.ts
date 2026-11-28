@@ -25,6 +25,16 @@ test('weekly score can be opened while its chapter enters', async ({ page }) => 
   await expect(chapter.locator('.ref-scores label').first()).toBeVisible();
 });
 
+test('weekly score chapter does not animate with reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  const animation = await page.locator('#progress').evaluate((element) => {
+    element.setAttribute('data-motion-phase', 'enter');
+    return getComputedStyle(element).animationName;
+  });
+  expect(animation).toBe('none');
+});
+
 test.describe('Landing #903 weekly score scale', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const width of [390, 1440]) {
